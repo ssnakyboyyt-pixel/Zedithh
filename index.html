@@ -7,19 +7,27 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-<script src="./vendor/tailwind.js"></script>
 <script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
-      colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} },
-      boxShadow: { soft:'0 2px 10px rgba(15,17,26,0.05)', zed:'0 4px 14px rgba(124,92,255,.14)', 'zed-soft':'0 2px 8px rgba(124,92,255,.10)' }
+function zedithApplyTailwindConfig(){
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
+        colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} },
+        boxShadow: { soft:'0 2px 10px rgba(15,17,26,0.05)', zed:'0 4px 14px rgba(124,92,255,.14)', 'zed-soft':'0 2px 8px rgba(124,92,255,.10)' }
+      }
     }
-  }
+  };
+}
+function zedithLoadCDNTailwind(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.tailwindcss.com';
+  s.onload = zedithApplyTailwindConfig;
+  document.head.appendChild(s);
 }
 </script>
+<script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
