@@ -114,7 +114,7 @@ const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
   image_gen: 200, image_edit: 200, voice: 100, smart_multiplier: 1.5
 };
-const PLAN_CREDITS = { free: 25000, pro: 500000, infinity: 1000000 };
+const PLAN_CREDITS = { free: 20000, pro: 500000, infinity: 1000000 };
 
 function estimateCreditCost({text='', feature='text', smart=false, attachment=null, creditCosts=DEFAULT_CREDIT_COSTS}){
   let cost = 0;
@@ -276,8 +276,20 @@ function App(){
   }
 
   async function loadProfile(){
-    const {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).single();
-    if(error){ toast('Failed to load profile','err'); return; }
+    let {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    if(!data && !error){
+      const adminUser = isAdmin(user);
+      const fresh = {
+        id:user.id, email:user.email||'', display_name:'', username:'', bio:'',
+        plan:'free', credits: adminUser ? 999999999 : 20000, monthly_credits: adminUser ? 999999999 : 20000,
+        created_at:new Date().toISOString()
+      };
+      const created = await supabase.from('profiles').insert(fresh).select().single();
+      if(created.error){ toast('Failed to load profile','err'); return; }
+      data = created.data;
+    } else if(error){
+      toast('Failed to load profile','err'); return;
+    }
     setProfile(data);
     setSettings(s=>({...s, displayName:data.display_name||'', username:data.username||'', email:data.email||user.email||'', bio:data.bio||''}));
   }
@@ -565,7 +577,7 @@ function App(){
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
       case 'analytics': return html`<${AnalyticsView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
-      case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>setComingSoon(k)} />`;
+      case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
       case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${planConfig} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
       default: return html`<${ChatView} ...${commonChatProps} />`;
@@ -587,7 +599,7 @@ function App(){
       profile=${profile}
       isAdminUser=${isAdmin(user)}
       credits=${profile?.credits||0}
-      monthlyCredits=${profile?.monthly_credits||25000}
+      monthlyCredits=${profile?.monthly_credits||20000}
       signOut=${signOut}
       openTool=${t=>setToolModal(t)}
       openNotifications=${openNotifications}
@@ -699,7 +711,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
 // ---------- Right Rail ----------
 function RightRail({chats, growth, openTool, setModule}){
   return html`
-  <aside className="hidden md:flex md:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
+  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
       <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
       <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
         Growth Overview 
@@ -1698,7 +1710,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
           <div className="font-[650] mb-2">Account</div>
           <div className="text-zinc-500 text-[11px] space-y-1">
             <div>Plan: <b>${(profile?.plan||'free').toUpperCase()}</b></div>
-            <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||25000).toLocaleString('en-IN')}</b></div>
+            <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||20000).toLocaleString('en-IN')}</b></div>
             <div>Storage: <b>Supabase Cloud</b></div>
           </div>
           <button onClick=${openUpgrade} className="w-full mt-3 bg-[#7c5cff] text-white py-[8px] rounded-xl text-[12px] font-[600]">Upgrade to Pro</button>
@@ -1717,7 +1729,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
   const [yearly,setYearly]=useState(false);
   const plans = [
     {k:'free', name:'Free', price:'₹0', sub:'Forever Free', credits:planConfig.free,
-      features:[['25K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
+      features:[['20K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
       btn:'Current Plan', popular:false},
     {k:'pro', name:'Pro', price:'₹299', sub:'/month', credits:planConfig.pro, badge:'★ Most Popular',
       features:[['500K Credits / month',1],['Advanced AI Models',1],['Web Search',1],['Voice Studio',1],['Channel Analytics',1],['AI Image Generation',1],['Faster Responses',1],['AI Memory',1],['Priority Support',1]],
@@ -1758,7 +1770,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
             <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 space-y-[9px] text-[12.5px] flex-1">
               ${p.features.map(([f,ok])=> html`<div className="flex items-start gap-2"><span className=${ok ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>${ok ? '✓' : '✕'}</span><span className=${ok ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400'}>${f}</span></div>`)}
             </div>
-            <button onClick=${()=>onPlan(p.k)} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#1f1f2d] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700' : ''} ${p.k==='pro' ? 'bg-[#7c5cff] hover:bg-[#6b48f5] text-white shadow-zed-soft' : ''} ${p.k==='infinity' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
+            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#1f1f2d] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[#7c5cff] hover:bg-[#6b48f5] text-white shadow-zed-soft' : ''} ${p.k==='infinity' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
               ${p.btn}
             </button>
           </div>
