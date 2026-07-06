@@ -56,22 +56,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body class="bg-[#f2f2f6] dark:bg-[#090a10] text-zinc-900 dark:text-zinc-100 antialiased overflow-hidden">
 
-<div id="viewport" class="w-screen h-screen overflow-auto bg-[#e2e3ea] dark:bg-[#05060a] relative">
-  <div id="scale-stage" class="origin-top-left" style="transform:scale(0.84) translate(18px,14px); width:1440px;">
-    <div id="root"></div>
-  </div>
-</div>
-
-<div id="zoom-bar" class="fixed bottom-[10px] left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-[6px] bg-white/94 dark:bg-[#171924]/94 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-full px-[10px] py-[5px] shadow-lg text-[10.5px]">
-  <button id="z-out" class="w-[26px] h-[26px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">−</button>
-  <span id="z-label" class="w-[38px] text-center font-[600]">84%</span>
-  <button id="z-in" class="w-[26px] h-[26px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">+</button>
-  <div class="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-[2px]"></div>
-  <button id="z-fit" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">Fit</button>
-  <button id="z-100" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">100%</button>
-  <button id="z-reset" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">Reset</button>
-  <span class="text-zinc-300 dark:text-zinc-600">|</span>
-  <button id="z-pan" class="px-[9px] py-[4px] rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-[9.5px] font-[700]">DRAG</button>
+<div id="viewport" class="w-screen h-[100dvh] overflow-hidden bg-[#e2e3ea] dark:bg-[#05060a] relative">
+  <div id="root" class="w-full h-full"></div>
 </div>
 
 <div id="toast-root" class="fixed bottom-16 right-5 z-[99999] space-y-2"></div>
@@ -255,6 +241,8 @@ function App(){
   const [comingSoon,setComingSoon]=useState(null);
 
   useEffect(()=>{ document.documentElement.classList.toggle('dark', theme==='dark'); },[theme]);
+
+  useEffect(()=>{ if(!loadingUser && !user){ location.href='landing.html'; } },[loadingUser,user]);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data})=>{
@@ -583,11 +571,10 @@ function App(){
     }
   };
 
-  if(loadingUser) return html`<div className="w-screen h-screen flex items-center justify-center text-zinc-500">Loading…</div>`;
-  if(!user) return html`<div className="w-screen h-screen flex flex-col items-center justify-center text-zinc-500 gap-4"><div>Please sign in to continue</div><a href="auth.html?mode=login" className="px-5 py-2 bg-[#7c5cff] text-white rounded-xl text-sm">Go to Sign In</a></div>`;
+  if(loadingUser || !user) return html`<div className="w-screen h-screen flex items-center justify-center text-zinc-500">Loading…</div>`;
 
   return html`
-  <div className="w-[1440px] h-[900px] bg-white dark:bg-[#0f111a] text-zinc-900 dark:text-zinc-100 flex rounded-[14px] overflow-hidden shadow-soft border border-zinc-200 dark:border-zinc-800">
+  <div className="w-full h-[100dvh] bg-white dark:bg-[#0f111a] text-zinc-900 dark:text-zinc-100 flex overflow-hidden">
     <${LeftSidebar}
       collapsed=${sidebarCollapsed}
       toggleCollapsed=${()=>setSidebarCollapsed(s=>!s)}
@@ -604,7 +591,7 @@ function App(){
       openTool=${t=>setToolModal(t)}
       openNotifications=${openNotifications}
     />
-    <div className="flex-1 flex min-w-0">
+    <div className="flex-1 flex min-w-0 h-full">
       ${renderModule()}
       ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} />` : null}
     </div>
@@ -618,7 +605,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
   const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[#efeaff] dark:bg-[#1e1a38] text-[#683ee6] dark:text-[#b79cff] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#151828]'}`;
   const unread = 0;
   return html`
-  <aside className=${`${collapsed?'w-[72px]':'w-[248px]'} shrink-0 h-[900px] bg-white dark:bg-[#0d0f1a] border-r border-zinc-200 dark:border-[#1c2030] flex flex-col transition-all duration-200`}>
+  <aside className=${`${collapsed?'w-[72px]':'w-[248px]'} shrink-0 h-full bg-white dark:bg-[#0d0f1a] border-r border-zinc-200 dark:border-[#1c2030] flex flex-col transition-all duration-200`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#181c2b]">
       <button onClick=${toggleCollapsed} className="p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Toggle sidebar">
         <${I} name="Menu" size=${18}/>
@@ -706,7 +693,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
 // ---------- Right Rail ----------
 function RightRail({chats, growth, openTool, setModule}){
   return html`
-  <aside className="w-[318px] shrink-0 h-[900px] overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
+  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
       <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
       <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
         Growth Overview 
@@ -817,7 +804,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const hasMessages = messages.length>0;
 
   return html`
-  <div className="flex-1 flex flex-col h-[900px] bg-[#fbfbfe] dark:bg-[#141620]">
+  <div className="flex-1 flex flex-col h-full bg-[#fbfbfe] dark:bg-[#141620]">
     <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#23283f] bg-white/85 dark:bg-[#141620]/90 backdrop-blur">
       <div className="flex items-center gap-2 text-[13.5px] font-[600]">
         Chat
@@ -997,7 +984,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
   const tabs=['Files','Tasks','Notes','Analytics','Settings'];
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
     <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
       <div className="flex items-center gap-3">
         <button onClick=${onBack} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ArrowLeft" size=${18}/></button>
@@ -1113,7 +1100,7 @@ function ProjectsView({projects, createProject, onOpenProject}){
   const [showCreate,setShowCreate]=useState(projects.length===0);
   const [filter,setFilter]=useState('All Projects');
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
     <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
       <div><div className="text-[19px] font-[800] display">My Projects</div><div className="text-[11px] text-zinc-500">${projects.length} Projects</div></div>
       <button onClick=${()=>setShowCreate(true)} className="bg-[#7c5cff] hover:bg-[#6b48f5] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
@@ -1215,7 +1202,7 @@ function PlannerView({items, createPlannerItem}){
   const toggleCheck=(id)=> setChecks(cs=>cs.map(c=>c.id===id?{...c,done:!c.done}:c));
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto flex gap-5">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto flex gap-5">
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -1372,7 +1359,7 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
   };
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
     <div className="text-[19px] font-[800] display mb-1">${initialFilter==='saved'?'Saved':'History'}</div>
     <div className="text-[12px] text-zinc-500 mb-4">${initialFilter==='saved'?'Your saved conversations and content.':'All your past conversations in one place.'}</div>
 
@@ -1462,7 +1449,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   };
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
     <div className="flex items-center gap-2 text-[19px] font-[800] display"><${I} name="Mic" size=${20}/> AI Voice Studio</div>
     <div className="text-[12px] text-zinc-500 mb-4">Create, clone, and customize realistic AI voices for your content.</div>
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
@@ -1561,7 +1548,7 @@ function AnalyticsView(){
   ];
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
     <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
     <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
 
@@ -1637,7 +1624,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
       <div className=${`absolute top-[2px] w-[18px] h-[18px] bg-white rounded-full shadow transition-all ${on?'right-[2px]':'left-[2px]'}`}></div>
     </button>`;
   return html`
-  <div className="flex-1 h-[900px] bg-[#f6f6fa] dark:bg-[#10121b] overflow-y-auto">
+  <div className="flex-1 h-full bg-[#f6f6fa] dark:bg-[#10121b] overflow-y-auto">
     <div className="px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#141725]">
       <div className="text-[22px] font-[800] display">Settings</div>
       <div className="text-[12px] text-zinc-500">Manage your account, preferences and everything about your Zedith experience.</div>
@@ -1735,7 +1722,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
   ];
 
   return html`
-  <div className="flex-1 h-[900px] overflow-y-auto bg-[#fbfbfe] dark:bg-[#0b0b14] text-zinc-900 dark:text-white transition-colors">
+  <div className="flex-1 h-full overflow-y-auto bg-[#fbfbfe] dark:bg-[#0b0b14] text-zinc-900 dark:text-white transition-colors">
     <div className="px-10 pt-10 pb-10 max-w-[1180px]">
       <div className="flex items-start justify-between">
         <div>
@@ -1778,7 +1765,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
 // ---------- Notifications ----------
 function NotificationsView({notifications,markRead}){
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto p-6">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto p-6">
     <div className="flex items-center justify-between max-w-[820px]">
       <div>
         <div className="text-[20px] font-[800] display flex items-center gap-2"><${I} name="Bell" size=${20}/> Notifications</div>
@@ -1853,7 +1840,7 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
   };
 
   return html`
-  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
     <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Shield" size=${20}/> Admin Panel</div>
     <div className="text-[12px] text-zinc-500 mb-5">Only visible to ${ADMIN_EMAIL}</div>
 
@@ -1902,33 +1889,6 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
 // ---------- mount ----------
 const root = createRoot(document.getElementById('root'));
 root.render(React.createElement(App));
-
-// zoom
-(function(){
-  const viewport=document.getElementById('viewport');
-  const stage=document.getElementById('scale-stage');
-  let zoom=0.84, panX=18, panY=14, dragging=false, sx=0, sy=0, spx=0, spy=0, panMode=true;
-  const apply=()=>{ stage.style.transform=`scale(${zoom}) translate(${panX}px,${panY}px)`; document.getElementById('z-label').textContent=Math.round(zoom*100)+'%'; };
-  document.getElementById('z-in').onclick=()=>{ zoom=Math.min(1.6, zoom+0.06); apply(); };
-  document.getElementById('z-out').onclick=()=>{ zoom=Math.max(0.28, zoom-0.06); apply(); };
-  document.getElementById('z-100').onclick=()=>{ zoom=1; panX=6; panY=6; apply(); };
-  document.getElementById('z-reset').onclick=()=>{ zoom=0.84; panX=18; panY=14; apply(); };
-  document.getElementById('z-fit').onclick=()=>{
-    const vw=viewport.clientWidth, vh=viewport.clientHeight;
-    const s=Math.min((vw-24)/1440,(vh-24)/900,1.08);
-    zoom=Math.max(0.28,s); panX=10; panY=10; apply();
-  };
-  const pb=document.getElementById('z-pan');
-  pb.onclick=()=>{ panMode=!panMode; pb.textContent=panMode?'DRAG':'SELECT'; viewport.style.cursor=panMode?'grab':'default'; };
-  viewport.addEventListener('mousedown', e=>{
-    if(!panMode) return;
-    if(e.target.closest('#zoom-bar')||e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('select')) return;
-    dragging=true; sx=e.clientX; sy=e.clientY; spx=panX; spy=panY; viewport.style.cursor='grabbing';
-  });
-  window.addEventListener('mousemove', e=>{ if(!dragging) return; panX=spx+(e.clientX-sx)/zoom; panY=spy+(e.clientY-sy)/zoom; apply(); });
-  window.addEventListener('mouseup', ()=>{ dragging=false; viewport.style.cursor=panMode?'grab':'default'; });
-  apply(); setTimeout(()=>document.getElementById('z-fit').click(), 70);
-})();
 </script>
 </body>
 </html>
