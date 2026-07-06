@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-<script src="./vendor/tailwind.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
   darkMode: 'class',
@@ -47,6 +47,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </script>
 </head>
 <body class="bg-[#f2f2f6] dark:bg-[#090a10] text-zinc-900 dark:text-zinc-100 antialiased overflow-hidden">
+
+<div id="boot-splash" style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#090a10;transition:opacity .25s ease;">
+  <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#845bff,#6236ff);display:flex;align-items:center;justify-content:center;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+  </div>
+  <div style="width:26px;height:26px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#845bff;animation:boot-spin .7s linear infinite;"></div>
+  <style>@keyframes boot-spin{to{transform:rotate(360deg)}}</style>
+</div>
 
 <div id="viewport" class="w-screen h-screen overflow-auto bg-[#e2e3ea] dark:bg-[#05060a] relative">
   <div id="scale-stage" class="origin-top-left" style="transform:scale(0.84) translate(18px,14px); width:1440px;">
@@ -1894,6 +1902,15 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
 // ---------- mount ----------
 const root = createRoot(document.getElementById('root'));
 root.render(React.createElement(App));
+
+// hide boot splash once the app has actually painted
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  const splash = document.getElementById('boot-splash');
+  if(splash){
+    splash.style.opacity = '0';
+    setTimeout(()=>splash.remove(), 260);
+  }
+}));
 
 // zoom
 (function(){
