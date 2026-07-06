@@ -40,6 +40,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn .22s ease}
+@media (max-width:767px){ input, textarea, select { font-size:16px !important; } }
 </style>
 <script type="importmap">
 {
@@ -591,6 +592,11 @@ function App(){
       openTool=${t=>setToolModal(t)}
       openNotifications=${openNotifications}
     />
+    ${sidebarCollapsed ? html`
+      <button onClick=${()=>setSidebarCollapsed(false)} className="md:hidden fixed top-[13px] left-[13px] z-40 w-[38px] h-[38px] rounded-[10px] bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-zinc-700 shadow-soft flex items-center justify-center" aria-label="Open sidebar">
+        <${I} name="Menu" size=${18}/>
+      </button>
+    ` : null}
     <div className="flex-1 flex min-w-0 h-full">
       ${renderModule()}
       ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} />` : null}
@@ -605,7 +611,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
   const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[#efeaff] dark:bg-[#1e1a38] text-[#683ee6] dark:text-[#b79cff] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#151828]'}`;
   const unread = 0;
   return html`
-  <aside className=${`${collapsed?'w-[72px]':'w-[248px]'} shrink-0 h-full bg-white dark:bg-[#0d0f1a] border-r border-zinc-200 dark:border-[#1c2030] flex flex-col transition-all duration-200`}>
+  <aside className=${`${collapsed?'w-0 md:w-[72px] border-r-0 md:border-r overflow-hidden':'w-[248px] border-r'} shrink-0 h-full bg-white dark:bg-[#0d0f1a] border-zinc-200 dark:border-[#1c2030] flex flex-col transition-all duration-200`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#181c2b]">
       <button onClick=${toggleCollapsed} className="p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Toggle sidebar">
         <${I} name="Menu" size=${18}/>
@@ -693,7 +699,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
 // ---------- Right Rail ----------
 function RightRail({chats, growth, openTool, setModule}){
   return html`
-  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
+  <aside className="hidden md:flex md:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
       <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
       <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
         Growth Overview 
@@ -830,7 +836,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           <div className="text-[15px] mt-2 text-zinc-600 dark:text-zinc-300">
             What would you like to <span className="text-[#7c5cff] font-[700]">create</span> or <span className="text-[#a056ff] font-[700]">learn</span> today?
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-7 text-left">
+          <div className="hidden md:grid md:grid-cols-4 gap-3 mt-7 text-left">
             ${[
               ['Give me 5 viral ideas','Lightbulb'],
               ['Write a script for this topic','FileText'],
@@ -905,7 +911,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
       `}
     </div>
 
-    <div className="px-5 pb-4">
+    <div className="px-3 sm:px-5 pb-4">
       <div className="max-w-[760px] mx-auto bg-white dark:bg-[#1b1e30] border border-zinc-200 dark:border-[#2b2f48] rounded-[18px] shadow-soft px-[13px] pt-[10px] pb-[10px]">
         ${attached ? html`
           <div className="mb-[8px] flex items-center gap-2 text-[11px] bg-zinc-50 dark:bg-[#22263a] border border-zinc-200 dark:border-zinc-700 rounded-[12px] px-3 py-[8px]">
@@ -919,25 +925,25 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           value=${input}
           onChange=${e=>setInput(e.target.value)}
           onKeyDown=${e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); doSend(); }}}
-          placeholder="Ask Zedith anything…  Tip: 'generate image of …'"
+          placeholder="Ask Zedith anything…"
           className="w-full bg-transparent outline-none text-[13.3px] py-[5px] placeholder-zinc-400"
         />
-        <div className="flex items-center gap-[7px] mt-[9px] flex-wrap">
-          <button onClick=${()=>imgRef.current?.click()} className="w-[33px] h-[33px] rounded-[10px] border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Upload image">
+        <div className="flex items-center gap-[5px] sm:gap-[7px] mt-[9px] flex-wrap">
+          <button onClick=${()=>imgRef.current?.click()} className="w-[33px] h-[33px] rounded-[10px] border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 shrink-0" title="Upload image">
             <${I} name="Plus" size=${15}/>
           </button>
-          <button onClick=${()=>setSmart(s=>!s)} className=${`px-[11px] h-[33px] rounded-[10px] text-[12px] font-[550] border flex items-center gap-[5px] ${smart ? 'border-[#7c5cff] bg-[#f5f1ff] dark:bg-[#221b3a] text-[#6a3ff5]':'border-zinc-200 dark:border-zinc-700'}`}>
-            <${I} name="Sparkles" size=${13}/> Smart
+          <button onClick=${()=>setSmart(s=>!s)} className=${`px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] font-[550] border flex items-center gap-[5px] shrink-0 ${smart ? 'border-[#7c5cff] bg-[#f5f1ff] dark:bg-[#221b3a] text-[#6a3ff5]':'border-zinc-200 dark:border-zinc-700'}`}>
+            <${I} name="Sparkles" size=${13}/><span className="hidden sm:inline">Smart</span>
           </button>
-          <button onClick=${()=>fileRef.current?.click()} className="px-[11px] h-[33px] rounded-[10px] text-[12px] border border-zinc-200 dark:border-zinc-700 flex items-center gap-[5px]">
-            <${I} name="Paperclip" size=${13}/> Attach
+          <button onClick=${()=>fileRef.current?.click()} className="px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] border border-zinc-200 dark:border-zinc-700 flex items-center gap-[5px] shrink-0">
+            <${I} name="Paperclip" size=${13}/><span className="hidden sm:inline">Attach</span>
           </button>
-          <button onClick=${()=>{ setWebSearch(w=>!w); toast(webSearch?'Web search off':'Web search on'); }} className=${`px-[11px] h-[33px] rounded-[10px] text-[12px] border flex items-center gap-[5px] ${webSearch ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-300':'border-zinc-200 dark:border-zinc-700'}`}>
-            <${I} name="Globe" size=${13}/> Search
+          <button onClick=${()=>{ setWebSearch(w=>!w); toast(webSearch?'Web search off':'Web search on'); }} className=${`px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] border flex items-center gap-[5px] shrink-0 ${webSearch ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-300':'border-zinc-200 dark:border-zinc-700'}`}>
+            <${I} name="Globe" size=${13}/><span className="hidden sm:inline">Search</span>
           </button>
           <div className="flex-1"></div>
-          <button onClick=${()=>{}} className="w-[33px] h-[33px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><${I} name="Mic" size=${14}/></button>
-          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[#7c5cff] hover:bg-[#6b48f5] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition">
+          <button onClick=${()=>{}} className="w-[33px] h-[33px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0"><${I} name="Mic" size=${14}/></button>
+          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[#7c5cff] hover:bg-[#6b48f5] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0">
             <${I} name="ArrowUp" size=${17}/>
           </button>
         </div>
