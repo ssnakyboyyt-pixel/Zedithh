@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Zedith — AI Creator Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
+      colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} }
+    }
+  }
+}
+</script>
+<style>
+*{font-family:Inter,system-ui,sans-serif}
+.display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
+</style>
+</head>
+<body class="bg-[#090a10] text-white antialiased">
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#090a10]/80 backdrop-blur-xl">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></div>
+        <span class="display font-[800] text-xl">Zedith</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="auth.html?mode=login" class="text-sm font-medium text-zinc-300 hover:text-white">Log in</a>
+        <a href="auth.html?mode=signup" class="px-4 py-2 rounded-full bg-[#7c5cff] text-white text-sm font-semibold hover:bg-[#6b48f5] transition">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="pt-32 pb-20 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-300 mb-6">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Now in Milestone 2
+      </div>
+      <h1 class="display text-5xl md:text-7xl font-[800] leading-tight mb-6">
+        Create faster with <span class="text-[#7c5cff]">Zedith AI</span>
+      </h1>
+      <p class="text-lg text-zinc-400 mb-8 max-w-2xl mx-auto">
+        The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="auth.html?mode=signup" class="px-8 py-4 rounded-full bg-[#7c5cff] text-white font-semibold hover:bg-[#6b48f5] transition">Get Started Free</a>
+        <a href="auth.html?mode=login" class="px-8 py-4 rounded-full border border-white/20 text-white font-semibold hover:bg-white/5 transition">Already have an account?</a>
+      </div>
+      <p class="text-xs text-zinc-500 mt-4">Free plan includes 25,000 credits/month. No credit card required.</p>
+    </div>
+  </section>
+
+  <section class="py-20 px-6 border-t border-white/5">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+        <h3 class="font-[700] text-lg mb-2">Content Planner</h3>
+        <p class="text-sm text-zinc-400">Plan, schedule, and manage your content calendar in one place.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+        <h3 class="font-[700] text-lg mb-2">AI Chat & Images</h3>
+        <p class="text-sm text-zinc-400">Generate scripts, thumbnails, hooks, and analyze content with AI.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+        <h3 class="font-[700] text-lg mb-2">Channel Analytics</h3>
+        <p class="text-sm text-zinc-400">Track views, CTR, audience growth, and get AI-powered insights.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="py-8 px-6 border-t border-white/10 text-center text-xs text-zinc-500">
+    © 2026 Zedith. Support: zedithsupport@gmail.com
+  </footer>
+</body>
+</html>
