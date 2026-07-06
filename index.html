@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Zedith — AI Creator Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="./vendor/tailwind.js"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
+      colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} },
+      boxShadow: { soft:'0 2px 10px rgba(15,17,26,0.05)', zed:'0 4px 14px rgba(124,92,255,.14)', 'zed-soft':'0 2px 8px rgba(124,92,255,.10)' }
+    }
+  }
+}
+</script>
+<style>
+*{font-family:Inter,system-ui,sans-serif}
+.display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#2b2d3d;border-radius:3px}
+.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
+.lucide{stroke-width:1.85}
+button:disabled{opacity:.55;cursor:not-allowed}
+.shimmer{background:linear-gradient(90deg,#ece9ff 25%,#f6f4ff 50%,#ece9ff 75%);background-size:200% 100%;animation:sh 1.4s infinite}
+.dark .shimmer{background:linear-gradient(90deg,#1d1b33 25%,#26224a 50%,#1d1b33 75%);background-size:200% 100%}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .22s ease}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "htm": "https://esm.sh/htm@3.1.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.468.0?external=react",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}
+</script>
+</head>
+<body class="bg-[#f2f2f6] dark:bg-[#090a10] text-zinc-900 dark:text-zinc-100 antialiased overflow-hidden">
+
+<div id="viewport" class="w-screen h-screen overflow-auto bg-[#e2e3ea] dark:bg-[#05060a] relative">
+  <div id="scale-stage" class="origin-top-left" style="transform:scale(0.84) translate(18px,14px); width:1440px;">
+    <div id="root"></div>
+  </div>
+</div>
+
+<div id="zoom-bar" class="fixed bottom-[10px] left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-[6px] bg-white/94 dark:bg-[#171924]/94 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-full px-[10px] py-[5px] shadow-lg text-[10.5px]">
+  <button id="z-out" class="w-[26px] h-[26px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">−</button>
+  <span id="z-label" class="w-[38px] text-center font-[600]">84%</span>
+  <button id="z-in" class="w-[26px] h-[26px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">+</button>
+  <div class="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-[2px]"></div>
+  <button id="z-fit" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">Fit</button>
+  <button id="z-100" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">100%</button>
+  <button id="z-reset" class="px-[8px] py-[4px] rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">Reset</button>
+  <span class="text-zinc-300 dark:text-zinc-600">|</span>
+  <button id="z-pan" class="px-[9px] py-[4px] rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-[9.5px] font-[700]">DRAG</button>
+</div>
+
+<div id="toast-root" class="fixed bottom-16 right-5 z-[99999] space-y-2"></div>
+
+<script type="module">
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
+import htm from 'htm';
+import * as Lucide from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+const html = htm.bind(React.createElement);
+const I = ({name, size=16, className="", ...p}) => {
+  const C = Lucide[name] || Lucide.Circle;
+  return React.createElement(C, {size, className:`lucide ${className}`, ...p});
+};
+
+// ---------- Supabase ----------
+const SUPABASE_URL = 'https://ghcgqrhhrxpyysjsxexv.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoY2dxcmhocnhweXlzanN4ZXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODExMTEsImV4cCI6MjA5ODc1NzExMX0.7gD3O0Oa-hhp1LfA8Mv0JM2J22U5SmC7YOWqC7u9LDM';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ---------- helpers ----------
+const ADMIN_EMAIL = 'zedithsupport@gmail.com';
+function uid(prefix='x'){ return prefix+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
+function toast(msg,type='ok'){
+  const root=document.getElementById('toast-root');
+  const el=document.createElement('div');
+  el.className=`px-3 py-2 rounded-xl text-[12px] shadow-lg fade-in ${type==='err'?'bg-red-600 text-white':'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'}`;
+  el.textContent=msg;
+  root.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(5px)'; setTimeout(()=>el.remove(),200)},2400);
+}
+function copyText(t){
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(t).then(()=>toast('Copied')).catch(()=>fallbackCopy(t));
+  } else fallbackCopy(t);
+}
+function fallbackCopy(t){
+  const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{document.execCommand('copy'); toast('Copied')}catch{toast('Copy failed','err')}
+  ta.remove();
+}
+function formatDate(d){
+  const date = new Date(d);
+  return date.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+}
+function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+function isAdmin(user){ return user?.email === ADMIN_EMAIL; }
+
+// ---------- Credit System ----------
+const DEFAULT_CREDIT_COSTS = {
+  text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
+  image_gen: 200, image_edit: 200, voice: 100, smart_multiplier: 1.5
+};
+const PLAN_CREDITS = { free: 25000, pro: 500000, infinity: 1000000 };
+
+function estimateCreditCost({text='', feature='text', smart=false, attachment=null, creditCosts=DEFAULT_CREDIT_COSTS}){
+  let cost = 0;
+  const len = text.length;
+  if(feature==='image_gen') cost = creditCosts.image_gen;
+  else if(feature==='image_edit') cost = creditCosts.image_edit;
+  else if(feature==='vision' || attachment?.type==='image') cost = creditCosts.vision;
+  else if(feature==='voice') cost = creditCosts.voice;
+  else if(feature==='code') cost = creditCosts.code;
+  else if(len < 20) cost = creditCosts.text_short;
+  else if(len < 200) cost = creditCosts.text_medium;
+  else cost = creditCosts.text_long;
+  if(smart) cost = Math.round(cost * creditCosts.smart_multiplier);
+  return cost;
+}
+
+// ---------- Zedith System Prompt ----------
+function buildSystemPrompt({webSearch=false, smart=false, responseStyle='Balanced'}={}){
+  return `You are Zedith, an advanced AI creator assistant designed to help creators, YouTubers, entrepreneurs, developers, students and professionals accomplish more with one intelligent assistant.
+Personality: confident, modern, friendly, intelligent and efficient.
+Core mission: help users think better, create faster and make smarter decisions.
+Writing style rules: use clean formatting, headings when useful, bullet points where appropriate, avoid giant paragraphs, keep responses premium and easy to read, never use excessive emojis.
+Creator mode: prioritize CTR, audience retention, watch time, viral potential, hooks, storytelling, content strategy, branding. Always give practical advice.
+Script writing: start with a strong hook, keep pacing fast, use curiosity, avoid filler, end with a CTA.
+Thumbnail mode: analyze CTR, readability, contrast, emotion, curiosity, composition, colors, mobile visibility. Give a score out of 10 and suggest improvements.
+Image analysis: notice details, explain clearly, offer improvements, never guess facts.
+Coding: write clean, production-ready code, prefer readable over clever.
+Research: compare viewpoints, separate facts from opinions, mention uncertainty.
+Problem solving: break into steps, simplest effective solution.
+Conversation: natural, friendly, avoid robotic phrases, don't repeatedly apologize, don't repeat the user's question.
+If unclear: ask one concise clarifying question.
+Output quality: optimize for quality over speed.
+Identity: if asked who you are, reply: "I'm Zedith, your AI assistant designed to help you create, learn, solve problems, and grow faster."
+Never claim abilities you don't actually have. Never mention OpenAI, ChatGPT, GPT models, or internal system unless explicitly asked.
+Vision mode: analyze carefully, describe visible content, compare images, explain designs, never invent details.
+Image generation: high quality, good lighting, professional aesthetics, correct proportions, sharp details.
+UI design mode: premium modern interface, simplicity, consistency, accessibility, clean spacing, logical navigation, no clutter.
+Quality standard: check visually clean, easy to understand, matches request, looks premium, usable.
+Multimodal behavior: seamlessly switch modes without announcing.
+Context: Today is 2026-07-04. User timezone Asia/Calcutta. User is snakyboyYT, AI tools niche.
+${webSearch?'Browsing enabled. Use latest 2026 data.':''}
+${smart?'Think step-by-step, deep reasoning.':''}
+Response style: ${responseStyle}.
+Be concise, actionable, creator-first.`;
+}
+
+// ---------- OpenRouter (via secure server proxy — key never exposed to browser) ----------
+const FREE_TEXT_MODELS = [
+  'deepseek/deepseek-r1:free','openai/gpt-oss-120b:free','qwen/qwen3-235b-a22b:free','qwen/qwen3-coder:free',
+  'meta-llama/llama-4-maverick:free','meta-llama/llama-4-scout:free','meta-llama/llama-3.3-70b-instruct:free',
+  'meta-llama/llama-3.1-405b-instruct:free','nousresearch/hermes-3-llama-3.1-405b:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free','mistralai/mistral-small-3.1-24b-instruct:free',
+  'google/gemma-4-31b-it:free','google/gemma-3-27b-it:free','x-ai/grok-3-mini-beta:free',
+  'deepseek/deepseek-chat-v3-0324:free','qwen/qwen-2.5-72b-instruct:free','openchat/openchat-7b:free'
+];
+const FREE_VISION_MODELS = [
+  'meta-llama/llama-4-maverick:free','meta-llama/llama-4-scout:free',
+  'google/gemma-4-31b-it:free','nvidia/nemotron-nano-12b-v2-vl:free'
+];
+const SMART_FIRST = ['deepseek/deepseek-r1:free','openai/gpt-oss-120b:free','qwen/qwen3-235b-a22b:free'];
+
+async function callOR(messages,{vision=false,smart=false,modelPref=null}={}){
+  const poolBase = vision ? [...FREE_VISION_MODELS, ...FREE_TEXT_MODELS] : FREE_TEXT_MODELS;
+  const pool = [...new Set([...(modelPref?[modelPref]:[]), ...(smart?SMART_FIRST:[]), ...poolBase])];
+  try{
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: 1300 })
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d?.text) return { text: d.text.trim(), model: d.model, tried: d.tried || 1 };
+    }
+  } catch(e){ /* fall through to offline fallback below */ }
+  return {
+    text: `⚠️ Zedith AI is at capacity right now (tried ${pool.length} free models).\n\nHere's an offline creator draft to keep you moving:\n\n1. I Tried 10 AI Tools So You Don't Have To\n2. How I Make Faceless YouTube Videos Using AI (Step-by-Step)\n3. AI Tools That Will Replace Expensive Software in 2026\n4. 5 AI Tools That Made Me 10x More Productive\n5. New AI Tools You Didn't Know Existed (Game Changers!)\n\nTip: enable Smart mode for deep reasoning, or try again in 60s.`,
+    model:'offline-fallback',
+    tried: pool.length,
+    error:true
+  };
+}
+
+function imageGenUrl(prompt){ return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${Math.floor(Math.random()*99999)}&model=flux`; }
+async function ttsFetch(text, voiceName='Brian'){
+  const map={Brian:'Brian',Amy:'Amy',Emma:'Emma',Joey:'Joey'};
+  const v=map[voiceName]||'Brian';
+  const url=`https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(v)}&text=${encodeURIComponent(text.slice(0,900))}`;
+  const res=await fetch(url); if(!res.ok) throw new Error('tts '+res.status);
+  const blob=await res.blob(); return URL.createObjectURL(blob);
+}
+
+
+// ---------- App ----------
+function App(){
+  const [user,setUser]=useState(null);
+  const [loadingUser,setLoadingUser]=useState(true);
+  const [profile,setProfile]=useState(null);
+  const [theme,setTheme]=useState('dark');
+  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
+  const [module,setModule]=useState('chat');
+  const [chats,setChats]=useState([]);
+  const [activeChatId,setActiveChatId]=useState(null);
+  const [activeProjectId,setActiveProjectId]=useState(null);
+  const [viewProjectId,setViewProjectId]=useState(null);
+  const [projects,setProjects]=useState([]);
+  const [plannerItems,setPlannerItems]=useState([]);
+  const [voiceHistory,setVoiceHistory]=useState([]);
+  const [myVoices,setMyVoices]=useState([
+    {id:'v1', name:'Brian', gender:'Male', accent:'US', cloned:false},
+    {id:'v2', name:'Amy', gender:'Female', accent:'US', cloned:false},
+    {id:'v3', name:'Emma', gender:'Female', accent:'US', cloned:false},
+    {id:'v4', name:'Joey', gender:'Male', accent:'US', cloned:false},
+  ]);
+  const [notifications,setNotifications]=useState([]);
+  const [settings,setSettings]=useState({
+    displayName:'', username:'', email:'', bio:'',
+    defaultModel:'auto', responseStyle:'Balanced', systemPrompt: '',
+    aiMemory:true, autoSave:true, webSearch:true, codeHighlight:true
+  });
+  const [creditCosts,setCreditCosts]=useState(DEFAULT_CREDIT_COSTS);
+  const [planConfig,setPlanConfig]=useState(PLAN_CREDITS);
+  const [transactions,setTransactions]=useState([]);
+  const [toolModal,setToolModal]=useState(null);
+  const [comingSoon,setComingSoon]=useState(null);
+
+  useEffect(()=>{ document.documentElement.classList.toggle('dark', theme==='dark'); },[theme]);
+
+  useEffect(()=>{
+    supabase.auth.getSession().then(({data})=>{
+      setUser(data.session?.user||null);
+      setLoadingUser(false);
+    });
+    const {data:listener}=supabase.auth.onAuthStateChange((_event,session)=>{
+      setUser(session?.user||null);
+    });
+    return ()=>listener.subscription.unsubscribe();
+  },[]);
+
+  useEffect(()=>{
+    if(!user) return;
+    loadAll();
+  },[user]);
+
+  async function loadAll(){
+    await Promise.all([
+      loadProfile(),
+      loadChats(),
+      loadProjects(),
+      loadPlanner(),
+      loadVoiceHistory(),
+      loadNotifications(),
+      loadSettings(),
+      loadCreditCosts(),
+      loadTransactions()
+    ]);
+  }
+
+  async function loadProfile(){
+    const {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).single();
+    if(error){ toast('Failed to load profile','err'); return; }
+    setProfile(data);
+    setSettings(s=>({...s, displayName:data.display_name||'', username:data.username||'', email:data.email||user.email||'', bio:data.bio||''}));
+  }
+
+  async function loadChats(){
+    const {data,error}=await supabase.from('chats').select('*').eq('user_id',user.id).order('updated_at',{ascending:false});
+    if(error){ toast('Failed to load chats','err'); return; }
+    setChats(data||[]);
+  }
+
+  async function loadProjects(){
+    const {data,error}=await supabase.from('projects').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+    if(error){ toast('Failed to load projects','err'); return; }
+    setProjects(data||[]);
+  }
+
+  async function loadPlanner(){
+    const {data,error}=await supabase.from('planner_items').select('*').eq('user_id',user.id).order('date',{ascending:true});
+    if(error){ toast('Failed to load planner','err'); return; }
+    setPlannerItems(data||[]);
+  }
+
+  async function loadVoiceHistory(){
+    const {data,error}=await supabase.from('voice_history').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+    if(error){ toast('Failed to load voice history','err'); return; }
+    setVoiceHistory(data||[]);
+  }
+
+  async function loadNotifications(){
+    const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+    if(error) return;
+    setNotifications(data||[]);
+  }
+
+  async function loadSettings(){
+    const {data,error}=await supabase.from('settings').select('*').eq('user_id',user.id).single();
+    if(error && error.code!=='PGRST116') return;
+    if(data?.data) setSettings(s=>({...s,...data.data}));
+  }
+
+  async function loadCreditCosts(){
+    const {data,error}=await supabase.from('admin_config').select('*');
+    if(error) return;
+    const costs = data.find(r=>r.key==='credit_costs');
+    const plans = data.find(r=>r.key==='plans');
+    if(costs) setCreditCosts({...DEFAULT_CREDIT_COSTS,...costs.value});
+    if(plans) setPlanConfig({...PLAN_CREDITS,...Object.fromEntries(Object.entries(plans.value).map(([k,v])=>[k,v.monthly_credits]))});
+  }
+
+  async function loadTransactions(){
+    const {data,error}=await supabase.from('credit_transactions').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
+    if(error) return;
+    setTransactions(data||[]);
+  }
+
+  async function saveProfile(patch){
+    if(!user) return;
+    const {error}=await supabase.from('profiles').update(patch).eq('id',user.id);
+    if(error) toast('Profile save failed','err');
+  }
+
+  async function saveSettings(newSettings){
+    if(!user) return;
+    const {error}=await supabase.from('settings').upsert({user_id:user.id, data:newSettings}, {onConflict:'user_id'});
+    if(error) toast('Settings save failed','err');
+  }
+
+  async function updateProfileCredits(newCredits){
+    if(!user || isAdmin(user)) return;
+    setProfile(p=>({...p, credits:newCredits}));
+    await supabase.from('profiles').update({credits:newCredits}).eq('id',user.id);
+  }
+
+  async function logTransaction(feature, spent, remaining, metadata={}){
+    if(!user || isAdmin(user)) return;
+    await supabase.from('credit_transactions').insert({user_id:user.id, feature, credits_spent:spent, remaining_balance:remaining, metadata});
+    await loadTransactions();
+  }
+
+  async function hasEnoughCredits(cost){
+    if(!user) return false;
+    if(isAdmin(user)) return true;
+    await loadProfile();
+    return (profile?.credits || 0) >= cost;
+  }
+
+  async function deductCredits(cost, feature, metadata={}){
+    if(!user || isAdmin(user)) return true;
+    const current = profile?.credits || 0;
+    if(current < cost) return false;
+    const remaining = current - cost;
+    await updateProfileCredits(remaining);
+    await logTransaction(feature, cost, remaining, metadata);
+    return true;
+  }
+
+  async function addNotification(title, body){
+    if(!user) return;
+    const {data,error}=await supabase.from('notifications').insert({user_id:user.id, title, body}).select();
+    if(!error && data) setNotifications(n=>[data[0], ...n]);
+  }
+
+  async function sendMessage({text, attachment=null, smart=false, webSearch=false, modelPref='auto'}){
+    let chatId = activeChatId;
+    let chat = chats.find(c=>c.id===chatId) || null;
+    if(!chat){
+      const newChat={id:uid('c'), user_id:user.id, project_id:activeProjectId, title:(text||attachment?.name||'New chat').slice(0,56), messages:[], saved:false, pinned:false, created_at:new Date().toISOString(), updated_at:new Date().toISOString()};
+      chat=newChat;
+      setChats(cs=>[chat, ...cs]);
+      setActiveChatId(chat.id);
+      chatId=chat.id;
+      await supabase.from('chats').insert(newChat);
+      addNotification('New chat started', chat.title);
+    }
+
+    const userMsg={id:uid('m'), role:'user', text:text||'', ts:Date.now(), attachment};
+    const updatedChat={...chat, messages:[...chat.messages, userMsg], updated_at:new Date().toISOString()};
+    setChats(cs=>cs.map(c=>c.id===chatId?updatedChat:c));
+    await supabase.from('chats').update({messages:updatedChat.messages, updated_at:updatedChat.updated_at}).eq('id',chatId);
+
+    const lower=(text||'').toLowerCase();
+    const wantsImage = /(\/image|generate image|create image|make.*image|draw |thumbnail|picture of|image of|imagine )/.test(lower);
+
+    if(wantsImage && !attachment){
+      const cost = estimateCreditCost({text, feature:'image_gen', smart, creditCosts});
+      const ok = await deductCredits(cost, 'image_gen', {prompt:text});
+      if(!ok){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+
+      const placeholderId=uid('m');
+      const chatWithPlaceholder={...updatedChat, messages:[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image_generating', prompt:text, ts:Date.now()}]};
+      setChats(cs=>cs.map(c=>c.id===chatId?chatWithPlaceholder:c));
+      try{
+        let imgPrompt=text.replace(/^(generate|create|make)\s+(an?\s+)?image\s+(of\s+)?/i,'').trim()||text;
+        const url=imageGenUrl(imgPrompt+', youtube thumbnail, vibrant, high detail');
+        await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
+        const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:`Here’s your generated image for: "${imgPrompt}"`, ts:Date.now()}];
+        setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
+        await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+        addNotification('Image generated', imgPrompt.slice(0,60));
+        return;
+      }catch(e){
+        const errMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'text', text:'Image generation failed: '+e.message, error:true, ts:Date.now()}];
+        setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:errMessages, updated_at:new Date().toISOString()}:c));
+        await supabase.from('chats').update({messages:errMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+        return;
+      }
+    }
+
+    const feature = attachment?.type==='image' ? 'vision' : text.length > 200 ? 'text_long' : text.length > 20 ? 'text_medium' : 'text_short';
+    const cost = estimateCreditCost({text, feature, smart, attachment, creditCosts});
+    const ok = await deductCredits(cost, feature, {length:text.length});
+    if(!ok){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+
+    const history=(chat?.messages||[]).slice(-8).map(mm=>{
+      if(mm.attachment?.type==='image'){
+        return {role:mm.role, content:[{type:'text', text:mm.text||'analyze image'}, {type:'image_url', image_url:{url:mm.attachment.dataUrl}}]};
+      }
+      return {role:mm.role, content:mm.text||''};
+    });
+    let userContent=text;
+    if(attachment?.type==='image'){
+      userContent=[{type:'text', text:text||'Analyze this image for YouTube – thumbnail score, CTR tips, hook ideas.'},{type:'image_url', image_url:{url:attachment.dataUrl}}];
+    }
+    const sys = buildSystemPrompt({webSearch, smart, responseStyle: settings.responseStyle}) + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
+    const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
+    try{
+      const {text:answer, model, tried, error} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref});
+      const assistantMsg={id:uid('m'), role:'assistant', text:answer, ts:Date.now(), model, tried, liked:0, error:!!error};
+      const finalMessages=[...updatedChat.messages, assistantMsg];
+      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
+      await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      if(!error) addNotification('Zedith replied', answer.slice(0,70));
+    }catch(e){
+      const errMsg={id:uid('m'), role:'assistant', text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, ts:Date.now()};
+      const finalMessages=[...updatedChat.messages, errMsg];
+      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
+      await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+    }
+  }
+
+  async function updateChat(chatId, patch){
+    const chat = chats.find(c=>c.id===chatId);
+    if(!chat) return;
+    const updated={...chat, ...patch, updated_at:new Date().toISOString()};
+    setChats(cs=>cs.map(c=>c.id===chatId?updated:c));
+    await supabase.from('chats').update(updated).eq('id',chatId);
+  }
+
+  async function updateMessage(chatId, msgId, patch){
+    const chat=chats.find(c=>c.id===chatId);
+    if(!chat) return;
+    const messages=chat.messages.map(m=>m.id===msgId?{...m,...patch}:m);
+    await updateChat(chatId,{messages});
+  }
+
+  async function createProject(np){
+    const proj={
+      id:uid('p'), user_id:user.id, title:np.title||'Untitled', cat:np.cat||'YouTube',
+      color:np.color||'#7c5cff', icon:np.icon||'FolderKanban', desc:np.desc||'',
+      tasks:[], files:[], notes:'', members:[{id:'m1',name:'You',role:'Owner'}],
+      created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+    };
+    const {data,error}=await supabase.from('projects').insert(proj).select();
+    if(error){ toast('Failed to create project','err'); return; }
+    setProjects(ps=>[proj,...ps]);
+    addNotification('Project created', proj.title);
+    return proj.id;
+  }
+
+  async function updateProject(id, patch){
+    const updated={...projects.find(p=>p.id===id), ...patch, updated_at:new Date().toISOString()};
+    setProjects(ps=>ps.map(p=>p.id===id?updated:p));
+    await supabase.from('projects').update(updated).eq('id',id);
+  }
+
+  async function deleteProject(id){
+    await supabase.from('projects').delete().eq('id',id);
+    setProjects(ps=>ps.filter(p=>p.id!==id));
+  }
+
+  async function uploadProjectFile(projectId, file){
+    const path = `${user.id}/${uid('f')}_${file.name}`;
+    const {error}=await supabase.storage.from('project-files').upload(path, file);
+    if(error){ toast('Upload failed','err'); return null; }
+    const {data}=supabase.storage.from('project-files').getPublicUrl(path);
+    return {name:file.name, size:file.size, type:file.type, url:data.publicUrl, uploadedAt:new Date().toISOString()};
+  }
+
+  async function createPlannerItem(item){
+    const newItem={...item, id:uid('pl'), user_id:user.id, created_at:new Date().toISOString()};
+    const {data,error}=await supabase.from('planner_items').insert(newItem).select();
+    if(error){ toast('Failed to schedule','err'); return; }
+    setPlannerItems(ps=>[newItem,...ps]);
+    addNotification('Content scheduled', newItem.title);
+  }
+
+  async function createVoiceEntry(entry){
+    const newEntry={...entry, id:uid('vh'), user_id:user.id, created_at:new Date().toISOString()};
+    const {data,error}=await supabase.from('voice_history').insert(newEntry).select();
+    if(error){ toast('Failed to save voice','err'); return; }
+    setVoiceHistory(h=>[newEntry,...h]);
+  }
+
+  async function markNotificationsRead(){
+    await supabase.from('notifications').update({read:true}).eq('user_id',user.id).eq('read',false);
+    setNotifications(ns=>ns.map(n=>({...n,read:true})));
+  }
+
+  async function signOut(){
+    await supabase.auth.signOut();
+    location.href='landing.html';
+  }
+
+  const startNewChat=()=>{ setActiveChatId(null); setActiveProjectId(null); setViewProjectId(null); setModule('chat'); };
+  const openProject=(pid)=>{ setActiveProjectId(pid); setActiveChatId(null); setViewProjectId(pid); setModule('project-detail'); };
+  const openChatForProject=(pid)=>{ setActiveProjectId(pid); setActiveChatId(null); setViewProjectId(null); setModule('chat'); };
+
+  const activeChat = useMemo(()=> chats.find(c=>c.id===activeChatId) || null, [chats, activeChatId]);
+  const recentChats = chats.slice(0,5).map(c=>({t:c.title||'Untitled', ago:formatDate(c.created_at)}));
+  const growth={views:0,change:0};
+
+  const updateSettings=(patch)=>{
+    const ns={...settings,...patch};
+    setSettings(ns);
+    saveSettings(ns);
+  };
+
+  const openNotifications=()=>setModule('notifications');
+  const openUpgrade=()=>setModule('upgrade');
+
+  const commonChatProps = {
+    chat:activeChat, chats, onSend:sendMessage, onNewChat:startNewChat, updateMessage, updateChat,
+    plan:profile?.plan||'free', credits:profile?.credits||0, isAdminUser:isAdmin(user),
+    openUpgrade, openNotifications, profile, settings
+  };
+
+  const renderModule=()=>{
+    switch(module){
+      case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
+      case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
+      case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} onOpenProject=${openProject} />`;
+      case 'planner': return html`<${PlannerView} items=${plannerItems} createPlannerItem=${createPlannerItem} />`;
+      case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} />`;
+      case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" />`;
+      case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
+      case 'analytics': return html`<${AnalyticsView} />`;
+      case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
+      case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>setComingSoon(k)} />`;
+      case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
+      case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${planConfig} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
+      default: return html`<${ChatView} ...${commonChatProps} />`;
+    }
+  };
+
+  if(loadingUser) return html`<div className="w-screen h-screen flex items-center justify-center text-zinc-500">Loading…</div>`;
+  if(!user) return html`<div className="w-screen h-screen flex flex-col items-center justify-center text-zinc-500 gap-4"><div>Please sign in to continue</div><a href="auth.html?mode=login" className="px-5 py-2 bg-[#7c5cff] text-white rounded-xl text-sm">Go to Sign In</a></div>`;
+
+  return html`
+  <div className="w-[1440px] h-[900px] bg-white dark:bg-[#0f111a] text-zinc-900 dark:text-zinc-100 flex rounded-[14px] overflow-hidden shadow-soft border border-zinc-200 dark:border-zinc-800">
+    <${LeftSidebar}
+      collapsed=${sidebarCollapsed}
+      toggleCollapsed=${()=>setSidebarCollapsed(s=>!s)}
+      module=${module}
+      setModule=${setModule}
+      onNewChat=${startNewChat}
+      theme=${theme}
+      toggleTheme=${()=>setTheme(t=>t==='dark'?'light':'dark')}
+      profile=${profile}
+      isAdminUser=${isAdmin(user)}
+      credits=${profile?.credits||0}
+      monthlyCredits=${profile?.monthly_credits||25000}
+      signOut=${signOut}
+      openTool=${t=>setToolModal(t)}
+      openNotifications=${openNotifications}
+    />
+    <div className="flex-1 flex min-w-0">
+      ${renderModule()}
+      ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} />` : null}
+    </div>
+    ${toolModal ? html`<${ToolModal} tool=${toolModal} onClose=${()=>setToolModal(null)} onSend=${sendMessage} />` : null}
+    ${comingSoon ? html`<${ComingSoonModal} plan=${comingSoon} onClose=${()=>setComingSoon(null)} />` : null}
+  </div>`;
+}
+
+// ---------- LeftSidebar ----------
+function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
+  const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[#efeaff] dark:bg-[#1e1a38] text-[#683ee6] dark:text-[#b79cff] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#151828]'}`;
+  const unread = 0;
+  return html`
+  <aside className=${`${collapsed?'w-[72px]':'w-[248px]'} shrink-0 h-[900px] bg-white dark:bg-[#0d0f1a] border-r border-zinc-200 dark:border-[#1c2030] flex flex-col transition-all duration-200`}>
+    <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#181c2b]">
+      <button onClick=${toggleCollapsed} className="p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Toggle sidebar">
+        <${I} name="Menu" size=${18}/>
+      </button>
+      ${!collapsed ? html`
+        <div className="flex items-center gap-2">
+          <div className="w-[28px] h-[28px] rounded-[8px] bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center text-white"><${I} name="Sparkles" size=${14}/></div>
+          <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
+        </div>
+      ` : null}
+    </div>
+
+    <div className="px-[10px] pt-[12px]">
+      <button onClick=${onNewChat} className=${`w-full flex items-center ${collapsed?'justify-center':'gap-[8px]'} px-3 py-[10px] rounded-[12px] bg-[#7c5cff] text-white text-[13px] font-[600] shadow-zed-soft hover:bg-[#6d48f5] transition`}>
+        <${I} name="Plus" size=${16}/>
+        ${!collapsed ? html`<span>New Chat</span><span className="ml-auto text-[10px] bg-white/15 px-[6px] py-[1px] rounded">⌘K</span>`:null}
+      </button>
+    </div>
+
+    <nav className="px-[10px] mt-[16px] space-y-[3px]">
+      ${[
+        ['chat','House','Home'],
+        ['projects','FolderKanban','My Projects'],
+        ['planner','CalendarDays','Content Planner'],
+        ['history','Clock','History'],
+        ['saved','Bookmark','Saved'],
+      ].map(([id,icon,label])=> html`
+        <button key=${id} onClick=${()=>setModule(id)} className=${itemCls(module===id)} title=${label}>
+          <${I} name=${icon} size=${17}/>
+          ${!collapsed ? label : null}
+        </button>
+      `)}
+      <div className=${`pt-[10px] mt-[10px] border-t border-zinc-100 dark:border-[#1a1d2d] ${collapsed?'text-center':''}`}>
+        ${!collapsed ? html`<div className="px-3 pb-[6px] text-[10px] uppercase tracking-wider text-zinc-400 font-[700]">Tools</div>`:null}
+        <button onClick=${()=>setModule('voice')} className=${itemCls(module==='voice')} title="AI Voice Studio">
+          <${I} name="Mic" size=${17}/> ${!collapsed ? 'AI Voice Studio' : ''}
+        </button>
+        <button onClick=${()=>setModule('analytics')} className=${itemCls(module==='analytics')} title="Channel Analytics">
+          <${I} name="BarChart3" size=${17}/> ${!collapsed ? 'Channel Analytics' : ''}
+        </button>
+        ${isAdminUser ? html`
+          <button onClick=${()=>setModule('admin')} className=${itemCls(module==='admin')} title="Admin Panel">
+            <${I} name="Shield" size=${17}/> ${!collapsed ? 'Admin Panel' : ''}
+          </button>
+        `:null}
+      </div>
+    </nav>
+
+    <div className="mt-auto px-[10px] pb-[10px]">
+      ${!collapsed ? html`
+        <div className="rounded-[16px] border border-zinc-200 dark:border-[#252944] bg-gradient-to-b from-[#faf9ff] to-white dark:from-[#161a2b] dark:to-[#131727] p-[14px] text-center">
+          <div className="flex justify-center text-amber-500"><${I} name="Crown" size=${20}/></div>
+          <div className="display font-[700] text-[13.5px] mt-1">Zedith ${(profile?.plan||'free').toUpperCase()}</div>
+          <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] text-[11px] font-[650] flex items-center justify-center gap-1">
+            ✨ ${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits
+          </button>
+          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-gradient-to-r from-[#6b38ff] to-[#3d7bff] text-white text-[12px] font-[650]">Upgrade Now →</button>
+        </div>
+      ` : html`
+        <button onClick=${()=>setModule('upgrade')} className="w-full py-[9px] rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" title="Upgrade">
+          <${I} name="Crown" size=${16} className="text-amber-500"/>
+        </button>
+      `}
+      <div className=${`flex items-center ${collapsed?'justify-center gap-1 flex-wrap':'gap-[8px]'} px-[4px] pt-[10px]`}>
+        <button onClick=${toggleTheme} className="w-[30px] h-[30px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center" title="Theme">
+          <${I} name=${theme==='dark'?'Moon':'Sun'} size=${14}/>
+        </button>
+        <button onClick=${signOut} className="w-[30px] h-[30px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center" title="Sign out">
+          <${I} name="LogOut" size=${14}/>
+        </button>
+        <button onClick=${()=>setModule('settings')} className="w-[30px] h-[30px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center" title="Settings">
+          <${I} name="Settings" size=${14}/>
+        </button>
+        ${!collapsed ? html`
+          <div className="ml-auto text-right">
+            <div className="text-[11px] font-[600] truncate max-w-[90px]">${profile?.display_name||'Creator'}</div>
+            <div className="text-[9px] text-zinc-400">${(profile?.plan||'free').toUpperCase()}</div>
+          </div>
+        ` : null}
+      </div>
+    </div>
+  </aside>`;
+}
+
+// ---------- Right Rail ----------
+function RightRail({chats, growth, openTool, setModule}){
+  return html`
+  <aside className="w-[318px] shrink-0 h-[900px] overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
+      <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
+      <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
+        Growth Overview 
+        <button onClick=${()=>toast('Date range selector – coming soon')} className="text-[11px] text-zinc-400 flex items-center gap-1">This Week <${I} name="ChevronDown" size=${12}/></button>
+      </div>
+      <div className="text-[24px] font-[800] display">${growth.views>0? (growth.views/1000).toFixed(1)+'K' : '—'}</div>
+      <div className="text-[11px] text-zinc-500">Total Views</div>
+      <div className="h-[56px] mt-2 flex items-center justify-center text-zinc-400 text-[11px]">No data yet – connect channel</div>
+    </div>
+
+      <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
+      <div className="flex justify-between items-center mb-2">
+        <div className="font-[650] text-[12.5px]">Top Performing Content</div>
+        <button onClick=${()=>setModule('analytics')} className="text-[11px] text-[#7c5cff]">View all ›</button>
+      </div>
+      <div className="text-[11.5px] text-zinc-500">No content yet. Connect your YouTube channel in Analytics.</div>
+    </div>
+
+      <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
+      <div className="flex justify-between items-center mb-[10px]">
+        <div className="font-[650] text-[12.5px]">Quick Tools</div>
+        <button onClick=${()=>openTool('Idea Generator')} className="text-[11px] text-zinc-500">View all ›</button>
+      </div>
+      <div className="grid grid-cols-5 gap-[4px] text-center">
+        ${[
+          ['FileText','Script','#7c5cff','Script Writer'],
+          ['Lightbulb','Idea','#eab308','Idea Generator'],
+          ['Wand2','Hook','#ef4444','Hook Generator'],
+          ['Image','Thumb','#3b82f6','Thumbnail Analyzer'],
+          ['AudioLines','Voice','#8b5cf6','AI Voice Generator'],
+        ].map(([ic,lbl,col,full])=> html`
+          <button key=${lbl} onClick=${()=>openTool(full)} className="relative">
+            <div className="w-[42px] h-[42px] mx-auto rounded-[12px] flex items-center justify-center" style=${{background:col+'18'}}>
+              <${I} name=${ic} size=${16} style=${{color:col}}/>
+            </div>
+            <div className="text-[9px] text-zinc-500 mt-1 leading-tight">${lbl}</div>
+          </button>
+        `)}
+      </div>
+    </div>
+
+    <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
+      <div className="flex justify-between items-center mb-[10px]">
+        <div className="font-[650] text-[12.5px]">Recent Chats</div>
+        <button onClick=${()=>setModule('history')} className="text-[11px] text-zinc-500">View all ›</button>
+      </div>
+      ${chats.length===0 ? html`<div className="text-[11.5px] text-zinc-500">No chats yet. Start a new conversation.</div>` : html`
+        <div className="space-y-[9px] text-[12px]">
+          ${chats.map(c=> html`
+            <div key=${c.t} className="flex justify-between gap-2">
+              <span className="truncate text-zinc-700 dark:text-zinc-300">${c.t}</span>
+              <span className="text-zinc-400 text-[11px] shrink-0">${c.ago}</span>
+            </div>
+          `)}
+        </div>
+      `}
+    </div>
+  </aside>`;
+}
+
+// ---------- Coming Soon Modal ----------
+function ComingSoonModal({plan,onClose}){
+  return html`
+  <div className="fixed inset-0 z-[400] bg-black/55 flex items-center justify-center p-4" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#181b2b] w-[420px] max-w-[96vw] rounded-[20px] shadow-2xl p-6 text-center" onClick=${e=>e.stopPropagation()}>
+      <div className="w-12 h-12 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center mx-auto mb-3"><${I} name="Rocket" size={22} className="text-[#7c5cff]"/></div>
+      <div className="font-[700] text-[18px]">${plan==='pro'?'Zedith Pro':'Zedith Infinity'} — Coming Soon</div>
+      <div className="text-[13px] text-zinc-500 mt-2">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Infinity'} upgrades are not yet available.</div>
+      <button onClick=${onClose} className="mt-5 px-5 py-2 rounded-xl bg-[#7c5cff] text-white text-sm font-semibold">Got it</button>
+    </div>
+  </div>`;
+}
+
+// ---------- Chat ----------
+function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, plan, credits, isAdminUser, openUpgrade, openNotifications, profile, settings}){
+  const [input,setInput]=useState('');
+  const [smart,setSmart]=useState(false);
+  const [webSearch,setWebSearch]=useState(settings?.webSearch ?? true);
+  const [attached,setAttached]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
+
+  const messages = chat?.messages || [];
+
+  useEffect(()=>{ scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading]);
+
+  const doSend = async (overrideText)=>{
+    const text=(overrideText ?? input).trim();
+    if(!text && !attached) return;
+    if(loading) return;
+    setLoading(true); setInput('');
+    const att=attached; setAttached(null);
+    try{ await onSend({text, attachment:att, smart, webSearch, modelPref:'auto'}); }
+    finally{ setLoading(false); }
+  };
+
+  const pickFile = (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      if(f.type.startsWith('image/')){ setAttached({type:'image', dataUrl:reader.result, name:f.name}); }
+      else { setInput(inp=> inp + `\n[File: ${f.name}]`); toast('File attached: '+f.name); }
+    };
+    if(f.type.startsWith('image/')) reader.readAsDataURL(f); else reader.readAsText(f);
+    e.target.value='';
+  };
+
+  const hasMessages = messages.length>0;
+
+  return html`
+  <div className="flex-1 flex flex-col h-[900px] bg-[#fbfbfe] dark:bg-[#141620]">
+    <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#23283f] bg-white/85 dark:bg-[#141620]/90 backdrop-blur">
+      <div className="flex items-center gap-2 text-[13.5px] font-[600]">
+        Chat
+        <${I} name="ChevronDown" size=${13} className="text-zinc-400"/>
+      </div>
+      <div className="flex items-center gap-[10px]">
+        <button onClick=${openUpgrade} className="px-[11px] py-[6px] rounded-[10px] text-[12px] font-[600] border border-zinc-300 dark:border-[#2f3452] flex items-center gap-[5px]">
+          <${I} name="Crown" size=${12} className="text-amber-500"/> ${plan.toUpperCase()}
+        </button>
+        <button onClick=${openNotifications} className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" title="Notifications">
+          <${I} name="Bell" size=${18}/>
+        </button>
+        <div className="text-[11px] px-3 py-[6px] rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] font-[600]">
+          ✨ ${credits.toLocaleString('en-IN')} Credits
+        </div>
+      </div>
+    </div>
+
+    <div ref=${scrollRef} className="flex-1 overflow-y-auto px-[28px] py-[26px]">
+      ${!hasMessages ? html`
+        <div className="max-w-[740px] mx-auto pt-14 text-center">
+          <div className="text-[28px] font-[800] display">Hey ${profile?.display_name||'creator'}! 👋</div>
+          <div className="text-[15px] mt-2 text-zinc-600 dark:text-zinc-300">
+            What would you like to <span className="text-[#7c5cff] font-[700]">create</span> or <span className="text-[#a056ff] font-[700]">learn</span> today?
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-7 text-left">
+            ${[
+              ['Give me 5 viral ideas','Lightbulb'],
+              ['Write a script for this topic','FileText'],
+              ['Generate a hook for my video','Wand2'],
+              ['Analyze my latest video','BarChart3'],
+            ].map(([l,ic])=> html`
+              <button key=${l} onClick=${()=>doSend(l)} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-[14px] hover:border-[#7c5cff] transition text-left">
+                <${I} name=${ic} size=${17} className="text-[#7c5cff] mb-[8px]"/>
+                <div className="text-[12.5px] font-[550]">${l}</div>
+              </button>
+            `)}
+          </div>
+          <div className="text-[11px] text-zinc-400 mt-6">Credit-based usage • ${isAdminUser?'Unlimited admin mode':'credits deducted per request'}</div>
+        </div>
+      ` : html`
+        <div className="max-w-[760px] mx-auto space-y-[26px]">
+          ${messages.map((m,idx)=> html`
+            <div key=${m.id||idx} className="fade-in">
+              ${m.role==='user' ? html`
+                <div className="flex justify-end">
+                  <div className="bg-[#ece7ff] dark:bg-[#241f44] px-[15px] py-[11px] rounded-[15px] max-w-[72%] text-[13.3px] leading-relaxed whitespace-pre-wrap">
+                    ${m.attachment?.type==='image' ? html`<img src=${m.attachment.dataUrl} className="max-h-[190px] rounded-[10px] mb-2 border border-zinc-300 dark:border-zinc-700"/>`:null}
+                    ${m.text}
+                  </div>
+                </div>
+              ` : html`
+                <div className="pr-6">
+                  ${m.type==='image_generating' ? html`
+                    <div className="border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4 bg-white dark:bg-[#181b2b] max-w-[520px]">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-full border-2 border-[#7c5cff] border-t-transparent animate-spin"></div>
+                        <div>
+                          <div className="font-[600] text-[13px]">Creating your image…</div>
+                          <div className="text-[11px] text-zinc-500 truncate">${m.prompt}</div>
+                        </div>
+                      </div>
+                      <div className="w-full h-[220px] rounded-[12px] shimmer"></div>
+                    </div>
+                  ` : m.type==='image' ? html`
+                    <div className="space-y-2 max-w-[560px]">
+                      <img src=${m.imageUrl} alt="generated" className="rounded-[14px] border border-zinc-200 dark:border-zinc-700 shadow-soft w-full"/>
+                      <div className="text-[12.5px] text-zinc-600 dark:text-zinc-300">${m.text}</div>
+                      <div className="flex gap-3 text-[11px] text-zinc-500">
+                        <a href=${m.imageUrl} download="zedith-image.png" target="_blank" className="hover:underline flex items-center gap-1"><${I} name="Download" size=${12}/> Download PNG</a>
+                        <button onClick=${()=>copyText(m.imageUrl)} className="hover:underline flex items-center gap-1"><${I} name="Copy" size=${12}/> Copy URL</button>
+                      </div>
+                    </div>
+                  ` : html`
+                    <div className="text-[13.6px] leading-[1.7] whitespace-pre-wrap">${m.text}</div>
+                  `}
+                  ${m.role==='assistant' && m.type!=='image_generating' ? html`
+                    <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
+                      <button onClick=${()=>copyText(m.text||m.prompt||'')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Copy" size=${13}/> Copy</button>
+                      <button onClick=${()=>{ const liked = m.liked===1?0:1; updateMessage(chat.id, m.id, {liked}); toast(liked?'Liked ✓':'Like removed'); }} className=${`flex items-center gap-[4px] ${m.liked===1?'text-emerald-600 font-[600]':''}`}>
+                        <${I} name="ThumbsUp" size=${13}/> ${m.liked===1?'Liked':''}
+                      </button>
+                      <button onClick=${()=>{ const dis = m.liked===-1?0:-1; updateMessage(chat.id, m.id, {liked:dis}); toast(dis?'Thanks for feedback':''); }} className=${m.liked===-1?'text-red-500':''}>
+                        <${I} name="ThumbsDown" size=${13}/>
+                      </button>
+                      <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance((m.text||'').slice(0,900)); u.lang='en-IN'; speechSynthesis.cancel(); speechSynthesis.speak(u); toast('Speaking…'); }catch{ toast('TTS failed','err'); } }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Volume2" size=${13}/> Speak</button>
+                      <button onClick=${()=>{ const lastUser = [...messages].reverse().find(mm=>mm.role==='user'); if(lastUser){ doSend(lastUser.text); toast('Regenerating…'); } }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="RefreshCw" size=${13}/> Regenerate</button>
+                      <button onClick=${()=>{ updateChat(chat.id, {saved:!chat.saved}); toast(chat.saved?'Removed from saved':'Saved chat ✓'); }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name=${chat.saved?'BookmarkCheck':'Bookmark'} size=${13}/> ${chat.saved?'Saved':''}</button>
+                      ${m.model ? html`<span className="text-[10px] text-zinc-400">• ${String(m.model).split('/').pop()} ${m.tried?`· ${m.tried} tried`:''}</span>`:null}
+                    </div>
+                  ` : null}
+                </div>
+              `}
+            </div>
+          `)}
+          ${loading ? html`<div className="text-[12.5px] text-zinc-500 flex items-center gap-2"><${I} name="Loader2" size=${14} className="animate-spin"/> Zedith is thinking${smart?' deeply':''}…</div>`:null}
+        </div>
+      `}
+    </div>
+
+    <div className="px-5 pb-4">
+      <div className="max-w-[760px] mx-auto bg-white dark:bg-[#1b1e30] border border-zinc-200 dark:border-[#2b2f48] rounded-[18px] shadow-soft px-[13px] pt-[10px] pb-[10px]">
+        ${attached ? html`
+          <div className="mb-[8px] flex items-center gap-2 text-[11px] bg-zinc-50 dark:bg-[#22263a] border border-zinc-200 dark:border-zinc-700 rounded-[12px] px-3 py-[8px]">
+            <${I} name="Image" size=${14}/>
+            <span className="flex-1 truncate">${attached.name}</span>
+            <img src=${attached.dataUrl} className="w-12 h-9 object-cover rounded-md"/>
+            <button onClick=${()=>setAttached(null)} className="text-zinc-500"><${I} name="X" size=${13}/></button>
+          </div>
+        `:null}
+        <input
+          value=${input}
+          onChange=${e=>setInput(e.target.value)}
+          onKeyDown=${e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); doSend(); }}}
+          placeholder="Ask Zedith anything…  Tip: 'generate image of …'"
+          className="w-full bg-transparent outline-none text-[13.3px] py-[5px] placeholder-zinc-400"
+        />
+        <div className="flex items-center gap-[7px] mt-[9px] flex-wrap">
+          <button onClick=${()=>imgRef.current?.click()} className="w-[33px] h-[33px] rounded-[10px] border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800" title="Upload image">
+            <${I} name="Plus" size=${15}/>
+          </button>
+          <button onClick=${()=>setSmart(s=>!s)} className=${`px-[11px] h-[33px] rounded-[10px] text-[12px] font-[550] border flex items-center gap-[5px] ${smart ? 'border-[#7c5cff] bg-[#f5f1ff] dark:bg-[#221b3a] text-[#6a3ff5]':'border-zinc-200 dark:border-zinc-700'}`}>
+            <${I} name="Sparkles" size=${13}/> Smart
+          </button>
+          <button onClick=${()=>fileRef.current?.click()} className="px-[11px] h-[33px] rounded-[10px] text-[12px] border border-zinc-200 dark:border-zinc-700 flex items-center gap-[5px]">
+            <${I} name="Paperclip" size=${13}/> Attach
+          </button>
+          <button onClick=${()=>{ setWebSearch(w=>!w); toast(webSearch?'Web search off':'Web search on'); }} className=${`px-[11px] h-[33px] rounded-[10px] text-[12px] border flex items-center gap-[5px] ${webSearch ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-300':'border-zinc-200 dark:border-zinc-700'}`}>
+            <${I} name="Globe" size=${13}/> Search
+          </button>
+          <div className="flex-1"></div>
+          <button onClick=${()=>{}} className="w-[33px] h-[33px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><${I} name="Mic" size=${14}/></button>
+          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[#7c5cff] hover:bg-[#6b48f5] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition">
+            <${I} name="ArrowUp" size=${17}/>
+          </button>
+        </div>
+        <input type="file" ref=${fileRef} accept="*/*" onChange=${pickFile} className="hidden"/>
+        <input type="file" ref=${imgRef} accept="image/*" onChange=${pickFile} className="hidden"/>
+      </div>
+      <div className="max-w-[760px] mx-auto flex items-center justify-between text-[10.5px] text-zinc-400 mt-[8px] px-1">
+        <span>${isAdminUser?'Admin mode: unlimited credits':`Credits: ${credits.toLocaleString('en-IN')} remaining`}</span>
+        <span>🔒 Secure</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Project Detail View ----------
+function ProjectDetailView({project, projects, updateProject, deleteProject, uploadProjectFile, onChat, onBack, addNotification}){
+  const [tab,setTab]=useState('Files');
+  const fileRef=useRef(null);
+  if(!project) return html`<div className="flex-1 flex items-center justify-center text-zinc-500">Project not found</div>`;
+
+  const tasks = project.tasks || [];
+  const files = project.files || [];
+  const notes = project.notes || '';
+  const members = project.members || [];
+
+  const updateTasks=(nt)=>updateProject(project.id,{tasks:nt});
+  const updateFiles=(nf)=>updateProject(project.id,{files:nf});
+  const updateNotes=(n)=>updateProject(project.id,{notes:n});
+
+  const addTask=()=>{ const t={id:uid('t'), text:'New task', done:false}; updateTasks([...tasks,t]); };
+  const toggleTask=(id)=> updateTasks(tasks.map(t=>t.id===id?{...t,done:!t.done}:t));
+  const updateTask=(id,text)=> updateTasks(tasks.map(t=>t.id===id?{...t,text}:t));
+  const removeTask=(id)=> updateTasks(tasks.filter(t=>t.id!==id));
+
+  const uploadFile=async (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const fileData = await uploadProjectFile(project.id, f);
+    if(!fileData) return;
+    const nf={id:uid('f'), ...fileData};
+    updateFiles([nf,...files]);
+    addNotification('File uploaded', f.name);
+  };
+
+  const tabs=['Files','Tasks','Notes','Analytics','Settings'];
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
+    <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <button onClick=${onBack} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ArrowLeft" size=${18}/></button>
+        <div className="w-10 h-10 rounded-[10px] flex items-center justify-center" style=${{background:project.color+'22', color:project.color}}>
+          <${I} name=${project.icon||'FolderKanban'} size=${18}/>
+        </div>
+        <div>
+          <div className="text-[19px] font-[800] display">${project.title}</div>
+          <div className="text-[11px] text-zinc-500">${project.cat||'General'} • Updated ${formatDate(project.updated_at||project.created_at)}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick=${()=>{ const email=prompt('Invite by email:'); if(email){ const nm=[...members,{id:uid('m'),name:email,role:'Editor'}]; updateProject(project.id,{members:nm}); toast('Invitation sent to '+email); } }} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
+          <${I} name="UserPlus" size=${14}/> Add members
+        </button>
+        <button onClick=${()=>{ copyText(window.location.href); toast('Project link copied'); }} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
+          <${I} name="Share2" size=${14}/> Share
+        </button>
+        <button onClick=${onChat} className="px-3 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600] flex items-center gap-2">
+          <${I} name="MessageSquare" size=${14}/> Project Chat
+        </button>
+      </div>
+    </div>
+
+    <div className="px-6 py-5">
+      <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
+        ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+      </div>
+
+      ${tab==='Files' ? html`
+        <div className="max-w-[900px]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-[13px] font-[650]">Project Files</div>
+            <button onClick=${()=>fileRef.current?.click()} className="px-3 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Upload" size=${14}/> Upload File</button>
+            <input type="file" ref=${fileRef} onChange=${uploadFile} className="hidden"/>
+          </div>
+          ${files.length===0 ? html`
+            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-10 text-center text-zinc-500">
+              <${I} name="FileText" size=${28} className="mx-auto mb-2"/><div className="font-[600]">No files yet</div><div className="text-[12px]">Upload scripts, thumbnails, research, or assets.</div>
+            </div>
+          ` : html`
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              ${files.map(f=> html`
+                <div key=${f.id} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-3 flex gap-3">
+                  <div className="w-10 h-10 rounded-[10px] bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center"><${I} name=${f.type?.startsWith('image/')?'Image':'FileText'} size=${16} className="text-[#7c5cff]"/></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12.5px] font-[600] truncate">${f.name}</div>
+                    <div className="text-[10.5px] text-zinc-500">${(f.size/1024).toFixed(1)} KB • ${formatDate(f.uploadedAt)}</div>
+                  </div>
+                  ${f.url ? html`<a href=${f.url} target="_blank" download=${f.name} className="text-[#7c5cff] text-[11px]">Open</a>`:null}
+                </div>
+              `)}
+            </div>
+          `}
+        </div>
+      ` : tab==='Tasks' ? html`
+        <div className="max-w-[700px]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-[13px] font-[650]">Tasks</div>
+            <button onClick=${addTask} className="px-3 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> Add Task</button>
+          </div>
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4 space-y-2">
+            ${tasks.length===0 ? html`<div className="text-zinc-500 text-[12px] text-center py-4">No tasks yet. Add your first project task.</div>` : tasks.map(t=> html`
+              <div key=${t.id} className="flex items-center gap-3 group">
+                <button onClick=${()=>toggleTask(t.id)} className=${`w-5 h-5 rounded-md border flex items-center justify-center ${t.done?'bg-emerald-500 border-emerald-500 text-white':'border-zinc-300 dark:border-zinc-600'}`}><${I} name="Check" size=${12}/></button>
+                <input value=${t.text} onChange=${e=>updateTask(t.id,e.target.value)} className=${`flex-1 bg-transparent text-[13px] outline-none ${t.done?'line-through text-zinc-400':''}`}/>
+                <button onClick=${()=>removeTask(t.id)} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500"><${I} name="Trash2" size=${14}/></button>
+              </div>
+            `)}
+          </div>
+        </div>
+      ` : tab==='Notes' ? html`
+        <div className="max-w-[800px]">
+          <div className="text-[13px] font-[650] mb-3">Project Notes</div>
+          <textarea value=${notes} onChange=${e=>updateNotes(e.target.value)} placeholder="Write ideas, scripts, research notes…" className="w-full h-[420px] bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4 text-[13px] outline-none resize-none"></textarea>
+        </div>
+      ` : tab==='Analytics' ? html`
+        <div className="max-w-[900px]">
+          <div className="text-[13px] font-[650] mb-4">Project Analytics</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            ${[['Tasks Done', tasks.filter(t=>t.done).length+'/'+tasks.length],['Files', files.length],['Members', members.length]].map(([l,v])=> html`
+              <div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-4">
+                <div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div>
+              </div>
+            `)}
+          </div>
+        </div>
+      ` : html`
+        <div className="max-w-[600px]">
+          <div className="text-[13px] font-[650] mb-3">Project Settings</div>
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4 space-y-3 text-[12px]">
+            <div><div className="text-zinc-500 mb-1">Project Name</div>
+              <input value=${project.title} onChange=${e=>updateProject(project.id,{title:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
+            </div>
+            <div><div className="text-zinc-500 mb-1">Category</div>
+              <select value=${project.cat} onChange=${e=>updateProject(project.id,{cat:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a]">
+                <option>YouTube</option><option>Instagram</option><option>TikTok</option><option>Podcast</option>
+              </select>
+            </div>
+            <div><div className="text-zinc-500 mb-1">Description</div>
+              <textarea value=${project.desc||''} onChange=${e=>updateProject(project.id,{desc:e.target.value})} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"></textarea>
+            </div>
+            <button onClick=${()=>{ if(confirm('Delete this project?')){ deleteProject(project.id); onBack(); } }} className="text-red-600 text-[12px] font-[600]">Delete Project</button>
+          </div>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+// ---------- Projects ----------
+function ProjectsView({projects, createProject, onOpenProject}){
+  const [showCreate,setShowCreate]=useState(projects.length===0);
+  const [filter,setFilter]=useState('All Projects');
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
+    <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
+      <div><div className="text-[19px] font-[800] display">My Projects</div><div className="text-[11px] text-zinc-500">${projects.length} Projects</div></div>
+      <button onClick=${()=>setShowCreate(true)} className="bg-[#7c5cff] hover:bg-[#6b48f5] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
+    </div>
+    ${projects.length===0 && !showCreate ? html`
+      <div className="h-[680px] flex flex-col items-center justify-center text-center px-10">
+        <div className="w-20 h-20 rounded-[18px] bg-[#f1efff] dark:bg-[#1e1a36] flex items-center justify-center mb-4"><${I} name="FolderKanban" size=${32} className="text-[#7c5cff]"/></div>
+        <div className="text-[18px] font-[750]">You don't have any projects yet</div>
+        <div className="text-[12.5px] text-zinc-500 mt-1 max-w-[380px]">Create your first project to organize your ideas, files, chats and content in one place.</div>
+        <button onClick=${()=>setShowCreate(true)} className="mt-4 bg-[#7c5cff] text-white px-4 py-[9px] rounded-xl text-[12.5px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${15}/> Create Project</button>
+      </div>
+    ` : html`
+      <div className="px-6 py-5">
+        <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
+          ${['All Projects','Active','Archived','Shared','Trash'].map(t=> html`
+            <button key=${t} onClick=${()=>setFilter(t)} className=${`pb-[10px] ${filter===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
+          `)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
+          ${projects.map(p=> html`
+            <button key=${p.id} onClick=${()=>onOpenProject(p.id)} className="text-left bg-white dark:bg-[#1a1d2e] rounded-[15px] border border-zinc-200 dark:border-[#2a2f4a] p-[15px] hover:border-[#7c5cff] transition">
+              <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-3" style=${{background:p.color+'22', color:p.color}}>
+                <${I} name=${p.icon||'FolderKanban'} size=${18}/>
+              </div>
+              <div className="font-[680] text-[13.5px]">${p.title}</div>
+              <div className="text-[11px] text-zinc-500">${p.cat||'General'}</div>
+              <div className="text-[10px] text-zinc-400 mt-1">Updated ${formatDate(p.updated_at||p.created_at)}</div>
+            </button>
+          `)}
+          <button onClick=${()=>setShowCreate(true)} className="rounded-[15px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 min-h-[170px] flex flex-col items-center justify-center text-zinc-500">
+            <${I} name="Plus" size=${20}/><div className="text-[12.5px] font-[600] mt-1">New Project</div>
+          </button>
+        </div>
+      </div>
+    `}
+    ${showCreate ? html`<${CreateProjectModal}
+      onClose=${()=>setShowCreate(false)}
+      onCreate=${async (np)=>{ const id=await createProject(np); if(id) onOpenProject(id); setShowCreate(false); }}
+    />`:null}
+  </div>`;
+}
+
+function CreateProjectModal({onClose,onCreate}){
+  const [name,setName]=useState(''); const [desc,setDesc]=useState(''); const [icon,setIcon]=useState('FolderKanban'); const [color,setColor]=useState('#7c5cff'); const [cat,setCat]=useState('YouTube');
+  return html`
+  <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#181b2b] w-[740px] max-w-[96vw] rounded-[18px] shadow-2xl" onClick=${e=>e.stopPropagation()}>
+      <div className="px-5 py-[14px] border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="font-[700]">Create New Project</div>
+        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+      </div>
+      <div className="p-5 grid grid-cols-3 gap-5 text-[12px]">
+        <div className="col-span-2 space-y-3">
+          <div className="text-[#7c5cff] font-[600] text-[11.5px]">1. Project Details</div>
+          <input value=${name} onChange=${e=>setName(e.target.value)} placeholder="Enter project name…" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/>
+          <textarea value=${desc} onChange=${e=>setDesc(e.target.value)} placeholder="Add a short description…" className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"></textarea>
+          <div className="text-[#7c5cff] font-[600] text-[11.5px]">2. Choose Icon & Color</div>
+          <div className="flex gap-[8px] flex-wrap">
+            ${['FolderKanban','Play','Code2','GraduationCap','Briefcase','Megaphone','Palette','Lightbulb'].map(ic=> html`
+              <button key=${ic} onClick=${()=>setIcon(ic)} className=${`w-10 h-10 rounded-[10px] border flex items-center justify-center ${icon===ic?'border-[#7c5cff] bg-[#f5f1ff] dark:bg-[#221d3a]':'border-zinc-200 dark:border-zinc-700'}`}><${I} name=${ic} size=${16}/></button>
+            `)}
+          </div>
+          <div className="flex gap-[8px]">
+            ${['#7c5cff','#ef4444','#f97316','#eab308','#10b981','#06b6d4','#3b82f6','#a855f7','#ec4899','#6b7280'].map(c=> html`
+              <button key=${c} onClick=${()=>setColor(c)} className="w-[22px] h-[22px] rounded-full" style=${{background:c, outline: color===c ? '2px solid #7c5cff':'none', outlineOffset:'2px'}}></button>
+            `)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[#7c5cff] font-[600] text-[11.5px]">3. Project Type</div>
+          <select value=${cat} onChange=${e=>setCat(e.target.value)} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] text-[12px]">
+            <option>YouTube</option><option>Instagram</option><option>TikTok</option><option>Podcast</option>
+          </select>
+        </div>
+      </div>
+      <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
+        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
+        <button onClick=${()=>onCreate({title:name, cat, icon, color, desc})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600]">Create Project</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Planner ----------
+function PlannerView({items, createPlannerItem}){
+  const [view,setView]=useState('Month');
+  const [showNew,setShowNew]=useState(false);
+  const today=new Date();
+  const [year,setYear]=useState(today.getFullYear());
+  const [month,setMonth]=useState(today.getMonth());
+  const days=daysInMonth(year,month);
+  const firstDay=new Date(year,month,1).getDay();
+  const [checks,setChecks]=useState([
+    {id:'c1',text:'Plan weekly content',done:false},
+    {id:'c2',text:'Schedule 3 videos',done:false},
+    {id:'c3',text:'Write thumbnails',done:false},
+    {id:'c4',text:'Review analytics',done:false},
+  ]);
+  const toggleCheck=(id)=> setChecks(cs=>cs.map(c=>c.id===id?{...c,done:!c.done}:c));
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto flex gap-5">
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[19px] font-[800] display">Content Planner</div>
+          <div className="text-[12px] text-zinc-500">Plan, schedule and manage your content in one place.</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-zinc-100 dark:bg-[#1e2135] rounded-[10px] p-1 text-[12px]">
+            ${['Month','Week','List'].map(v=> html`<button key=${v} onClick=${()=>setView(v)} className=${`px-3 py-[6px] rounded-[8px] ${view===v?'bg-white dark:bg-[#2a2d46] shadow-sm font-[600]':'text-zinc-500'}`}>${v}</button>`)}
+          </div>
+          <button onClick=${()=>setShowNew(true)} className="bg-[#7c5cff] text-white px-3 py-[8px] rounded-xl text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Content</button>
+        </div>
+      </div>
+
+      ${view==='Month' ? html`
+        <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick=${()=>{ const d=new Date(year,month-1,1); setYear(d.getFullYear()); setMonth(d.getMonth()); }} className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ChevronLeft" size=${16}/></button>
+            <div className="font-[700] text-[14px]">${new Date(year,month).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+            <button onClick=${()=>{ const d=new Date(year,month+1,1); setYear(d.getFullYear()); setMonth(d.getMonth()); }} className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ChevronRight" size=${16}/></button>
+          </div>
+          <div className="grid grid-cols-7 text-center text-[11px] text-zinc-500 mb-2">
+            ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>html`<div key=${d}>${d}</div>`)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            ${Array.from({length:firstDay}).map((_,i)=>html`<div key=${'e'+i} className="h-[90px]"></div>`)}
+            ${Array.from({length:days},(_,i)=>{
+              const day=i+1;
+              const dayItems=items.filter(it=>{ const d=new Date(it.date); return d.getDate()===day && d.getMonth()===month && d.getFullYear()===year; });
+              return html`
+                <button key=${day} onClick=${()=>setShowNew(true)} className="h-[90px] rounded-[10px] border border-zinc-100 dark:border-zinc-800 p-1 text-left hover:border-[#7c5cff] transition">
+                  <div className="text-[11px] font-[600] mb-1 ${day===today.getDate() && month===today.getMonth() ? 'text-[#7c5cff]' : ''}">${day}</div>
+                  ${dayItems.slice(0,2).map(it=>html`<div key=${it.id} className="text-[9px] truncate px-1 py-[2px] rounded bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] mb-[2px]">${it.title}</div>`)}
+                  ${dayItems.length>2 ? html`<div className="text-[9px] text-zinc-400">+${dayItems.length-2} more</div>`:null}
+                </button>
+              `;
+            })}
+          </div>
+        </div>
+      ` : view==='Week' ? html`
+        <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-8 text-center text-zinc-500">
+          <${I} name="CalendarDays" size=${32} className="mx-auto mb-3"/>
+          <div className="font-[600]">Week view</div>
+          <div className="text-[12px]">Weekly timeline view coming soon with drag-and-drop scheduling.</div>
+        </div>
+      ` : html`
+        <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+          <div className="text-[13px] font-[650] mb-3">Scheduled Content</div>
+          ${items.length===0 ? html`<div className="text-zinc-500 text-[12px] text-center py-8">No content scheduled yet.</div>` : html`
+            <div className="space-y-2">
+              ${items.map(it=>html`
+                <div key=${it.id} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center"><${I} name=${it.type==='video'?'Play':'FileText'} size=${14} className="text-[#7c5cff]"/></div>
+                    <div>
+                      <div className="text-[12.5px] font-[600]">${it.title}</div>
+                      <div className="text-[10.5px] text-zinc-500">${it.platform} • ${formatDate(it.date)}</div>
+                    </div>
+                  </div>
+                  <span className=${`text-[10px] px-2 py-1 rounded-full ${it.status==='Published'?'bg-emerald-100 text-emerald-700':it.status==='Scheduled'?'bg-blue-100 text-blue-700':'bg-zinc-100 text-zinc-600'}`}>${it.status}</span>
+                </div>
+              `)}
+            </div>
+          `}
+        </div>
+      `}
+    </div>
+
+    <aside className="w-[280px] shrink-0 space-y-4">
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="font-[650] text-[13px] mb-3">Publishing Checklist</div>
+        <div className="space-y-2">
+          ${checks.map(c=>html`
+            <button key=${c.id} onClick=${()=>toggleCheck(c.id)} className="w-full flex items-center gap-2 text-left text-[12px]">
+              <span className=${`w-4 h-4 rounded border flex items-center justify-center ${c.done?'bg-emerald-500 border-emerald-500 text-white':'border-zinc-300 dark:border-zinc-600'}`}><${I} name="Check" size=${10}/></span>
+              <span className=${c.done?'line-through text-zinc-400':''}>${c.text}</span>
+            </button>
+          `)}
+        </div>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="font-[650] text-[13px] mb-2">Up Next</div>
+        ${items.filter(it=>new Date(it.date)>=today).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,3).length===0 ? html`<div className="text-[11px] text-zinc-500">Nothing scheduled yet.</div>` : html`
+          <div className="space-y-2">
+            ${items.filter(it=>new Date(it.date)>=today).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,3).map(it=>html`
+              <div key=${it.id} className="text-[11px]"><div className="font-[600]">${it.title}</div><div className="text-zinc-500">${formatDate(it.date)}</div></div>
+            `)}
+          </div>
+        `}
+      </div>
+    </aside>
+
+    ${showNew ? html`<${NewContentModal} onClose=${()=>setShowNew(false)} onCreate=${(it)=>{ createPlannerItem(it); setShowNew(false); toast('Content scheduled'); }}/>` : null}
+  </div>`;
+}
+
+function NewContentModal({onClose,onCreate}){
+  const [title,setTitle]=useState(''); const [platform,setPlatform]=useState('YouTube'); const [type,setType]=useState('video'); const [date,setDate]=useState(new Date().toISOString().split('T')[0]); const [status,setStatus]=useState('Draft');
+  return html`
+  <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#181b2b] w-[520px] max-w-[96vw] rounded-[18px] shadow-2xl p-5" onClick=${e=>e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="font-[700]">New Content</div>
+        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+      </div>
+      <div className="space-y-3 text-[12px]">
+        <div><div className="text-zinc-500 mb-1">Title</div><input value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. 10 AI Tools for YouTube" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><div className="text-zinc-500 mb-1">Platform</div>
+            <select value=${platform} onChange=${e=>setPlatform(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option>YouTube</option><option>Instagram</option><option>TikTok</option></select>
+          </div>
+          <div><div className="text-zinc-500 mb-1">Type</div>
+            <select value=${type} onChange=${e=>setType(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option value="video">Video</option><option value="short">Short</option><option value="post">Post</option></select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><div className="text-zinc-500 mb-1">Date</div><input type="date" value=${date} onChange=${e=>setDate(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/></div>
+          <div><div className="text-zinc-500 mb-1">Status</div>
+            <select value=${status} onChange=${e=>setStatus(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option>Draft</option><option>Scheduled</option><option>Published</option></select>
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 mt-5">
+        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
+        <button onClick=${()=>onCreate({title:title||'Untitled', platform, type, date, status})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600]">Schedule</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- History ----------
+function HistoryView({chats, updateChat, projects, voiceHistory, filter: initialFilter='all'}){
+  const [query,setQuery]=useState('');
+  const [tab,setTab]=useState(initialFilter==='saved'?'Saved':'All');
+  const [sort,setSort]=useState('Newest');
+  const [layout,setLayout]=useState('list');
+
+  let items=[];
+  if(tab==='All') items=[...chats.map(c=>({...c,type:'chat'})), ...voiceHistory.map(v=>({...v,type:'voice'}))].sort((a,b)=>new Date(b.created_at||b.created_at)-new Date(a.created_at||a.created_at));
+  else if(tab==='Chats') items=chats.map(c=>({...c,type:'chat'}));
+  else if(tab==='Projects') items=chats.filter(c=>c.project_id).map(c=>({...c,type:'chat'}));
+  else if(tab==='Voice') items=voiceHistory.map(v=>({...v,type:'voice'}));
+  else if(tab==='Saved') items=chats.filter(c=>c.saved).map(c=>({...c,type:'chat'}));
+  else if(tab==='Archived') items=[];
+
+  if(query.trim()) items=items.filter(it=> (it.title||it.text||it.prompt||'').toLowerCase().includes(query.toLowerCase()));
+  if(sort==='Newest') items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(sort==='Oldest') items.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  if(sort==='Name') items.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+
+  const toggleSaved=(id)=>{
+    const chat=chats.find(c=>c.id===id);
+    if(chat) updateChat(id,{saved:!chat.saved});
+  };
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+    <div className="text-[19px] font-[800] display mb-1">${initialFilter==='saved'?'Saved':'History'}</div>
+    <div className="text-[12px] text-zinc-500 mb-4">${initialFilter==='saved'?'Your saved conversations and content.':'All your past conversations in one place.'}</div>
+
+    <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="relative flex-1 min-w-[200px]">
+        <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search history…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none"/>
+      </div>
+      <select value=${sort} onChange=${e=>setSort(e.target.value)} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12px]">
+        <option>Newest</option><option>Oldest</option><option>Name</option>
+      </select>
+      <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden text-[12px]">
+        <button onClick=${()=>setLayout('list')} className=${`px-3 py-[8px] ${layout==='list'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="List" size=${14}/></button>
+        <button onClick=${()=>setLayout('grid')} className=${`px-3 py-[8px] ${layout==='grid'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="LayoutGrid" size=${14}/></button>
+      </div>
+    </div>
+
+    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
+      ${['All','Chats','Projects','Voice','Saved','Archived'].map(t=> html`
+        <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
+      `)}
+    </div>
+
+    ${items.length===0 ? html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-10 text-center text-zinc-500">
+        <${I} name="Clock" size=${28} className="mx-auto mb-2"/>
+        ${initialFilter==='saved'?'No saved chats yet.':'No conversations yet. Start a new chat.'}
+      </div>
+    ` : html`
+      <div className=${layout==='grid'?'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-[10px] max-w-[900px]'}>
+        ${items.map(it=> html`
+          <div key=${it.id} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-[14px] flex gap-3">
+            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center">
+              <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[#7c5cff]"/>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-[600] text-[13px] truncate">${it.title || (it.type==='voice'? it.voice+' voice' : 'Untitled')}</div>
+              <div className="text-[11.5px] text-zinc-500 truncate">${it.type==='voice' ? it.text?.slice(0,120)+'…' : it.messages?.[it.messages.length-1]?.text?.slice(0,120) || '—'}</div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <div className="text-[11px] text-zinc-400">${formatDate(it.created_at)}</div>
+              ${it.type==='chat' ? html`<button onClick=${()=>toggleSaved(it.id)} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${14}/></button>`:null}
+            </div>
+          </div>
+        `)}
+      </div>
+    `}
+  </div>`;
+}
+
+// ---------- Voice Studio ----------
+function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits}){
+  const [text,setText]=useState('Welcome to Zedith AI Voice Studio. Create realistic AI voices for your YouTube content.');
+  const [voice,setVoice]=useState('Brian');
+  const [audioUrl,setAudioUrl]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [tab,setTab]=useState('Voice Generator');
+  const [cloneName,setCloneName]=useState('');
+  const [cloneFile,setCloneFile]=useState(null);
+
+  const gen = async ()=>{
+    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
+    const cost = estimateCreditCost({text, feature:'voice', creditCosts:DEFAULT_CREDIT_COSTS});
+    const ok = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
+    if(!ok && !isAdminUser){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+
+    setBusy(true); setAudioUrl(null);
+    try{
+      const url = await ttsFetch(text, voice);
+      setAudioUrl(url);
+      await createVoiceEntry({text, voice, url});
+      toast('Voice ready');
+    }catch(e){
+      try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); toast('Played via browser TTS (fallback)'); }catch{ toast('Voice failed','err'); }
+    }finally{ setBusy(false); }
+  };
+
+  const doClone=async ()=>{
+    if(!cloneName.trim() || !cloneFile) return toast('Enter voice name and upload sample','err');
+    const path=`${user?.id||'temp'}/voice_${uid('vc')}_${cloneFile.name}`;
+    const {error}=await supabase.storage.from('voice-samples').upload(path, cloneFile);
+    if(error) return toast('Voice sample upload failed','err');
+    const newVoice={id:uid('vc'), name:cloneName, gender:'Custom', accent:'Cloned', cloned:true, sample:cloneFile.name};
+    setMyVoices(v=>[...v,newVoice]);
+    setCloneName(''); setCloneFile(null);
+    toast('Voice clone queued – processing takes ~2 min');
+  };
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+    <div className="flex items-center gap-2 text-[19px] font-[800] display"><${I} name="Mic" size=${20}/> AI Voice Studio</div>
+    <div className="text-[12px] text-zinc-500 mb-4">Create, clone, and customize realistic AI voices for your content.</div>
+    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
+      ${['Voice Generator','Voice Cloning','My Voices','History'].map(t=> html`
+        <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
+      `)}
+    </div>
+
+    ${tab==='Voice Generator' ? html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[880px] space-y-4">
+        <div className="font-[600] text-[13px]">1. Choose a Voice</div>
+        <div className="flex gap-3 flex-wrap">
+          ${[...new Set(myVoices.map(v=>v.name))].map(n=> html`
+            <button key=${n} onClick=${()=>setVoice(n)} className=${`px-4 py-[10px] rounded-[12px] border text-[12px] text-left ${voice===n?'border-[#7c5cff] bg-[#f8f5ff] dark:bg-[#221d3a]':'border-zinc-200 dark:border-zinc-700'}`}>
+              <div className="font-[600]">${n}</div><div className="text-[10.5px] text-zinc-500">${myVoices.find(v=>v.name===n)?.gender||'Voice'} • ${myVoices.find(v=>v.name===n)?.accent||'US'}</div>
+            </button>
+          `)}
+        </div>
+        <div className="font-[600] text-[13px]">2. Enter your text</div>
+        <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#14182a] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
+        <div className="flex gap-3 items-center">
+          <button onClick=${gen} disabled=${busy} className="bg-[#7c5cff] hover:bg-[#6b48f5] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2">
+            <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
+          </button>
+          <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); }catch{} }} className="px-[14px] py-[10px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Preview (10s)</button>
+          <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estimateCreditCost({text,feature:'voice',creditCosts:DEFAULT_CREDIT_COSTS})} Credits`}</div>
+        </div>
+        ${audioUrl ? html`
+          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#14182a]">
+            <audio controls src=${audioUrl} className="w-full"></audio>
+            <div className="flex gap-3 text-[11px] mt-2">
+              <a href=${audioUrl} download="zedith-voice.mp3" className="text-[#7c5cff] hover:underline">Download MP3</a>
+              <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline">Copy link</button>
+            </div>
+          </div>
+        `:null}
+      </div>
+    ` : tab==='Voice Cloning' ? html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[700px] space-y-4">
+        <div className="font-[650] text-[13px]">Clone Your Voice</div>
+        <div className="text-[12px] text-zinc-500">Upload a clear 30-60 second sample of your voice.</div>
+        <div><div className="text-[11px] text-zinc-500 mb-1">Voice Name</div><input value=${cloneName} onChange=${e=>setCloneName(e.target.value)} placeholder="e.g. My Studio Voice" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12px]"/></div>
+        <div>
+          <div className="text-[11px] text-zinc-500 mb-1">Voice Sample</div>
+          <label className="block w-full h-[120px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#7c5cff]">
+            <${I} name="Upload" size=${24} className="text-zinc-400 mb-2"/>
+            <div className="text-[12px] text-zinc-500">${cloneFile ? cloneFile.name : 'Click to upload MP3/WAV (max 10MB)'}</div>
+            <input type="file" accept="audio/*" className="hidden" onChange=${e=>{ setCloneFile(e.target.files?.[0]||null); }}/>
+          </label>
+        </div>
+        <button onClick=${doClone} className="px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600]">Start Voice Cloning</button>
+      </div>
+    ` : tab==='My Voices' ? html`
+      <div className="max-w-[900px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          ${myVoices.map(v=> html`
+            <div key=${v.id} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center"><${I} name="Mic" size=${16} className="text-[#7c5cff]"/></div>
+                <div><div className="font-[600] text-[13px]">${v.name}</div><div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div></div>
+              </div>
+              ${v.cloned ? html`<span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Cloned</span>`:html`<span className="text-[10px] px-2 py-1 rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800">Built-in</span>`}
+            </div>
+          `)}
+        </div>
+      </div>
+    ` : html`
+      <div className="max-w-[900px]">
+        ${voiceHistory.length===0 ? html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-10 text-center text-zinc-500"><${I} name="Clock" size=${28} className="mx-auto mb-2"/>No voice generations yet.</div>
+        ` : html`
+          <div className="space-y-2">
+            ${voiceHistory.map(h=> html`
+              <div key=${h.id} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-3 flex items-center justify-between">
+                <div><div className="font-[600] text-[13px]">${h.voice}</div><div className="text-[11px] text-zinc-500 truncate max-w-[500px]">${h.text}</div><div className="text-[10px] text-zinc-400">${formatDate(h.created_at)}</div></div>
+                <audio controls src=${h.url} className="w-[220px] h-[34px]"></audio>
+              </div>
+            `)}
+          </div>
+        `}
+      </div>
+    `}
+  </div>`;
+}
+
+// ---------- Channel Analytics ----------
+function AnalyticsView(){
+  const [tab,setTab]=useState('Overview');
+  const [connected,setConnected]=useState(false);
+  const tabs=['Overview','Content','Audience','Engagement','Revenue','Trends'];
+  const mockStats=[['Total Views','128.4K','+12.3%'],['Watch Time','4.2K hrs','+8.1%'],['Subscribers','8.2K','+4.5%'],['Avg CTR','6.8%','+1.2%']];
+  const mockVideos=[
+    {title:'10 AI Tools You Need in 2026', views:'42K', ctr:'8.2%', avgView:'4:12'},
+    {title:'How I Edit YouTube Shorts with AI', views:'31K', ctr:'7.5%', avgView:'3:48'},
+    {title:'Faceless YouTube Channel Setup', views:'24K', ctr:'6.1%', avgView:'5:20'},
+  ];
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+    <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
+    <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
+
+    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
+      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+    </div>
+
+    ${!connected ? html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-10 text-center max-w-[760px]">
+        <${I} name="Lock" size=${32} className="mx-auto text-[#7c5cff] mb-3"/>
+        <div className="font-[700]">No Social Accounts Connected</div>
+        <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube / Instagram / TikTok to unlock analytics.</div>
+        <button onClick=${()=>{ setConnected(true); toast('Demo: channel connected'); }} className="mt-4 bg-[#7c5cff] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600]">Connect Your Account</button>
+        <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
+      </div>
+    ` : html`
+      <div className="space-y-5 max-w-[1000px]">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          ${mockStats.map(([l,v,c])=>html`<div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-4"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div><div className="text-[11px] text-emerald-600">${c}</div></div>`)}
+        </div>
+        ${tab==='Overview' ? html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+            <div className="font-[650] text-[13px] mb-3">Performance Overview</div>
+            <div className="h-[220px] flex items-end gap-2 px-2">
+              ${[35,52,48,68,75,62,88,95,82,70,90,105].map((h,i)=>html`<div key=${i} className="flex-1 flex flex-col items-center gap-1"><div className="w-full bg-[#7c5cff]/20 rounded-t-md relative" style=${{height:h+'px'}}><div className="absolute bottom-0 left-0 right-0 bg-[#7c5cff] rounded-t-md" style=${{height:(h*0.6)+'px'}}></div></div><div className="text-[9px] text-zinc-500">${['J','F','M','A','M','J','J','A','S','O','N','D'][i]}</div></div>`)}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+            <div className="font-[650] text-[13px] mb-3">Top Performing Content</div>
+            <div className="space-y-2">
+              ${mockVideos.map((v,i)=>html`<div key=${i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">${i+1}</div><div className="font-[600]">${v.title}</div></div><div className="flex gap-4 text-zinc-500"><span>${v.views} views</span><span>${v.ctr} CTR</span><span>${v.avgView} avg</span></div></div>`)}
+            </div>
+          </div>
+        ` : tab==='Content' ? html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Content Performance</div>
+            ${mockVideos.map((v,i)=>html`<div key=${i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="font-[600]">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${v.views} views</span><span>${v.ctr} CTR</span></div></div>`)}
+          </div>
+        ` : tab==='Audience' ? html`
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Age Groups</div>
+              ${[['18-24','32%'],['25-34','45%'],['35-44','15%'],['45+','8%']].map(([a,p])=>html`<div key=${a} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-16">${a}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#7c5cff] rounded-full" style=${{width:p}}></div></div><div className="w-10 text-right">${p}</div></div>`)}
+            </div>
+            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Top Countries</div>
+              ${[['India','42%'],['USA','23%'],['UK','12%'],['Canada','8%'],['Other','15%']].map(([c,p])=>html`<div key=${c} className="flex items-center justify-between mb-2 text-[12px]"><span>${c}</span><span className="font-[600]">${p}</span></div>`)}
+            </div>
+          </div>
+        ` : tab==='Engagement' ? html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Engagement Metrics</div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              ${[['Likes','8.4K','+5.2%'],['Comments','1.2K','+3.1%'],['Shares','642','+12.8%']].map(([l,v,c])=>html`<div key=${l} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-xl"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[20px] font-[800] display mt-1">${v}</div><div className="text-[11px] text-emerald-600">${c}</div></div>`)}
+            </div>
+          </div>
+        ` : tab==='Revenue' ? html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Estimated Revenue</div><div className="text-[28px] font-[800] display">₹24,850</div><div className="text-[12px] text-zinc-500">Last 28 days</div><div className="mt-4 text-[12px] text-zinc-500">RPM: ₹4.20 • CPM: ₹12.50</div></div>
+        ` : html`
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Trending Topics</div>
+            <div className="flex flex-wrap gap-2">
+              ${['AI tools','Faceless YouTube','YouTube Shorts','ChatGPT alternatives','Thumbnail design','Monetization','Video SEO'].map(t=>html`<span key=${t} className="px-3 py-1 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] text-[12px]">${t}</span>`)}
+            </div>
+          </div>
+        `}
+      </div>
+    `}
+  </div>`;
+}
+
+// ---------- Settings ----------
+function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,openUpgrade}){
+  const upd=(k,v)=>{ const ns={...settings,[k]:v}; setSettings(ns); };
+  const saveAll=()=>{ saveProfile({display_name:settings.displayName, username:settings.username, bio:settings.bio}); toast('Profile & settings saved'); };
+  const Toggle=({on,setOn})=> html`
+    <button onClick=${()=>{ setOn(!on); }} className=${`w-11 h-[22px] rounded-full relative transition ${on?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+      <div className=${`absolute top-[2px] w-[18px] h-[18px] bg-white rounded-full shadow transition-all ${on?'right-[2px]':'left-[2px]'}`}></div>
+    </button>`;
+  return html`
+  <div className="flex-1 h-[900px] bg-[#f6f6fa] dark:bg-[#10121b] overflow-y-auto">
+    <div className="px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#141725]">
+      <div className="text-[22px] font-[800] display">Settings</div>
+      <div className="text-[12px] text-zinc-500">Manage your account, preferences and everything about your Zedith experience.</div>
+    </div>
+    <div className="px-7 py-5 grid grid-cols-12 gap-5 max-w-[1180px]">
+      <div className="col-span-8 space-y-4">
+        <div className="bg-white dark:bg-[#171a2a] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5">
+          <div className="font-[650] mb-3">Profile Information</div>
+          <div className="grid grid-cols-2 gap-3 text-[12px]">
+            <div><div className="text-zinc-500 mb-1">Display Name</div>
+              <input value=${settings.displayName} onChange=${e=>upd('displayName',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
+            </div>
+            <div><div className="text-zinc-500 mb-1">Username</div>
+              <input value=${settings.username} onChange=${e=>upd('username',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
+            </div>
+            <div className="col-span-2"><div className="text-zinc-500 mb-1">Email Address</div>
+              <input value=${settings.email} disabled className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 outline-none"/>
+            </div>
+            <div className="col-span-2"><div className="text-zinc-500 mb-1">Bio</div>
+              <textarea value=${settings.bio} onChange=${e=>upd('bio',e.target.value)} className="w-full h-[72px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12px]"></textarea>
+            </div>
+          </div>
+          <button onClick=${saveAll} className="mt-4 px-4 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600]">Save Changes</button>
+        </div>
+
+        <div className="bg-white dark:bg-[#171a2a] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5 text-[12.5px] space-y-4">
+          <div className="font-[650] text-[14px]">AI Preferences</div>
+          <div className="flex items-center justify-between">
+            <div><div className="font-[550]">Default AI Model</div><div className="text-[11px] text-zinc-500">Zedith auto-rotates all 27 free models</div></div>
+            <div className="text-[11px] px-3 py-[6px] rounded-xl bg-zinc-100 dark:bg-zinc-800 font-[600]">Auto – Best Free</div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div><div className="font-[550]">Response Style</div><div className="text-[11px] text-zinc-500">How should Zedith respond?</div></div>
+            <select value=${settings.responseStyle} onChange=${e=>upd('responseStyle', e.target.value)} className="border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-[6px] text-[11.5px] bg-white dark:bg-[#14182a]">
+              <option>Balanced</option><option>Creative</option><option>Precise</option>
+            </select>
+          </div>
+          ${[
+            ['aiMemory','AI Memory','Allow Zedith to remember your chats.'],
+            ['autoSave','Auto Save Chats','Automatically save your conversations.'],
+            ['webSearch','Web Search','Allow Zedith to search the web.'],
+            ['codeHighlight','Code Highlighting','Show syntax highlighting in code blocks.'],
+          ].map(([k,t,s])=> html`
+            <div key=${k} className="flex items-center justify-between">
+              <div><div className="font-[550]">${t}</div><div className="text-[11px] text-zinc-500">${s}</div></div>
+              <${Toggle} on=${settings[k]} setOn=${v=>upd(k,v)} />
+            </div>
+          `)}
+          <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <div><div className="font-[550]">Custom System Prompt</div><div className="text-[11px] text-zinc-500">Add extra instructions Zedith follows in every chat.</div></div>
+            </div>
+            <textarea value=${settings.systemPrompt||''} onChange=${e=>upd('systemPrompt',e.target.value)} placeholder="e.g. Always reply in Hinglish. Focus on Indian creators." className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12px]"></textarea>
+          </div>
+          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
+            <div><div className="font-[550]">Theme</div><div className="text-[11px] text-zinc-500">Dark / Light</div></div>
+            <button onClick=${()=>{ setTheme(theme==='dark'?'light':'dark'); toast('Theme '+(theme==='dark'?'light':'dark')); }} className="px-3 py-[6px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[11.5px]">
+              ${theme==='dark'?'🌙 Dark':'☀️ Light'}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="col-span-4 space-y-4">
+        <div className="bg-white dark:bg-[#171a2a] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-4 text-[12px]">
+          <div className="font-[650] mb-2">Account</div>
+          <div className="text-zinc-500 text-[11px] space-y-1">
+            <div>Plan: <b>${(profile?.plan||'free').toUpperCase()}</b></div>
+            <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||25000).toLocaleString('en-IN')}</b></div>
+            <div>Storage: <b>Supabase Cloud</b></div>
+          </div>
+          <button onClick=${openUpgrade} className="w-full mt-3 bg-[#7c5cff] text-white py-[8px] rounded-xl text-[12px] font-[600]">Upgrade to Pro</button>
+        </div>
+        <div className="bg-[#fff5f5] dark:bg-[#2a1515] border border-red-100 dark:border-red-900/40 rounded-[14px] p-4 text-[12px]">
+          <div className="font-[700] text-red-600">Support</div>
+          <a href="mailto:zedithsupport@gmail.com" className="mt-2 text-[12px] text-red-600 underline block">Contact: zedithsupport@gmail.com</a>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Upgrade ----------
+function UpgradeView({plan, planConfig, onPlan}) {
+  const [yearly,setYearly]=useState(false);
+  const plans = [
+    {k:'free', name:'Free', price:'₹0', sub:'Forever Free', credits:planConfig.free,
+      features:[['25K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
+      btn:'Current Plan', popular:false},
+    {k:'pro', name:'Pro', price:'₹299', sub:'/month', credits:planConfig.pro, badge:'★ Most Popular',
+      features:[['500K Credits / month',1],['Advanced AI Models',1],['Web Search',1],['Voice Studio',1],['Channel Analytics',1],['AI Image Generation',1],['Faster Responses',1],['AI Memory',1],['Priority Support',1]],
+      btn:'Upgrade to Pro', popular:true},
+    {k:'infinity', name:'Zedith Infinity', price:'₹599', sub:'/month', credits:planConfig.infinity, badge:'✦ Best Value',
+      features:[['1M Credits / month',1],['All AI Models',1],['Voice Studio (HQ)',1],['Channel Analytics (Advanced)',1],['AI Image Generation',1],['Fastest Responses',1],['Advanced AI Memory',1],['VIP Priority Support',1],['Early Access',1]],
+      btn:'Upgrade to Infinity', best:true},
+  ];
+
+  return html`
+  <div className="flex-1 h-[900px] overflow-y-auto bg-[#fbfbfe] dark:bg-[#0b0b14] text-zinc-900 dark:text-white transition-colors">
+    <div className="px-10 pt-10 pb-10 max-w-[1180px]">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-[32px] font-[800] display">Upgrade Your <span className="text-[#7c5cff]">Experience</span></div>
+          <div className="text-zinc-500 dark:text-zinc-400 mt-1 text-[13.5px]">Choose the plan that fits your creative journey.</div>
+          <div className="mt-5 inline-flex bg-zinc-100 dark:bg-[#181828] rounded-full p-1 text-[12.5px] border border-zinc-200 dark:border-zinc-800">
+            <button onClick=${()=>setYearly(false)} className=${`px-4 py-[6px] rounded-full transition ${!yearly?'bg-white dark:bg-[#252542] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>Monthly</button>
+            <button onClick=${()=>setYearly(true)} className=${`px-4 py-[6px] rounded-full transition flex items-center gap-2 ${yearly?'bg-white dark:bg-[#252542] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>
+              Yearly <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-[2px] rounded-full">Save 20%</span>
+            </button>
+          </div>
+        </div>
+        <div className="text-[11.5px] text-zinc-500 dark:text-violet-300 flex items-center gap-1"><${I} name="Lock" size=${13}/> Secure. Cancel anytime.</div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        ${plans.map(p=> html`
+          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[#7c5cff]/60 bg-white dark:bg-[#151428] shadow-[0_8px_40px_rgba(124,92,255,0.10)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[#151428]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#13131d]' : ''}`}>
+            ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#9b6bff] text-white'}`}>${p.badge}</div>`:null}
+            <div className="text-zinc-400 mb-2 mt-2">
+              ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#9b6cff]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
+            </div>
+            <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[#7c5cff]':''} ${p.k==='infinity'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
+            <div className="text-[12px] text-zinc-500 dark:text-zinc-400 min-h-[34px]">${p.k==='free'?'Explore Zedith with essential features.':p.k==='pro'?'More power, more creativity.':'Unlimited creativity. Ultimate everything.'}</div>
+            <div className="mt-2 text-[14px] font-[600] text-[#7c5cff]">${p.credits.toLocaleString('en-IN')} Credits / month</div>
+            <div className="mt-2 text-[30px] font-[800] tracking-tight">${p.price} <span className="text-[12px] text-zinc-500 font-[500]">${p.sub}</span></div>
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 space-y-[9px] text-[12.5px] flex-1">
+              ${p.features.map(([f,ok])=> html`<div className="flex items-start gap-2"><span className=${ok ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>${ok ? '✓' : '✕'}</span><span className=${ok ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400'}>${f}</span></div>`)}
+            </div>
+            <button onClick=${()=>onPlan(p.k)} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#1f1f2d] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700' : ''} ${p.k==='pro' ? 'bg-[#7c5cff] hover:bg-[#6b48f5] text-white shadow-zed-soft' : ''} ${p.k==='infinity' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
+              ${p.btn}
+            </button>
+          </div>
+        `)}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Notifications ----------
+function NotificationsView({notifications,markRead}){
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto p-6">
+    <div className="flex items-center justify-between max-w-[820px]">
+      <div>
+        <div className="text-[20px] font-[800] display flex items-center gap-2"><${I} name="Bell" size=${20}/> Notifications</div>
+        <div className="text-[12px] text-zinc-500">Real-time activity from your workspace.</div>
+      </div>
+      <button onClick=${markRead} className="text-[12px] px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700">Mark all read</button>
+    </div>
+    <div className="max-w-[820px] mt-5 space-y-[10px]">
+      ${notifications.length===0 ? html`<div className="text-zinc-500 text-[13px]">No notifications yet.</div>` : notifications.map(n=> html`
+        <div key=${n.id} className=${`bg-white dark:bg-[#1a1d2e] border ${n.read?'border-zinc-200 dark:border-[#2a2f4a]':'border-[#7c5cff]/40'} rounded-[13px] p-[14px] flex gap-3`}>
+          <div className=${`w-8 h-8 rounded-full flex items-center justify-center ${n.read?'bg-zinc-100 dark:bg-zinc-800':'bg-[#efeaff] dark:bg-[#221d3a]'}`}>
+            <${I} name="Bell" size=${14} className=${n.read?'text-zinc-400':'text-[#7c5cff]'} />
+          </div>
+          <div className="flex-1">
+            <div className="font-[600] text-[13px]">${n.title}</div>
+            <div className="text-[12px] text-zinc-500">${n.body}</div>
+            <div className="text-[10.5px] text-zinc-400 mt-1">${new Date(n.created_at).toLocaleString()}</div>
+          </div>
+          ${!n.read ? html`<div className="w-2 h-2 rounded-full bg-[#7c5cff] mt-1"></div>`:null}
+        </div>
+      `)}
+    </div>
+  </div>`;
+}
+
+// ---------- Quick Tool Modal ----------
+function ToolModal({tool,onClose,onSend}){
+  const [input,setInput]=useState('');
+  const prompts={
+    'Script Writer':'Write a YouTube script about: ',
+    'Idea Generator':'Generate 5 viral YouTube video ideas about: ',
+    'Hook Generator':'Write 5 attention-grabbing hooks for a video about: ',
+    'Thumbnail Analyzer':'Analyze this thumbnail idea and score it out of 10: ',
+    'AI Voice Generator':'Convert this script into spoken audio: '
+  };
+  const run=()=>{
+    const p = prompts[tool]||'';
+    onSend({text:p+input, smart:false, webSearch:true});
+    onClose();
+  };
+  return html`
+  <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#181b2b] w-[480px] max-w-[96vw] rounded-[18px] shadow-2xl p-5" onClick=${e=>e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="font-[700] text-[15px]">${tool}</div>
+        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+      </div>
+      <div className="text-[12px] text-zinc-500 mb-3">${prompts[tool]}</div>
+      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[12.5px]"></textarea>
+      <div className="flex justify-end gap-2 mt-4">
+        <button onClick=${onClose} className="px-4 py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
+        <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600] disabled:opacity-50">Run in Chat</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Admin Panel ----------
+function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPlanConfig, setCreditCosts}){
+  if(!isAdmin(user)) return html`<div className="flex-1 flex items-center justify-center text-zinc-500">Access denied</div>`;
+  const [plans,setPlans]=useState(planConfig);
+  const [costs,setCosts]=useState(creditCosts);
+
+  const saveConfig=async ()=>{
+    await supabase.from('admin_config').upsert([
+      {key:'plans', value:{free:{monthly_credits:plans.free}, pro:{monthly_credits:plans.pro}, infinity:{monthly_credits:plans.infinity}}},
+      {key:'credit_costs', value:costs}
+    ], {onConflict:'key'});
+    setPlanConfig(plans);
+    setCreditCosts(costs);
+    toast('Admin config saved');
+  };
+
+  return html`
+  <div className="flex-1 h-[900px] bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Shield" size=${20}/> Admin Panel</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Only visible to ${ADMIN_EMAIL}</div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-[1000px]">
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-3">Plan Monthly Credits</div>
+        ${Object.keys(plans).map(plan=>html`
+          <div key=${plan} className="flex items-center justify-between mb-3">
+            <span className="text-[12px] font-[600] uppercase">${plan}</span>
+            <input type="number" value=${plans[plan]} onChange=${e=>setPlans(p=>({...p,[plan]:parseInt(e.target.value)||0}))} className="w-32 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px]"/>
+          </div>
+        `)}
+      </div>
+
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-3">Credit Costs</div>
+        ${Object.keys(costs).map(k=>html`
+          <div key=${k} className="flex items-center justify-between mb-3">
+            <span className="text-[12px] font-[600]">${k.replace(/_/g,' ')}</span>
+            <input type="number" value=${costs[k]} onChange=${e=>setCosts(c=>({...c,[k]:parseInt(e.target.value)||0}))} className="w-32 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px]"/>
+          </div>
+        `)}
+      </div>
+    </div>
+
+    <button onClick=${saveConfig} className="mt-5 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600]">Save Configuration</button>
+
+    <div className="mt-6 bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[1000px]">
+      <div className="font-[650] text-[13px] mb-3">Recent Credit Transactions</div>
+      ${transactions.length===0 ? html`<div className="text-[12px] text-zinc-500">No transactions yet.</div>` : html`
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          ${transactions.slice(0,20).map(t=>html`
+            <div key=${t.id} className="flex justify-between text-[12px] p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+              <span>${t.feature}</span>
+              <span className="text-red-500">-${t.credits_spent}</span>
+              <span className="text-zinc-500">${t.remaining_balance} left</span>
+              <span className="text-zinc-400">${new Date(t.created_at).toLocaleString()}</span>
+            </div>
+          `)}
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+// ---------- mount ----------
+const root = createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+
+// zoom
+(function(){
+  const viewport=document.getElementById('viewport');
+  const stage=document.getElementById('scale-stage');
+  let zoom=0.84, panX=18, panY=14, dragging=false, sx=0, sy=0, spx=0, spy=0, panMode=true;
+  const apply=()=>{ stage.style.transform=`scale(${zoom}) translate(${panX}px,${panY}px)`; document.getElementById('z-label').textContent=Math.round(zoom*100)+'%'; };
+  document.getElementById('z-in').onclick=()=>{ zoom=Math.min(1.6, zoom+0.06); apply(); };
+  document.getElementById('z-out').onclick=()=>{ zoom=Math.max(0.28, zoom-0.06); apply(); };
+  document.getElementById('z-100').onclick=()=>{ zoom=1; panX=6; panY=6; apply(); };
+  document.getElementById('z-reset').onclick=()=>{ zoom=0.84; panX=18; panY=14; apply(); };
+  document.getElementById('z-fit').onclick=()=>{
+    const vw=viewport.clientWidth, vh=viewport.clientHeight;
+    const s=Math.min((vw-24)/1440,(vh-24)/900,1.08);
+    zoom=Math.max(0.28,s); panX=10; panY=10; apply();
+  };
+  const pb=document.getElementById('z-pan');
+  pb.onclick=()=>{ panMode=!panMode; pb.textContent=panMode?'DRAG':'SELECT'; viewport.style.cursor=panMode?'grab':'default'; };
+  viewport.addEventListener('mousedown', e=>{
+    if(!panMode) return;
+    if(e.target.closest('#zoom-bar')||e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('select')) return;
+    dragging=true; sx=e.clientX; sy=e.clientY; spx=panX; spy=panY; viewport.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove', e=>{ if(!dragging) return; panX=spx+(e.clientX-sx)/zoom; panY=spy+(e.clientY-sy)/zoom; apply(); });
+  window.addEventListener('mouseup', ()=>{ dragging=false; viewport.style.cursor=panMode?'grab':'default'; });
+  apply(); setTimeout(()=>document.getElementById('z-fit').click(), 70);
+})();
+</script>
+</body>
+</html>
