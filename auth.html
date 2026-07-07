@@ -136,7 +136,21 @@ tailwind.config = {
         }
       } catch(err){
         console.error('Signup error object:', err);
-        const msg = (err && err.message) ? err.message : JSON.stringify(err);
+        let msg = 'Something went wrong.';
+        if (err && typeof err.message === 'string' && err.message.trim()) {
+          msg = err.message;
+        } else if (!navigator.onLine) {
+          msg = 'You appear to be offline. Check your connection and try again.';
+        } else if (err instanceof TypeError) {
+          msg = 'Could not reach the server (network/CORS error). This is usually a Supabase project or Site URL config issue, not something wrong with your input.';
+        } else {
+          try {
+            const keys = Object.getOwnPropertyNames(err || {});
+            msg = keys.length ? JSON.stringify(err, keys) : 'Unknown error (empty error object) — likely a failed network request to Supabase.';
+          } catch(_) {
+            msg = 'Unknown error (empty error object) — likely a failed network request to Supabase.';
+          }
+        }
         showMessage(msg, 'err');
         submitBtn.disabled = false;
         submitBtn.textContent = mode==='signup'?'Create account':'Log in';
