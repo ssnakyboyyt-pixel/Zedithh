@@ -439,14 +439,16 @@ function App(){
       setChats(cs=>[chat, ...cs]);
       setActiveChatId(chat.id);
       chatId=chat.id;
-      await supabase.from('chats').insert(newChat);
+      const {error:chatInsertErr} = await supabase.from('chats').insert(newChat);
+      if(chatInsertErr){ console.error('chat insert error:', chatInsertErr); toast('Chat not saved: '+chatInsertErr.message,'err'); }
       addNotification('New chat started', chat.title);
     }
 
     const userMsg={id:uid('m'), role:'user', text:text||'', ts:Date.now(), attachment};
     const updatedChat={...chat, messages:[...chat.messages, userMsg], updated_at:new Date().toISOString()};
     setChats(cs=>cs.map(c=>c.id===chatId?updatedChat:c));
-    await supabase.from('chats').update({messages:updatedChat.messages, updated_at:updatedChat.updated_at}).eq('id',chatId);
+    const {error:saveErr} = await supabase.from('chats').update({messages:updatedChat.messages, updated_at:updatedChat.updated_at}).eq('id',chatId);
+    if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
 
     const lower=(text||'').toLowerCase();
     const wantsImage = /(\/image|generate image|create image|make.*image|draw |thumbnail|picture of|image of|imagine )/.test(lower);
@@ -559,7 +561,7 @@ function App(){
   async function createPlannerItem(item){
     const newItem={...item, id:uid('pl'), user_id:user.id, created_at:new Date().toISOString()};
     const {data,error}=await supabase.from('planner_items').insert(newItem).select();
-    if(error){ toast('Failed to schedule','err'); return; }
+    if(error){ console.error('createPlannerItem error:', error); toast('Failed to schedule: '+(error.message||'unknown error'),'err'); return; }
     setPlannerItems(ps=>[newItem,...ps]);
     addNotification('Content scheduled', newItem.title);
   }
