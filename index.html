@@ -735,7 +735,9 @@ function App(){
 
     const history=(chat?.messages||[]).slice(-8).map(mm=>{
       if(mm.attachment?.type==='image'){
-        return {role:mm.role, content:[{type:'text', text:mm.text||'analyze image'}, {type:'image_url', image_url:{url:mm.attachment.dataUrl}}]};
+        // Don't resend old images as raw vision content in every future turn — just
+        // note that an image was there. Only the CURRENT message (below) sends real image data.
+        return {role:mm.role, content:(mm.text||'')+' [User previously shared an image here.]'};
       }
       return {role:mm.role, content:mm.text||''};
     });
@@ -774,6 +776,13 @@ function App(){
     const {error:e3}=await supabase.from('chats').update(updated).eq('id',chatId); if(e3) console.error('chat save error:', e3);
   }
 
+  async function deleteChat(chatId){
+    const {error}=await supabase.from('chats').delete().eq('id',chatId);
+    if(error){ console.error('deleteChat error:', error); toast('Failed to delete chat: '+error.message,'err'); return; }
+    setChats(cs=>cs.filter(c=>c.id!==chatId));
+    toast('Chat deleted');
+  }
+
   async function updateMessage(chatId, msgId, patch){
     const chat=chats.find(c=>c.id===chatId);
     if(!chat) return;
@@ -785,7 +794,7 @@ function App(){
     const proj={
       id:uid('p'), user_id:user.id, title:np.title||'Untitled', cat:np.cat||'YouTube',
       color:np.color||'#7c5cff', icon:np.icon||'FolderKanban', desc:np.desc||'',
-      tasks:[], files:[], notes:'', members:[{id:'m1',name:'You',role:'Owner'}],
+      tasks:[], files:[], notes:'', members:[{id:'m1',name:'You',role:'Owner'}], pinned:false,
       created_at:new Date().toISOString(), updated_at:new Date().toISOString()
     };
     const {data,error}=await supabase.from('projects').insert(proj).select();
@@ -869,10 +878,10 @@ function App(){
     switch(module){
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
-      case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} onOpenProject=${openProject} />`;
+      case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} updateProject=${updateProject} deleteProject=${deleteProject} onOpenProject=${openProject} />`;
       case 'planner': return html`<${PlannerView} items=${plannerItems} createPlannerItem=${createPlannerItem} />`;
-      case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
-      case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
+      case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
+      case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
       case 'analytics': return html`<${AnalyticsView} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
@@ -1439,12 +1448,16 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
 }
 
 // ---------- Projects ----------
-function ProjectsView({projects, createProject, onOpenProject}){
+function ProjectsView({projects, createProject, updateProject, deleteProject, onOpenProject}){
   const [showCreate,setShowCreate]=useState(false);
   const [filter,setFilter]=useState('All Projects');
+  const [menuOpenId,setMenuOpenId]=useState(null);
+  const [renaming,setRenaming]=useState(null);
+  const [deleting,setDeleting]=useState(null);
+  const sorted = [...projects].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
   return html`
   <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] overflow-y-auto">
-    <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
+    <div className="px-4 sm:px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#232844] flex items-center justify-between">
       <div><div className="text-[19px] font-[800] display">My Projects</div><div className="text-[11px] text-zinc-500">${projects.length} Projects</div></div>
       <button onClick=${()=>setShowCreate(true)} className="bg-[#7c5cff] hover:bg-[#6b48f5] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
     </div>
@@ -1456,22 +1469,32 @@ function ProjectsView({projects, createProject, onOpenProject}){
         <button onClick=${()=>setShowCreate(true)} className="mt-4 bg-[#7c5cff] text-white px-4 py-[9px] rounded-xl text-[12.5px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${15}/> Create Project</button>
       </div>
     ` : html`
-      <div className="px-6 py-5">
-        <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
+      <div className="px-4 sm:px-6 py-5">
+        <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4 overflow-x-auto no-scrollbar">
           ${['All Projects','Active','Archived','Shared','Trash'].map(t=> html`
-            <button key=${t} onClick=${()=>setFilter(t)} className=${`pb-[10px] ${filter===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
+            <button key=${t} onClick=${()=>setFilter(t)} className=${`shrink-0 pb-[10px] ${filter===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
           `)}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
-          ${projects.map(p=> html`
-            <button key=${p.id} onClick=${()=>onOpenProject(p.id)} className="text-left bg-white dark:bg-[#1a1d2e] rounded-[15px] border border-zinc-200 dark:border-[#2a2f4a] p-[15px] hover:border-[#7c5cff] transition">
-              <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-3" style=${{background:p.color+'22', color:p.color}}>
-                <${I} name=${p.icon||'FolderKanban'} size=${18}/>
-              </div>
-              <div className="font-[680] text-[13.5px]">${p.title}</div>
-              <div className="text-[11px] text-zinc-500">${p.cat||'General'}</div>
-              <div className="text-[10px] text-zinc-400 mt-1">Updated ${formatDate(p.updated_at||p.created_at)}</div>
-            </button>
+          ${sorted.map(p=> html`
+            <div key=${p.id} className=${`relative text-left bg-white dark:bg-[#1a1d2e] rounded-[15px] border p-[15px] hover:border-[#7c5cff] transition ${p.pinned?'border-[#7c5cff]/50':'border-zinc-200 dark:border-[#2a2f4a]'}`}>
+              <button onClick=${()=>onOpenProject(p.id)} className="text-left w-full">
+                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-3" style=${{background:p.color+'22', color:p.color}}>
+                  <${I} name=${p.icon||'FolderKanban'} size=${18}/>
+                </div>
+                <div className="font-[680] text-[13.5px] flex items-center gap-1">${p.pinned?html`<${I} name="Pin" size=${11} className="text-[#7c5cff]"/>`:null} ${p.title}</div>
+                <div className="text-[11px] text-zinc-500">${p.cat||'General'}</div>
+                <div className="text-[10px] text-zinc-400 mt-1">Updated ${formatDate(p.updated_at||p.created_at)}</div>
+              </button>
+              <button onClick=${e=>{ e.stopPropagation(); setMenuOpenId(menuOpenId===p.id?null:p.id); }} className="absolute top-[12px] right-[12px] p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="MoreVertical" size=${14}/></button>
+              ${menuOpenId===p.id ? html`
+                <div className="absolute top-[38px] right-[12px] z-20 bg-white dark:bg-[#1e2232] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 w-[140px] text-[12px]">
+                  <button onClick=${()=>{ updateProject(p.id,{pinned:!p.pinned}); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800">${p.pinned?'Unpin':'Pin'}</button>
+                  <button onClick=${()=>{ setRenaming(p); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800">Rename</button>
+                  <button onClick=${()=>{ setDeleting(p); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800 text-red-500">Delete</button>
+                </div>
+              `:null}
+            </div>
           `)}
           <button onClick=${()=>setShowCreate(true)} className="rounded-[15px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 min-h-[170px] flex flex-col items-center justify-center text-zinc-500">
             <${I} name="Plus" size=${20}/><div className="text-[12.5px] font-[600] mt-1">New Project</div>
@@ -1483,6 +1506,8 @@ function ProjectsView({projects, createProject, onOpenProject}){
       onClose=${()=>setShowCreate(false)}
       onCreate=${async (np)=>{ const id=await createProject(np); if(id) onOpenProject(id); setShowCreate(false); }}
     />`:null}
+    ${renaming ? html`<${PromptDialog} title="Rename project" placeholder=${renaming.title} onSubmit=${v=>updateProject(renaming.id,{title:v})} onClose=${()=>setRenaming(null)}/>` : null}
+    ${deleting ? html`<${ConfirmDialog} title="Delete this project?" message="This action cannot be undone." confirmLabel="Delete" danger=${true} onConfirm=${()=>deleteProject(deleting.id)} onClose=${()=>setDeleting(null)}/>` : null}
   </div>`;
 }
 
@@ -1675,11 +1700,13 @@ function NewContentModal({onClose,onCreate}){
 }
 
 // ---------- History ----------
-function HistoryView({chats, updateChat, projects, voiceHistory, filter: initialFilter='all', onOpenChat}){
+function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, filter: initialFilter='all', onOpenChat}){
   const [query,setQuery]=useState('');
   const [tab,setTab]=useState(initialFilter==='saved'?'Saved':'All');
   const [sort,setSort]=useState('Newest');
   const [layout,setLayout]=useState('list');
+  const [renaming,setRenaming]=useState(null);
+  const [deleting,setDeleting]=useState(null);
 
   let items=[];
   if(tab==='All') items=[...chats.map(c=>({...c,type:'chat'})), ...voiceHistory.map(v=>({...v,type:'voice'}))].sort((a,b)=>new Date(b.created_at||b.created_at)-new Date(a.created_at||a.created_at));
@@ -1693,14 +1720,19 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
   if(sort==='Newest') items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   if(sort==='Oldest') items.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   if(sort==='Name') items.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+  items.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
 
   const toggleSaved=(id)=>{
     const chat=chats.find(c=>c.id===id);
     if(chat) updateChat(id,{saved:!chat.saved});
   };
+  const togglePinned=(id)=>{
+    const chat=chats.find(c=>c.id===id);
+    if(chat) updateChat(id,{pinned:!chat.pinned});
+  };
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-4 sm:p-6 overflow-y-auto">
     <div className="text-[19px] font-[800] display mb-1">${initialFilter==='saved'?'Saved':'History'}</div>
     <div className="text-[12px] text-zinc-500 mb-4">${initialFilter==='saved'?'Your saved conversations and content.':'All your past conversations in one place.'}</div>
 
@@ -1716,9 +1748,9 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
       </div>
     </div>
 
-    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
+    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4 overflow-x-auto no-scrollbar">
       ${['All','Chats','Projects','Voice','Saved','Archived'].map(t=> html`
-        <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
+        <button key=${t} onClick=${()=>setTab(t)} className=${`shrink-0 pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>
       `)}
     </div>
 
@@ -1730,23 +1762,33 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
     ` : html`
       <div className=${layout==='grid'?'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-[10px] max-w-[900px]'}>
         ${items.map(it=> html`
-          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-[14px] flex gap-3 ${it.type==='chat'?'cursor-pointer hover:border-[#7c5cff] transition':''}`}>
-            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center">
+          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#1a1d2e] border rounded-[13px] p-[14px] flex gap-3 ${it.pinned?'border-[#7c5cff]/50':'border-zinc-200 dark:border-[#2a2f4a]'} ${it.type==='chat'?'cursor-pointer hover:border-[#7c5cff] transition':''}`}>
+            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center shrink-0">
               <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[#7c5cff]"/>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-[600] text-[13px] truncate">${it.title || (it.type==='voice'? it.voice+' voice' : 'Untitled')}</div>
+              <div className="font-[600] text-[13px] truncate flex items-center gap-1">${it.pinned?html`<${I} name="Pin" size=${11} className="text-[#7c5cff] shrink-0"/>`:null} ${it.title || (it.type==='voice'? it.voice+' voice' : 'Untitled')}</div>
               <div className="text-[11.5px] text-zinc-500 truncate">${it.type==='voice' ? it.text?.slice(0,120)+'…' : it.messages?.[it.messages.length-1]?.text?.slice(0,120) || '—'}</div>
             </div>
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1 shrink-0">
               <div className="text-[11px] text-zinc-400">${formatDate(it.created_at)}</div>
-              ${it.type==='chat' ? html`<button onClick=${e=>{ e.stopPropagation(); toggleSaved(it.id); }} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${14}/></button>`:null}
+              ${it.type==='chat' ? html`
+                <div className="flex items-center gap-[6px]">
+                  <button onClick=${e=>{ e.stopPropagation(); togglePinned(it.id); }} title=${it.pinned?'Unpin':'Pin'} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name="Pin" size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); setRenaming(it); }} title="Rename" className="text-zinc-400 hover:text-[#7c5cff]"><${I} name="Pencil" size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); toggleSaved(it.id); }} title=${it.saved?'Unsave':'Save'} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); setDeleting(it); }} title="Delete" className="text-zinc-400 hover:text-red-500"><${I} name="Trash2" size=${13}/></button>
+                </div>
+              `:null}
             </div>
           </div>
         `)}
       </div>
     `}
-  </div>`;
+  </div>
+  ${renaming ? html`<${PromptDialog} title="Rename chat" placeholder=${renaming.title||'Untitled'} onSubmit=${v=>updateChat(renaming.id,{title:v})} onClose=${()=>setRenaming(null)}/>` : null}
+  ${deleting ? html`<${ConfirmDialog} title="Delete this chat?" message="This will permanently delete the conversation." confirmLabel="Delete" danger=${true} onConfirm=${()=>deleteChat(deleting.id)} onClose=${()=>setDeleting(null)}/>` : null}
+  `;
 }
 
 // ---------- Voice Studio ----------
