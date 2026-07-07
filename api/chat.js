@@ -23,6 +23,8 @@ export default async function handler(req, res) {
     ? models
     : ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'];
 
+  const failures = [];
+
   // Try each free model in order until one responds successfully.
   for (let i = 0; i < pool.length; i++) {
     const model = pool[i];
@@ -38,14 +40,21 @@ export default async function handler(req, res) {
         body: JSON.stringify({ model, messages, temperature, max_tokens }),
       });
 
-      if (!r.ok) continue; // try the next model in the pool
+      if (!r.ok) {
+        let bodyText = '';
+        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        failures.push(`${model}: HTTP ${r.status} ${bodyText}`);
+        continue; // try the next model in the pool
+      }
 
       const data = await r.json();
       const text = data?.choices?.[0]?.message?.content;
       if (text && text.trim()) {
         return res.status(200).json({ text: text.trim(), model, tried: i + 1 });
       }
+      failures.push(`${model}: empty response`);
     } catch (e) {
+      failures.push(`${model}: ${e.message}`);
       continue; // network hiccup on this model — try the next one
     }
   }
@@ -53,7 +62,7 @@ export default async function handler(req, res) {
   // Every model in the pool failed or was rate-limited.
   return res.status(200).json({
     text: null,
-    error: true,
+    error: failures.join(' | ').slice(0, 500),
     tried: pool.length,
   });
 }
