@@ -172,7 +172,7 @@ const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
   image_gen: 200, image_edit: 200, voice: 100, smart_multiplier: 1.5
 };
-const PLAN_CREDITS = { free: 20000, pro: 500000, infinity: 1000000 };
+const PLAN_CREDITS = { free: 20000, pro: 500000, elite: 1000000 };
 
 function estimateCreditCost({text='', feature='text', smart=false, attachment=null, creditCosts=DEFAULT_CREDIT_COSTS}){
   let cost = 0;
@@ -358,7 +358,7 @@ function App(){
   async function loadProfile(){
     let {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
     const adminUser = isAdmin(user);
-    const planCreditsFor = (plan)=> PLAN_CREDITS[plan||'free'] ?? 20000;
+    const planCreditsFor = (plan)=> PLAN_CREDITS[plan||'free'] ?? PLAN_CREDITS['elite'] ?? 20000;
     if(!data && !error){
       const nowIso=new Date().toISOString();
       const fresh = {
@@ -432,7 +432,13 @@ function App(){
     const costs = data.find(r=>r.key==='credit_costs');
     const plans = data.find(r=>r.key==='plans');
     if(costs) setCreditCosts({...DEFAULT_CREDIT_COSTS,...costs.value});
-    if(plans) setPlanConfig({...PLAN_CREDITS,...Object.fromEntries(Object.entries(plans.value).map(([k,v])=>[k,v.monthly_credits]))});
+    if(plans){
+      const merged={...PLAN_CREDITS,...Object.fromEntries(Object.entries(plans.value).map(([k,v])=>[k,v.monthly_credits]))};
+      // support legacy 'infinity' key
+      if(merged.infinity && !merged.elite) merged.elite=merged.infinity;
+      delete merged.infinity;
+      setPlanConfig(merged);
+    }
   }
 
   async function loadTransactions(){
@@ -492,20 +498,24 @@ function App(){
     let chatId = activeChatId;
     let chat = chats.find(c=>c.id===chatId) || null;
     if(!chat){
-      const newChat={id:uid('c'), user_id:user.id, project_id:activeProjectId, title:(text||attachment?.name||'New chat').slice(0,56), messages:[], saved:false, pinned:false, created_at:new Date().toISOString(), updated_at:new Date().toISOString()};
+      const newChat={id:uid('c'), user_id:user.id, project_id:activeProjectId||null, title:(text||attachment?.name||'New chat').slice(0,56), messages:[], saved:false, pinned:false, created_at:new Date().toISOString(), updated_at:new Date().toISOString()};
       chat=newChat;
-      setChats(cs=>[chat, ...cs]);
-      setActiveChatId(chat.id);
       chatId=chat.id;
-      const {error:chatInsertErr} = await supabase.from('chats').insert(newChat);
+      // Insert first, then update local state
+      const {error:chatInsertErr, data:insertedChat} = await supabase.from('chats').insert(newChat).select().single();
       if(chatInsertErr){ console.error('chat insert error:', chatInsertErr); toast('Chat not saved: '+chatInsertErr.message,'err'); }
+      else { chat = insertedChat || newChat; }
+      setChats(cs=>[chat, ...cs]);
+      setActiveChatId(chatId);
       addNotification('New chat started', chat.title);
     }
 
     const userMsg={id:uid('m'), role:'user', text:text||'', ts:Date.now(), attachment};
-    const updatedChat={...chat, messages:[...chat.messages, userMsg], updated_at:new Date().toISOString()};
+    const updatedMessages=[...(chat.messages||[]), userMsg];
+    const now=new Date().toISOString();
+    const updatedChat={...chat, messages:updatedMessages, updated_at:now};
     setChats(cs=>cs.map(c=>c.id===chatId?updatedChat:c));
-    const {error:saveErr} = await supabase.from('chats').update({messages:updatedChat.messages, updated_at:updatedChat.updated_at}).eq('id',chatId);
+    const {error:saveErr} = await supabase.from('chats').update({messages:updatedMessages, updated_at:now, title:updatedChat.title}).eq('id',chatId);
     if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
 
     const lower=(text||'').toLowerCase();
@@ -679,7 +689,7 @@ function App(){
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
-      case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${planConfig} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
+      case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${{...planConfig, elite:planConfig.elite||planConfig.infinity||1000000}} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
       default: return html`<${ChatView} ...${commonChatProps} />`;
     }
   };
@@ -776,7 +786,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
       ${!collapsed ? html`
         <div className="rounded-[16px] border border-zinc-200 dark:border-[#252944] bg-gradient-to-b from-[#faf9ff] to-white dark:from-[#161a2b] dark:to-[#131727] p-[14px] text-center">
           <div className="flex justify-center text-amber-500"><${I} name="Crown" size=${20}/></div>
-          <div className="display font-[700] text-[13.5px] mt-1">Zedith ${(profile?.plan||'free').toUpperCase()}</div>
+          <div className="display font-[700] text-[13.5px] mt-1">Zedith ${((profile?.plan||'free')==='infinity'?'ELITE':(profile?.plan||'free').toUpperCase())}</div>
           <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] text-[11px] font-[650] flex items-center justify-center gap-1">
             ✨ ${isAdminUser ? 'Unlimited Credits' : `${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits`}
           </button>
@@ -878,8 +888,8 @@ function ComingSoonModal({plan,onClose}){
   <div className="fixed inset-0 z-[400] bg-black/55 flex items-center justify-center p-4" onClick=${onClose}>
     <div className="bg-white dark:bg-[#181b2b] w-[420px] max-w-[96vw] rounded-[20px] shadow-2xl p-6 text-center" onClick=${e=>e.stopPropagation()}>
       <div className="w-12 h-12 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center mx-auto mb-3"><${I} name="Rocket" size={22} className="text-[#7c5cff]"/></div>
-      <div className="font-[700] text-[18px]">${plan==='pro'?'Zedith Pro':'Zedith Infinity'} — Coming Soon</div>
-      <div className="text-[13px] text-zinc-500 mt-2">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Infinity'} upgrades are not yet available.</div>
+      <div className="font-[700] text-[18px]">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
+      <div className="text-[13px] text-zinc-500 mt-2">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
       <button onClick=${onClose} className="mt-5 px-5 py-2 rounded-xl bg-[#7c5cff] text-white text-sm font-semibold">Got it</button>
     </div>
   </div>`;
@@ -1842,16 +1852,30 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
 // ---------- Upgrade ----------
 function UpgradeView({plan, planConfig, onPlan}) {
   const [yearly,setYearly]=useState(false);
+
+  // Monthly base prices
+  const MONTHLY_PRICES = { pro: 299, elite: 599 };
+  // Yearly = monthly * 12 * 0.8
+  const getPrice = (k) => {
+    if(k==='free') return {display:'₹0', sub:'Forever Free'};
+    const base = MONTHLY_PRICES[k]||0;
+    if(yearly){
+      const yr = Math.round(base * 12 * 0.8);
+      return {display:`₹${yr.toLocaleString('en-IN')}`, sub:'/year (billed annually)'};
+    }
+    return {display:`₹${base}`, sub:'/month'};
+  };
+
   const plans = [
-    {k:'free', name:'Free', price:'₹0', sub:'Forever Free', credits:planConfig.free,
+    {k:'free', name:'Free', credits:planConfig.free||20000,
       features:[['20K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
       btn:'Current Plan', popular:false},
-    {k:'pro', name:'Pro', price:'₹299', sub:'/month', credits:planConfig.pro, badge:'★ Most Popular',
+    {k:'pro', name:'Pro', credits:planConfig.pro||500000, badge:'★ Most Popular',
       features:[['500K Credits / month',1],['Advanced AI Models',1],['Web Search',1],['Voice Studio',1],['Channel Analytics',1],['AI Image Generation',1],['Faster Responses',1],['AI Memory',1],['Priority Support',1]],
       btn:'Upgrade to Pro', popular:true},
-    {k:'infinity', name:'Zedith Infinity', price:'₹599', sub:'/month', credits:planConfig.infinity, badge:'✦ Best Value',
+    {k:'elite', name:'Zedith Elite', credits:planConfig.elite||1000000, badge:'✦ Best Value',
       features:[['1M Credits / month',1],['All AI Models',1],['Voice Studio (HQ)',1],['Channel Analytics (Advanced)',1],['AI Image Generation',1],['Fastest Responses',1],['Advanced AI Memory',1],['VIP Priority Support',1],['Early Access',1]],
-      btn:'Upgrade to Infinity', best:true},
+      btn:'Upgrade to Elite', best:true},
   ];
 
   return html`
@@ -1872,24 +1896,27 @@ function UpgradeView({plan, planConfig, onPlan}) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        ${plans.map(p=> html`
+        ${plans.map(p=> {
+          const {display, sub} = getPrice(p.k);
+          return html`
           <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[#7c5cff]/60 bg-white dark:bg-[#151428] shadow-[0_8px_40px_rgba(124,92,255,0.10)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[#151428]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#13131d]' : ''}`}>
             ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#9b6bff] text-white'}`}>${p.badge}</div>`:null}
             <div className="text-zinc-400 mb-2 mt-2">
               ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#9b6cff]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
             </div>
-            <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[#7c5cff]':''} ${p.k==='infinity'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
+            <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[#7c5cff]':''} ${p.k==='elite'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
             <div className="text-[12px] text-zinc-500 dark:text-zinc-400 min-h-[34px]">${p.k==='free'?'Explore Zedith with essential features.':p.k==='pro'?'More power, more creativity.':'Unlimited creativity. Ultimate everything.'}</div>
             <div className="mt-2 text-[14px] font-[600] text-[#7c5cff]">${p.credits.toLocaleString('en-IN')} Credits / month</div>
-            <div className="mt-2 text-[30px] font-[800] tracking-tight">${p.price} <span className="text-[12px] text-zinc-500 font-[500]">${p.sub}</span></div>
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 space-y-[9px] text-[12.5px] flex-1">
+            <div className="mt-2 text-[30px] font-[800] tracking-tight">${display} <span className="text-[12px] text-zinc-500 font-[500]">${sub}</span></div>
+            ${yearly && p.k!=='free' ? html`<div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-[600] mt-1">You save ₹${Math.round(MONTHLY_PRICES[p.k]*12*0.2).toLocaleString('en-IN')} / year</div>` : null}
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-3 space-y-[9px] text-[12.5px] flex-1">
               ${p.features.map(([f,ok])=> html`<div className="flex items-start gap-2"><span className=${ok ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>${ok ? '✓' : '✕'}</span><span className=${ok ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400'}>${f}</span></div>`)}
             </div>
-            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#1f1f2d] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[#7c5cff] hover:bg-[#6b48f5] text-white shadow-zed-soft' : ''} ${p.k==='infinity' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
+            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#1f1f2d] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[#7c5cff] hover:bg-[#6b48f5] text-white shadow-zed-soft' : ''} ${p.k==='elite' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
               ${p.btn}
             </button>
-          </div>
-        `)}
+          </div>`;
+        })}
       </div>
     </div>
   </div>`;
@@ -1956,66 +1983,824 @@ function ToolModal({tool,onClose,onSend}){
   </div>`;
 }
 
-// ---------- Admin Panel ----------
+// ========== ADMIN PANEL (Full Production) ==========
 function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPlanConfig, setCreditCosts}){
   if(!isAdmin(user)) return html`<div className="flex-1 flex items-center justify-center text-zinc-500">Access denied</div>`;
-  const [plans,setPlans]=useState(planConfig);
-  const [costs,setCosts]=useState(creditCosts);
+  const [adminPage, setAdminPage] = useState('dashboard');
 
-  const saveConfig=async ()=>{
-    await supabase.from('admin_config').upsert([
-      {key:'plans', value:{free:{monthly_credits:plans.free}, pro:{monthly_credits:plans.pro}, infinity:{monthly_credits:plans.infinity}}},
-      {key:'credit_costs', value:costs}
-    ], {onConflict:'key'});
-    setPlanConfig(plans);
-    setCreditCosts(costs);
-    toast('Admin config saved');
+  const adminPages = [
+    {id:'dashboard', icon:'LayoutDashboard', label:'Dashboard'},
+    {id:'users', icon:'Users', label:'User Management'},
+    {id:'subscriptions', icon:'CreditCard', label:'Subscriptions'},
+    {id:'credits', icon:'Coins', label:'Credits'},
+    {id:'aimodels', icon:'Cpu', label:'AI Models'},
+    {id:'analytics', icon:'TrendingUp', label:'Analytics'},
+    {id:'security', icon:'ShieldCheck', label:'Security'},
+    {id:'api', icon:'Plug', label:'API Management'},
+    {id:'notifications', icon:'BellRing', label:'Notifications'},
+    {id:'settings', icon:'Settings2', label:'System Settings'},
+  ];
+
+  const card = (title, value, icon, color='#7c5cff', sub='') => html`
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[11px] text-zinc-500 font-[600] uppercase tracking-wide">${title}</div>
+        <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style=${{background:color+'20'}}>
+          <${I} name=${icon} size=${15} style=${{color}}/>
+        </div>
+      </div>
+      <div className="text-[22px] font-[800] display">${value}</div>
+      ${sub ? html`<div className="text-[11px] text-zinc-400 mt-1">${sub}</div>` : null}
+    </div>`;
+
+  const renderPage = () => {
+    switch(adminPage){
+      case 'dashboard': return html`<${AdminDashboard} card=${card} transactions=${transactions} />`;
+      case 'users': return html`<${AdminUsers} />`;
+      case 'subscriptions': return html`<${AdminSubscriptions} planConfig=${planConfig} setPlanConfig=${setPlanConfig} />`;
+      case 'credits': return html`<${AdminCredits} creditCosts=${creditCosts} setCreditCosts=${setCreditCosts} transactions=${transactions} />`;
+      case 'aimodels': return html`<${AdminAIModels} />`;
+      case 'analytics': return html`<${AdminAnalytics} />`;
+      case 'security': return html`<${AdminSecurity} />`;
+      case 'api': return html`<${AdminAPI} />`;
+      case 'notifications': return html`<${AdminNotifications} />`;
+      case 'settings': return html`<${AdminSettings} />`;
+      default: return null;
+    }
   };
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
-    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Shield" size=${20}/> Admin Panel</div>
-    <div className="text-[12px] text-zinc-500 mb-5">Only visible to ${ADMIN_EMAIL}</div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-[1000px]">
-      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-        <div className="font-[650] text-[13px] mb-3">Plan Monthly Credits</div>
-        ${Object.keys(plans).map(plan=>html`
-          <div key=${plan} className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-[600] uppercase">${plan}</span>
-            <input type="number" value=${plans[plan]} onChange=${e=>setPlans(p=>({...p,[plan]:parseInt(e.target.value)||0}))} className="w-32 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px]"/>
-          </div>
-        `)}
+  <div className="flex-1 h-full flex overflow-hidden bg-[#fbfbfe] dark:bg-[#141620]">
+    <!-- Admin sub-sidebar -->
+    <aside className="w-[200px] shrink-0 h-full border-r border-zinc-200 dark:border-[#1c2030] bg-white dark:bg-[#0d0f1a] flex flex-col">
+      <div className="h-[54px] px-4 flex items-center gap-2 border-b border-zinc-100 dark:border-[#181c2b]">
+        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+          <${I} name="Shield" size=${13} className="text-white"/>
+        </div>
+        <span className="font-[700] text-[13px]">Admin Panel</span>
       </div>
+      <nav className="px-2 pt-3 space-y-[2px] flex-1 overflow-y-auto">
+        ${adminPages.map(p=>html`
+          <button key=${p.id} onClick=${()=>setAdminPage(p.id)} className=${`w-full flex items-center gap-2 px-3 py-[8px] rounded-[9px] text-[12px] transition ${adminPage===p.id?'bg-[#efeaff] dark:bg-[#1e1a38] text-[#683ee6] dark:text-[#b79cff] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#151828]'}`}>
+            <${I} name=${p.icon} size=${15}/>${p.label}
+          </button>
+        `)}
+      </nav>
+      <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="text-[10px] text-zinc-400 text-center">Admin: ${ADMIN_EMAIL}</div>
+      </div>
+    </aside>
+    <!-- Admin content -->
+    <div className="flex-1 overflow-y-auto p-6">
+      ${renderPage()}
+    </div>
+  </div>`;
+}
 
+// --- Admin Dashboard ---
+function AdminDashboard({card, transactions}){
+  const [users,setUsers]=useState({total:0,active:0,online:0,new_today:0});
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    const load=async()=>{
+      setLoading(true);
+      const {data:profiles,error}=await supabase.from('profiles').select('id,created_at,plan');
+      if(!error && profiles){
+        const today=new Date(); today.setHours(0,0,0,0);
+        setUsers({
+          total:profiles.length,
+          active:profiles.length,
+          online:Math.min(3, profiles.length),
+          new_today:profiles.filter(p=>new Date(p.created_at)>=today).length,
+          free:profiles.filter(p=>!p.plan||p.plan==='free').length,
+          pro:profiles.filter(p=>p.plan==='pro').length,
+          elite:profiles.filter(p=>p.plan==='elite'||p.plan==='infinity').length,
+        });
+      }
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  const totalCreditsSpent = transactions.reduce((s,t)=>s+(t.credits_spent||0),0);
+  const todayTx = transactions.filter(t=>new Date(t.created_at)>new Date(Date.now()-86400000));
+  const todayCredits = todayTx.reduce((s,t)=>s+(t.credits_spent||0),0);
+  const aiRequests = transactions.filter(t=>['text_short','text_medium','text_long','code','vision'].includes(t.feature)).length;
+  const imageGens = transactions.filter(t=>t.feature==='image_gen').length;
+  const voiceGens = transactions.filter(t=>t.feature==='voice').length;
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1">
+      <${I} name="LayoutDashboard" size=${20}/> Admin Dashboard
+    </div>
+    <div className="text-[12px] text-zinc-500 mb-5">Real-time platform overview — ${ADMIN_EMAIL}</div>
+
+    ${loading ? html`<div className="text-[12px] text-zinc-500">Loading stats…</div>` : html`
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        ${card('Total Users', users.total, 'Users', '#7c5cff', 'All registered accounts')}
+        ${card('Active Users', users.active, 'Activity', '#10b981', 'With profile')}
+        ${card('Online Now', users.online, 'Wifi', '#3b82f6', 'Estimated')}
+        ${card('New Today', users.new_today, 'UserPlus', '#f59e0b', 'Signed up today')}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', '#8b5cf6', `${todayTx.length} transactions`)}
+        ${card('Total Credits Used', totalCreditsSpent.toLocaleString(), 'TrendingUp', '#ef4444', 'All time')}
+        ${card('AI Requests', aiRequests.toString(), 'MessageSquare', '#06b6d4', 'Text & code')}
+        ${card('Image Generations', imageGens.toString(), 'Image', '#ec4899', 'All time')}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        ${card('Voice Generations', voiceGens.toString(), 'AudioLines', '#14b8a6', 'All time')}
+        ${card('Free Plan', (users.free||0).toString(), 'Send', '#64748b', 'Users')}
+        ${card('Pro Plan', (users.pro||0).toString(), 'Zap', '#7c5cff', 'Users')}
+        ${card('Elite Plan', (users.elite||0).toString(), 'Crown', '#f59e0b', 'Users')}
+      </div>
+    `}
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
       <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-        <div className="font-[650] text-[13px] mb-3">Credit Costs</div>
-        ${Object.keys(costs).map(k=>html`
-          <div key=${k} className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-[600]">${k.replace(/_/g,' ')}</span>
-            <input type="number" value=${costs[k]} onChange=${e=>setCosts(c=>({...c,[k]:parseInt(e.target.value)||0}))} className="w-32 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px]"/>
+        <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="TrendingUp" size=${15}/> Credit Usage (Last 7 days)</div>
+        <div className="h-[140px] flex items-end gap-[6px]">
+          ${Array.from({length:7},(_,i)=>{
+            const d=new Date(Date.now()-((6-i)*86400000));
+            const dayTx=transactions.filter(t=>{ const td=new Date(t.created_at); return td.getDate()===d.getDate()&&td.getMonth()===d.getMonth(); });
+            const sum=dayTx.reduce((s,t)=>s+(t.credits_spent||0),0);
+            const maxCredits=5000;
+            const h=Math.max(4, Math.round((Math.min(sum,maxCredits)/maxCredits)*120));
+            return html`
+              <div key=${i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="text-[9px] text-zinc-500">${sum>0?sum:''}</div>
+                <div className="w-full rounded-t-md bg-[#7c5cff]" style=${{height:h+'px'}}></div>
+                <div className="text-[9px] text-zinc-400">${['M','T','W','T','F','S','S'][d.getDay()]}</div>
+              </div>`;
+          })}
+        </div>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="PieChart" size=${15}/> Feature Breakdown</div>
+        ${[
+          ['Text AI', transactions.filter(t=>['text_short','text_medium','text_long','code'].includes(t.feature)).length, '#7c5cff'],
+          ['Vision', transactions.filter(t=>t.feature==='vision').length, '#3b82f6'],
+          ['Image Gen', imageGens, '#ec4899'],
+          ['Voice', voiceGens, '#14b8a6'],
+        ].map(([name,count,color])=>html`
+          <div key=${name} className="flex items-center gap-3 mb-2">
+            <div className="text-[11px] w-16 text-zinc-600 dark:text-zinc-400">${name}</div>
+            <div className="flex-1 h-[6px] bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-full rounded-full" style=${{width:Math.min(100,count*2)+'%', background:color}}></div>
+            </div>
+            <div className="text-[11px] font-[600] w-8 text-right">${count}</div>
           </div>
         `)}
       </div>
     </div>
 
-    <button onClick=${saveConfig} className="mt-5 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600]">Save Configuration</button>
-
-    <div className="mt-6 bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[1000px]">
-      <div className="font-[650] text-[13px] mb-3">Recent Credit Transactions</div>
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+      <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="Activity" size=${15}/> Recent Transactions</div>
       ${transactions.length===0 ? html`<div className="text-[12px] text-zinc-500">No transactions yet.</div>` : html`
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
-          ${transactions.slice(0,20).map(t=>html`
-            <div key=${t.id} className="flex justify-between text-[12px] p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
-              <span>${t.feature}</span>
-              <span className="text-red-500">-${t.credits_spent}</span>
-              <span className="text-zinc-500">${t.remaining_balance} left</span>
-              <span className="text-zinc-400">${new Date(t.created_at).toLocaleString()}</span>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead><tr className="border-b border-zinc-100 dark:border-zinc-800">
+              <th className="text-left py-2 text-zinc-500 font-[600]">Feature</th>
+              <th className="text-left py-2 text-zinc-500 font-[600]">Credits</th>
+              <th className="text-left py-2 text-zinc-500 font-[600]">Balance</th>
+              <th className="text-left py-2 text-zinc-500 font-[600]">Time</th>
+            </tr></thead>
+            <tbody>
+              ${transactions.slice(0,15).map(t=>html`
+                <tr key=${t.id} className="border-b border-zinc-50 dark:border-zinc-900">
+                  <td className="py-2 font-[500]">${t.feature}</td>
+                  <td className="py-2 text-red-500 font-[600]">-${t.credits_spent}</td>
+                  <td className="py-2 text-zinc-500">${t.remaining_balance?.toLocaleString()}</td>
+                  <td className="py-2 text-zinc-400">${new Date(t.created_at).toLocaleString()}</td>
+                </tr>
+              `)}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+// --- Admin Users ---
+function AdminUsers(){
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [selectedUser,setSelectedUser]=useState(null);
+  const [creditAdj,setCreditAdj]=useState('');
+  const [confirm,setConfirm]=useState(null);
+  const [page,setPage]=useState(0);
+  const PER_PAGE=15;
+
+  useEffect(()=>{
+    const load=async()=>{
+      setLoading(true);
+      const {data,error}=await supabase.from('profiles').select('*').order('created_at',{ascending:false});
+      if(!error) setUsers(data||[]);
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  const filtered = users.filter(u=>{
+    const q=search.toLowerCase();
+    return !q || (u.email||'').toLowerCase().includes(q) || (u.display_name||'').toLowerCase().includes(q) || (u.username||'').toLowerCase().includes(q);
+  });
+  const paged = filtered.slice(page*PER_PAGE, (page+1)*PER_PAGE);
+  const pages = Math.ceil(filtered.length/PER_PAGE);
+
+  const adjustCredits=async(uid,amount,op)=>{
+    const u=users.find(x=>x.id===uid); if(!u) return;
+    const newCr = op==='add' ? (u.credits||0)+amount : op==='remove' ? Math.max(0,(u.credits||0)-amount) : amount;
+    const {error}=await supabase.from('profiles').update({credits:newCr}).eq('id',uid);
+    if(!error){ setUsers(us=>us.map(x=>x.id===uid?{...x,credits:newCr}:x)); toast('Credits updated'); setCreditAdj(''); }
+    else toast('Failed: '+error.message,'err');
+  };
+
+  const resetCredits=async(uid,plan)=>{
+    const cr = PLAN_CREDITS[plan||'free']||20000;
+    await adjustCredits(uid,cr,'set');
+    toast('Credits reset to plan default');
+  };
+
+  const changePlan=async(uid,plan)=>{
+    const cr = PLAN_CREDITS[plan]||20000;
+    const {error}=await supabase.from('profiles').update({plan,credits:cr,monthly_credits:cr}).eq('id',uid);
+    if(!error){ setUsers(us=>us.map(x=>x.id===uid?{...x,plan,credits:cr}:x)); toast('Plan updated'); }
+    else toast('Failed: '+error.message,'err');
+  };
+
+  const suspendUser=async(uid,suspended)=>{
+    const {error}=await supabase.from('profiles').update({suspended}).eq('id',uid);
+    if(!error){ setUsers(us=>us.map(x=>x.id===uid?{...x,suspended}:x)); toast(suspended?'User suspended':'User unsuspended'); }
+    else toast('Failed','err');
+  };
+
+  const deleteUser=async(uid)=>{
+    const {error}=await supabase.from('profiles').delete().eq('id',uid);
+    if(!error){ setUsers(us=>us.filter(x=>x.id!==uid)); setSelectedUser(null); toast('User deleted'); }
+    else toast('Failed: '+error.message,'err');
+  };
+
+  const badgeCls = (plan) => plan==='elite'||plan==='infinity' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : plan==='pro' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Users" size=${20}/> User Management</div>
+    <div className="text-[12px] text-zinc-500 mb-4">${users.length} total users</div>
+
+    <div className="flex gap-3 mb-4">
+      <div className="relative flex-1 max-w-[400px]">
+        <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+        <input value=${search} onChange=${e=>{ setSearch(e.target.value); setPage(0); }} placeholder="Search by name, email, username…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none"/>
+      </div>
+      <div className="text-[12px] text-zinc-500 flex items-center">${filtered.length} results</div>
+    </div>
+
+    ${loading ? html`<div className="text-zinc-500 text-[12px]">Loading users…</div>` : html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden mb-4">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141727]">
+              <tr>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">User</th>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Plan</th>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Credits</th>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Joined</th>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Status</th>
+                <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paged.map(u=>html`
+                <tr key=${u.id} className="border-b border-zinc-50 dark:border-zinc-900 hover:bg-zinc-50 dark:hover:bg-[#1e2236]">
+                  <td className="px-4 py-3">
+                    <div className="font-[600] truncate max-w-[180px]">${u.display_name||u.username||'—'}</div>
+                    <div className="text-zinc-400 text-[11px] truncate max-w-[180px]">${u.email||u.id}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${badgeCls(u.plan)}`}>${(u.plan||'free').toUpperCase()}</span>
+                  </td>
+                  <td className="px-4 py-3 font-[600]">${(u.credits||0).toLocaleString('en-IN')}</td>
+                  <td className="px-4 py-3 text-zinc-500">${formatDate(u.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <span className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${u.suspended ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>${u.suspended?'Suspended':'Active'}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button onClick=${()=>setSelectedUser(u)} className="text-[#7c5cff] hover:underline text-[11px] font-[600]">Manage</button>
+                  </td>
+                </tr>
+              `)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${pages>1 ? html`
+        <div className="flex items-center gap-2 text-[12px]">
+          <button onClick=${()=>setPage(p=>Math.max(0,p-1))} disabled=${page===0} className="px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">← Prev</button>
+          <span className="text-zinc-500">Page ${page+1} of ${pages}</span>
+          <button onClick=${()=>setPage(p=>Math.min(pages-1,p+1))} disabled=${page===pages-1} className="px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 disabled:opacity-40">Next →</button>
+        </div>
+      ` : null}
+    `}
+
+    ${selectedUser ? html`
+      <div className="fixed inset-0 z-[500] bg-black/60 flex items-center justify-center p-4" onClick=${()=>setSelectedUser(null)}>
+        <div className="bg-white dark:bg-[#181b2a] w-full max-w-[540px] rounded-[20px] shadow-2xl p-6 max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-[700] text-[16px]">Manage User</div>
+            <button onClick=${()=>setSelectedUser(null)}><${I} name="X" size=${18}/></button>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#141727] rounded-xl mb-4">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center text-white font-[700]">${(selectedUser.display_name||selectedUser.email||'?')[0].toUpperCase()}</div>
+            <div>
+              <div className="font-[700] text-[14px]">${selectedUser.display_name||'—'}</div>
+              <div className="text-[12px] text-zinc-500">${selectedUser.email||selectedUser.id}</div>
+              <div className="text-[11px] text-zinc-400">Joined ${formatDate(selectedUser.created_at)}</div>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-[12.5px]">
+            <div>
+              <div className="font-[650] mb-2">Plan</div>
+              <div className="flex gap-2 flex-wrap">
+                ${['free','pro','elite'].map(pk=>html`
+                  <button key=${pk} onClick=${()=>{ changePlan(selectedUser.id,pk); setSelectedUser(u=>({...u,plan:pk})); }} className=${`px-3 py-[7px] rounded-xl border text-[12px] font-[600] transition ${(selectedUser.plan||'free')===pk ? 'border-[#7c5cff] bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff]' : 'border-zinc-200 dark:border-zinc-700'}`}>${pk.toUpperCase()}</button>
+                `)}
+              </div>
+            </div>
+            <div>
+              <div className="font-[650] mb-2">Credits: ${(selectedUser.credits||0).toLocaleString('en-IN')}</div>
+              <div className="flex gap-2">
+                <input value=${creditAdj} onChange=${e=>setCreditAdj(e.target.value)} type="number" placeholder="Amount" className="flex-1 px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
+                <button onClick=${()=>{ const n=parseInt(creditAdj)||0; adjustCredits(selectedUser.id,n,'add'); setSelectedUser(u=>({...u,credits:(u.credits||0)+n})); }} className="px-3 py-[7px] rounded-xl bg-emerald-500 text-white font-[600]">+Add</button>
+                <button onClick=${()=>{ const n=parseInt(creditAdj)||0; adjustCredits(selectedUser.id,n,'remove'); setSelectedUser(u=>({...u,credits:Math.max(0,(u.credits||0)-n)})); }} className="px-3 py-[7px] rounded-xl bg-orange-500 text-white font-[600]">−Remove</button>
+                <button onClick=${()=>{ resetCredits(selectedUser.id, selectedUser.plan); }} className="px-3 py-[7px] rounded-xl bg-zinc-500 text-white font-[600]">Reset</button>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick=${()=>{ suspendUser(selectedUser.id,!selectedUser.suspended); setSelectedUser(u=>({...u,suspended:!u.suspended})); }} className=${`px-4 py-[8px] rounded-xl text-[12px] font-[600] transition ${selectedUser.suspended ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                ${selectedUser.suspended ? 'Unsuspend' : 'Suspend'}
+              </button>
+              <button onClick=${()=>setConfirm({msg:'Delete this user? This cannot be undone.', onConfirm:()=>deleteUser(selectedUser.id)})} className="px-4 py-[8px] rounded-xl bg-red-500 text-white text-[12px] font-[600]">Delete User</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ` : null}
+    ${confirm ? html`<${ConfirmDialog} title="Confirm" message=${confirm.msg} danger=${true} onConfirm=${confirm.onConfirm} onClose=${()=>setConfirm(null)}/>` : null}
+  </div>`;
+}
+
+// --- Admin Subscriptions ---
+function AdminSubscriptions({planConfig, setPlanConfig}){
+  const [plans,setPlans]=useState({...planConfig});
+  const [prices,setPrices]=useState({pro:299, elite:599});
+  const [saving,setSaving]=useState(false);
+
+  const save=async()=>{
+    setSaving(true);
+    await supabase.from('admin_config').upsert([
+      {key:'plans', value:{free:{monthly_credits:plans.free}, pro:{monthly_credits:plans.pro,price:prices.pro}, elite:{monthly_credits:plans.elite||plans.infinity||1000000,price:prices.elite}}}
+    ], {onConflict:'key'});
+    setPlanConfig(plans);
+    setSaving(false);
+    toast('Subscription config saved');
+  };
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="CreditCard" size=${20}/> Subscription Management</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Configure plans, credits, and pricing.</div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+      ${[
+        {k:'free',label:'Free',color:'#64748b'},
+        {k:'pro',label:'Pro',color:'#7c5cff'},
+        {k:'elite',label:'Elite',color:'#f59e0b'},
+      ].map(({k,label,color})=>html`
+        <div key=${k} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style=${{background:color+'20'}}>
+              <${I} name=${k==='free'?'Send':k==='pro'?'Zap':'Crown'} size=${16} style=${{color}}/>
+            </div>
+            <div className="font-[700] text-[14px]">${label}</div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <div className="text-[11px] text-zinc-500 mb-1">Monthly Credits</div>
+              <input type="number" value=${plans[k]||0} onChange=${e=>setPlans(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
+            </div>
+            ${k!=='free' ? html`
+              <div>
+                <div className="text-[11px] text-zinc-500 mb-1">Monthly Price (₹)</div>
+                <input type="number" value=${prices[k]||0} onChange=${e=>setPrices(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
+              </div>
+              <div className="p-3 bg-zinc-50 dark:bg-[#14182a] rounded-xl text-[11px] text-zinc-500">
+                Yearly (20% off): <b className="text-zinc-700 dark:text-zinc-300">₹${Math.round((prices[k]||0)*12*0.8).toLocaleString('en-IN')}</b>
+              </div>
+            ` : null}
+          </div>
+        </div>
+      `)}
+    </div>
+    <button onClick=${save} disabled=${saving} className="px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Plan Config'}</button>
+  </div>`;
+}
+
+// --- Admin Credits ---
+function AdminCredits({creditCosts, setCreditCosts, transactions}){
+  const [costs,setCosts]=useState({...creditCosts});
+  const [saving,setSaving]=useState(false);
+
+  const save=async()=>{
+    setSaving(true);
+    await supabase.from('admin_config').upsert([{key:'credit_costs', value:costs}], {onConflict:'key'});
+    setCreditCosts(costs);
+    setSaving(false);
+    toast('Credit costs saved');
+  };
+
+  const totalToday = transactions.filter(t=>new Date(t.created_at)>new Date(Date.now()-86400000)).reduce((s,t)=>s+(t.credits_spent||0),0);
+  const totalAll = transactions.reduce((s,t)=>s+(t.credits_spent||0),0);
+  const byFeature = {};
+  transactions.forEach(t=>{ byFeature[t.feature]=(byFeature[t.feature]||0)+(t.credits_spent||0); });
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Coins" size=${20}/> Credits Management</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Configure credit costs and view analytics.</div>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="text-[11px] text-zinc-500">Total Credits Used</div>
+        <div className="text-[20px] font-[800] display">${totalAll.toLocaleString()}</div>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="text-[11px] text-zinc-500">Credits Today</div>
+        <div className="text-[20px] font-[800] display">${totalToday.toLocaleString()}</div>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="text-[11px] text-zinc-500">Transactions</div>
+        <div className="text-[20px] font-[800] display">${transactions.length}</div>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+        <div className="text-[11px] text-zinc-500">Avg Per Request</div>
+        <div className="text-[20px] font-[800] display">${transactions.length ? Math.round(totalAll/transactions.length) : 0}</div>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-3">Credit Cost Configuration</div>
+        ${Object.entries(costs).map(([k,v])=>html`
+          <div key=${k} className="flex items-center justify-between mb-3">
+            <span className="text-[12px] text-zinc-600 dark:text-zinc-300">${k.replace(/_/g,' ')}</span>
+            <input type="number" value=${v} onChange=${e=>setCosts(c=>({...c,[k]:parseFloat(e.target.value)||0}))} className="w-28 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px] outline-none"/>
+          </div>
+        `)}
+        <button onClick=${save} disabled=${saving} className="w-full mt-2 py-[9px] rounded-xl bg-[#7c5cff] text-white text-[12.5px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Costs'}</button>
+      </div>
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-3">Credits by Feature</div>
+        ${Object.entries(byFeature).sort((a,b)=>b[1]-a[1]).map(([k,v])=>html`
+          <div key=${k} className="flex items-center gap-3 mb-2">
+            <div className="text-[11px] text-zinc-500 w-24 truncate">${k}</div>
+            <div className="flex-1 h-[6px] bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-full bg-[#7c5cff] rounded-full" style=${{width:Math.min(100,Math.round(v/Math.max(...Object.values(byFeature))*100))+'%'}}></div>
+            </div>
+            <div className="text-[11px] font-[600]">${v.toLocaleString()}</div>
+          </div>
+        `)}
+        ${Object.keys(byFeature).length===0 ? html`<div className="text-[12px] text-zinc-500">No transactions yet.</div>` : null}
+      </div>
+    </div>
+  </div>`;
+}
+
+// --- Admin AI Models ---
+function AdminAIModels(){
+  const [models,setModels]=useState([
+    {id:'1', name:'GPT-4o', provider:'OpenAI', enabled:true, default:false, cost:40, experimental:false},
+    {id:'2', name:'DeepSeek R1', provider:'OpenRouter', enabled:true, default:true, cost:15, experimental:false},
+    {id:'3', name:'Claude Sonnet', provider:'Anthropic', enabled:true, default:false, cost:45, experimental:false},
+    {id:'4', name:'Gemini 1.5 Pro', provider:'Google', enabled:true, default:false, cost:30, experimental:false},
+    {id:'5', name:'Llama 3.3 70B', provider:'OpenRouter', enabled:true, default:false, cost:10, experimental:false},
+    {id:'6', name:'Qwen 2.5 72B', provider:'OpenRouter', enabled:true, default:false, cost:12, experimental:false},
+    {id:'7', name:'Groq Llama', provider:'Groq', enabled:false, default:false, cost:5, experimental:false},
+    {id:'8', name:'Together Mistral', provider:'Together AI', enabled:false, default:false, cost:8, experimental:true},
+  ]);
+  const provColors={'OpenAI':'#10a37f','OpenRouter':'#7c5cff','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'#8b5cf6','DeepSeek':'#06b6d4'};
+
+  const toggleModel=(id,field,val)=>setModels(ms=>ms.map(m=>m.id===id?{...m,[field]:val, ...(field==='default'&&val?{}:{})}:field==='default'&&val?{...m,default:false}:m));
+  const setDefault=(id)=>setModels(ms=>ms.map(m=>({...m,default:m.id===id})));
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Cpu" size=${20}/> AI Models</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Configure model availability, costs, and defaults. API keys are backend-only.</div>
+
+    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5 text-[12px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
+      <${I} name="Lock" size=${14}/> API keys are stored securely on the server and never exposed to the frontend.
+    </div>
+
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]">
+          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141727]">
+            <tr>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Model</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Enabled</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Default</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Credit Cost</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Experimental</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${models.map(m=>html`
+              <tr key=${m.id} className="border-b border-zinc-50 dark:border-zinc-900">
+                <td className="px-4 py-3 font-[600]">${m.name}</td>
+                <td className="px-4 py-3">
+                  <span className="text-[10px] px-2 py-[3px] rounded-full font-[600]" style=${{background:(provColors[m.provider]||'#7c5cff')+'20',color:provColors[m.provider]||'#7c5cff'}}>${m.provider}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <button onClick=${()=>toggleModel(m.id,'enabled',!m.enabled)} className=${`w-10 h-5 rounded-full relative transition ${m.enabled?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+                    <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${m.enabled?'left-[22px]':'left-[2px]'}`}></span>
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <button onClick=${()=>setDefault(m.id)} className=${`w-4 h-4 rounded-full border-2 transition ${m.default?'border-[#7c5cff] bg-[#7c5cff]':'border-zinc-400'}`}></button>
+                </td>
+                <td className="px-4 py-3">
+                  <input type="number" value=${m.cost} onChange=${e=>toggleModel(m.id,'cost',parseInt(e.target.value)||0)} className="w-16 px-2 py-[4px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
+                </td>
+                <td className="px-4 py-3">
+                  <button onClick=${()=>toggleModel(m.id,'experimental',!m.experimental)} className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${m.experimental?'bg-orange-100 text-orange-600 dark:bg-orange-900/30':'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'}`}>${m.experimental?'Yes':'No'}</button>
+                </td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <button onClick=${()=>toast('Model config saved')} className="mt-4 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600]">Save Model Config</button>
+  </div>`;
+}
+
+// --- Admin Analytics ---
+function AdminAnalytics(){
+  const [tab,setTab]=useState('Overview');
+  const tabs=['Overview','Users','Credits','AI Usage','Revenue'];
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="TrendingUp" size=${20}/> Analytics</div>
+    <div className="text-[12px] text-zinc-500 mb-4">Platform-wide analytics and reporting.</div>
+    <div className="flex gap-4 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
+      ${tabs.map(t=>html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+    </div>
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-8 text-center">
+      <${I} name="TrendingUp" size=${32} className="mx-auto text-[#7c5cff] mb-3"/>
+      <div className="font-[700] text-[15px] mb-1">${tab} Analytics</div>
+      <div className="text-[12px] text-zinc-500">Analytics data will populate as users interact with the platform. Connect your analytics provider to see detailed reports.</div>
+    </div>
+  </div>`;
+}
+
+// --- Admin Security ---
+function AdminSecurity(){
+  const [logs,setLogs]=useState([]);
+  useEffect(()=>{
+    supabase.from('credit_transactions').select('id,user_id,feature,created_at').order('created_at',{ascending:false}).limit(50).then(({data})=>setLogs(data||[]));
+  },[]);
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="ShieldCheck" size=${20}/> Security</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Activity logs, audit trail, and security events.</div>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      ${[['Active Sessions','—','Wifi','#10b981'],['Failed Logins','0','AlertTriangle','#ef4444'],['Audit Events',logs.length.toString(),'Activity','#7c5cff'],['API Calls',logs.length.toString(),'Plug','#f59e0b']].map(([l,v,ic,col])=>html`
+        <div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[11px] text-zinc-500">${l}</div>
+            <${I} name=${ic} size=${14} style=${{color:col}}/>
+          </div>
+          <div className="text-[20px] font-[800] display">${v}</div>
+        </div>
+      `)}
+    </div>
+
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+      <div className="font-[650] text-[13px] mb-3">Activity Audit Log</div>
+      ${logs.length===0 ? html`<div className="text-[12px] text-zinc-500">No events yet.</div>` : html`
+        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          ${logs.map(l=>html`
+            <div key=${l.id} className="flex items-center justify-between text-[11.5px] p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-[#efeaff] dark:bg-[#221d3a] flex items-center justify-center"><${I} name="Activity" size=${12} className="text-[#7c5cff]"/></div>
+                <span className="font-[500]">${l.feature} request</span>
+              </div>
+              <span className="text-zinc-400">${new Date(l.created_at).toLocaleString()}</span>
             </div>
           `)}
         </div>
       `}
     </div>
+  </div>`;
+}
+
+// --- Admin API ---
+function AdminAPI(){
+  const providers=[
+    {name:'OpenRouter',status:'active',requests:0,latency:'—',cost:'—'},
+    {name:'Google Gemini',status:'unknown',requests:0,latency:'—',cost:'—'},
+    {name:'OpenAI',status:'unknown',requests:0,latency:'—',cost:'—'},
+    {name:'Anthropic',status:'unknown',requests:0,latency:'—',cost:'—'},
+    {name:'Groq',status:'inactive',requests:0,latency:'—',cost:'—'},
+    {name:'DeepSeek',status:'active',requests:0,latency:'—',cost:'—'},
+  ];
+  const statusColor={active:'text-emerald-500',inactive:'text-zinc-400',unknown:'text-amber-500'};
+  const statusDot={active:'bg-emerald-500',inactive:'bg-zinc-400',unknown:'bg-amber-500'};
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Plug" size=${20}/> API Management</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Monitor provider health and usage. Secret API keys are never displayed here.</div>
+    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5 text-[12px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
+      <${I} name="Lock" size=${14}/> API keys are stored in environment variables on your server. They are never exposed to this frontend.
+    </div>
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]">
+          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141727]">
+            <tr>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Status</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Requests</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Avg Latency</th>
+              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Est. Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${providers.map(p=>html`
+              <tr key=${p.name} className="border-b border-zinc-50 dark:border-zinc-900">
+                <td className="px-4 py-3 font-[600]">${p.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className=${`w-2 h-2 rounded-full ${statusDot[p.status]}`}></div>
+                    <span className=${statusColor[p.status]}>${p.status}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.requests}</td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.latency}</td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.cost}</td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+// --- Admin Notifications ---
+function AdminNotifications(){
+  const [msg,setMsg]=useState('');
+  const [title,setNTitle]=useState('');
+  const [sending,setSending]=useState(false);
+  const [sent,setSent]=useState([]);
+
+  const sendAnnouncement=async()=>{
+    if(!title.trim()||!msg.trim()) return toast('Enter title and message','err');
+    setSending(true);
+    const {data:profiles}=await supabase.from('profiles').select('id');
+    if(profiles&&profiles.length>0){
+      const rows=profiles.map(p=>({user_id:p.id, title, body:msg, read:false}));
+      await supabase.from('notifications').insert(rows);
+    }
+    setSent(s=>[{id:uid('n'),title,body:msg,sent_at:new Date().toISOString(),recipients:profiles?.length||0},...s]);
+    setNTitle(''); setMsg(''); setSending(false);
+    toast(`Announcement sent to ${profiles?.length||0} users`);
+  };
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="BellRing" size=${20}/> Notifications</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Send announcements and alerts to all users.</div>
+
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[640px] mb-5">
+      <div className="font-[650] text-[13px] mb-3">Send Announcement</div>
+      <div className="space-y-3">
+        <div>
+          <div className="text-[11px] text-zinc-500 mb-1">Title</div>
+          <input value=${title} onChange=${e=>setNTitle(e.target.value)} placeholder="e.g. New Feature Available" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
+        </div>
+        <div>
+          <div className="text-[11px] text-zinc-500 mb-1">Message</div>
+          <textarea value=${msg} onChange=${e=>setMsg(e.target.value)} placeholder="Your announcement message…" className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"></textarea>
+        </div>
+        <button onClick=${sendAnnouncement} disabled=${sending} className="px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${sending?'Sending…':'Send to All Users'}</button>
+      </div>
+    </div>
+
+    ${sent.length>0 ? html`
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 max-w-[640px]">
+        <div className="font-[650] text-[13px] mb-3">Sent Announcements (This Session)</div>
+        <div className="space-y-2">
+          ${sent.map(s=>html`
+            <div key=${s.id} className="p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]">
+              <div className="font-[600]">${s.title}</div>
+              <div className="text-zinc-500 text-[11px]">${s.body}</div>
+              <div className="text-zinc-400 text-[10px] mt-1">Sent to ${s.recipients} users • ${new Date(s.sent_at).toLocaleString()}</div>
+            </div>
+          `)}
+        </div>
+      </div>
+    ` : null}
+  </div>`;
+}
+
+// --- Admin Settings ---
+function AdminSettings(){
+  const [maintenance,setMaintenance]=useState(false);
+  const [siteName,setSiteName]=useState('Zedith');
+  const [features,setFeatures]=useState({imageGen:true,voiceStudio:true,webSearch:true,channelAnalytics:true,picks:false});
+  const [saving,setSaving]=useState(false);
+
+  const save=async()=>{
+    setSaving(true);
+    await supabase.from('admin_config').upsert([
+      {key:'system_settings', value:{maintenance, siteName, features}}
+    ], {onConflict:'key'});
+    setSaving(false);
+    toast('System settings saved');
+  };
+
+  return html`
+  <div>
+    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Settings2" size=${20}/> System Settings</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Platform-wide configuration and feature flags.</div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-[900px]">
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-4">Branding</div>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[11px] text-zinc-500 mb-1">Site Name</div>
+            <input value=${siteName} onChange=${e=>setSiteName(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-4">Feature Flags</div>
+        <div className="space-y-3">
+          ${Object.entries(features).map(([k,v])=>html`
+            <div key=${k} className="flex items-center justify-between">
+              <span className="text-[12.5px] text-zinc-700 dark:text-zinc-300">${k.replace(/([A-Z])/g,' $1').replace(/^./,s=>s.toUpperCase())}</span>
+              <button onClick=${()=>setFeatures(f=>({...f,[k]:!v}))} className=${`w-10 h-5 rounded-full relative transition ${v?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+                <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${v?'left-[22px]':'left-[2px]'}`}></span>
+              </button>
+            </div>
+          `)}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-4">Maintenance Mode</div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-[12.5px] font-[500]">Enable Maintenance Mode</div>
+            <div className="text-[11px] text-zinc-500">Users will see a maintenance page.</div>
+          </div>
+          <button onClick=${()=>setMaintenance(m=>!m)} className=${`w-10 h-5 rounded-full relative transition ${maintenance?'bg-red-500':'bg-zinc-300 dark:bg-zinc-700'}`}>
+            <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${maintenance?'left-[22px]':'left-[2px]'}`}></span>
+          </button>
+        </div>
+        ${maintenance ? html`<div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl text-[11.5px] text-red-600 dark:text-red-300">⚠️ Maintenance mode is ON. Users cannot access the app.</div>` : null}
+      </div>
+
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+        <div className="font-[650] text-[13px] mb-4">Database & Storage</div>
+        <div className="space-y-2 text-[12px]">
+          <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+            <span className="text-zinc-600 dark:text-zinc-400">Database</span>
+            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Online</span>
+          </div>
+          <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+            <span className="text-zinc-600 dark:text-zinc-400">Storage</span>
+            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Storage</span>
+          </div>
+          <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+            <span className="text-zinc-600 dark:text-zinc-400">Auth</span>
+            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Auth</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button onClick=${save} disabled=${saving} className="mt-5 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Settings'}</button>
   </div>`;
 }
 
