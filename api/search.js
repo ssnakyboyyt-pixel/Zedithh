@@ -50,7 +50,16 @@ export default async function handler(req, res) {
       snippet: (item.content || '').slice(0, 500),
     })).filter(item => item.url);
 
-    return res.status(200).json({ results, query });
+    // Pre-built context block the client can drop straight into a system/user
+    // message so the model is grounded in REAL results instead of guessing.
+    // This is what actually fixes "hallucinated sources" — the model never
+    // has to invent a URL because real ones are already in its context.
+    const searchContext = results.length
+      ? `Web search results for "${query}" (use ONLY these sources; cite the URL for any fact you use; if these don't answer the question, say so instead of guessing):\n\n` +
+        results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
+      : `Web search for "${query}" returned no results. Tell the user you couldn't find current information rather than guessing.`;
+
+    return res.status(200).json({ results, query, searchContext });
   } catch (e) {
     return res.status(200).json({ results: [], error: 'network error: ' + e.message });
   }

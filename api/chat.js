@@ -14,6 +14,48 @@ function hasImage(messages) {
   return messages.some(m => Array.isArray(m.content) && m.content.some(p => p.type === 'image_url'));
 }
 
+// Sanitize messages before sending to a TEXT-ONLY provider (Groq/Cerebras).
+// Strips image parts and flattens any array-content into a plain string, so a
+// message shape that's valid for Gemini/OpenRouter can never crash Groq/Cerebras
+// with "messages[n].content must be a string".
+function toTextOnlyMessages(messages) {
+  return messages.map(m => {
+    if (Array.isArray(m.content)) {
+      const text = m.content
+        .filter(p => p && p.type === 'text')
+        .map(p => p.text || '')
+        .join('\n')
+        .trim();
+      return { role: m.role, content: text || '[image omitted]' };
+    }
+    if (typeof m.content !== 'string') {
+      return { role: m.role, content: m.content == null ? '' : String(m.content) };
+    }
+    return m;
+  });
+}
+
+// Wrap a fetch with a hard timeout so one hung provider can't stall the whole chain.
+async function fetchWithTimeout(url, options, ms = 15000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Retry once on 429 (rate limit) with a short backoff before giving up on a model.
+async function fetchWithRetry(url, options, ms = 15000) {
+  let r = await fetchWithTimeout(url, options, ms);
+  if (r.status === 429) {
+    await new Promise(res => setTimeout(res, 1200));
+    r = await fetchWithTimeout(url, options, ms);
+  }
+  return r;
+}
+
 // ---------- Groq (OpenAI-compatible, but the free text models have NO vision support) ----------
 async function tryGroq(messages, temperature, max_tokens, failures) {
   const key = process.env.GROQ_API_KEY;
@@ -22,13 +64,14 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
     failures.push('groq: skipped (free Groq models here do not support image input)');
     return null;
   }
+  const safeMessages = toTextOnlyMessages(messages);
   const models = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'];
   for (const model of models) {
     try {
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const r = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, temperature, max_tokens }),
+        body: JSON.stringify({ model, messages: safeMessages, temperature, max_tokens }),
       });
       if (!r.ok) {
         let bodyText = '';
@@ -55,13 +98,14 @@ async function tryCerebras(messages, temperature, max_tokens, failures) {
     failures.push('cerebras: skipped (no vision support on free-tier models)');
     return null;
   }
+  const safeMessages = toTextOnlyMessages(messages);
   const models = ['llama3.1-8b', 'llama-3.3-70b'];
   for (const model of models) {
     try {
-      const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+      const r = await fetchWithRetry('https://api.cerebras.ai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, temperature, max_tokens }),
+        body: JSON.stringify({ model, messages: safeMessages, temperature, max_tokens }),
       });
       if (!r.ok) {
         let bodyText = '';
@@ -127,7 +171,7 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
           : systemMsg.content;
         body.systemInstruction = { parts: [{ text: sysText }] };
       }
-      const r = await fetch(url, {
+      const r = await fetchWithRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -160,7 +204,7 @@ async function tryOpenRouter(messages, temperature, max_tokens, models, failures
     : (models && models.length ? models : textModels);
   for (const model of pool) {
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const r = await fetchWithRetry('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
