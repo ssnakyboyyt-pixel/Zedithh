@@ -6,7 +6,7 @@
 <title>Zedith — AI Creator Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script>
 function zedithApplyTailwindConfig(){
   tailwind.config = {
@@ -31,6 +31,9 @@ function zedithLoadCDNTailwind(){
 <style>
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+.pulse-dot{animation:pulseDot 2s ease-in-out infinite}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#2b2d3d;border-radius:3px}
 .no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
 .lucide{stroke-width:1.85}
@@ -2238,16 +2241,16 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
     {id:'settings', icon:'Settings2', label:'System Settings'},
   ];
 
-  const card = (title, value, icon, color='#7c5cff', sub='') => html`
-    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] text-zinc-500 font-[600] uppercase tracking-wide">${title}</div>
-        <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style=${{background:color+'20'}}>
-          <${I} name=${icon} size=${15} style=${{color}}/>
+  const card = (title, value, icon, color='#e8b04b', sub='') => html`
+    <div className="bg-[#12131e] border border-[#1e2030] rounded-[12px] p-4 hover:border-[#2a2c42] transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] text-zinc-500 font-[650] uppercase tracking-[0.06em]">${title}</div>
+        <div className="w-7 h-7 rounded-[8px] flex items-center justify-center" style=${{background:color+'14', border:`1px solid ${color}2a`}}>
+          <${I} name=${icon} size=${13} style=${{color}}/>
         </div>
       </div>
-      <div className="text-[22px] font-[800] display">${value}</div>
-      ${sub ? html`<div className="text-[11px] text-zinc-400 mt-1">${sub}</div>` : null}
+      <div className="text-[24px] font-[700] mono tracking-tight text-zinc-100">${value}</div>
+      ${sub ? html`<div className="text-[10.5px] text-zinc-500 mt-1">${sub}</div>` : null}
     </div>`;
 
   const renderPage = () => {
@@ -2268,28 +2271,36 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
   };
 
   return html`
-  <div className="flex-1 h-full flex overflow-hidden bg-[#fbfbfe] dark:bg-[#141620]">
-    <!-- Admin sub-sidebar -->
-    <aside className="w-[200px] shrink-0 h-full border-r border-zinc-200 dark:border-[#1c2030] bg-white dark:bg-[#0d0f1a] flex flex-col">
-      <div className="h-[54px] px-4 flex items-center gap-2 border-b border-zinc-100 dark:border-[#181c2b]">
-        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
-          <${I} name="Shield" size=${13} className="text-white"/>
+  <div className="flex-1 h-full flex overflow-hidden bg-[#0a0b12]">
+    <!-- Admin sub-sidebar: instrument rail -->
+    <aside className="w-[210px] shrink-0 h-full border-r border-[#1c1d2b] bg-[#0d0e17] flex flex-col">
+      <div className="h-[58px] px-4 flex items-center gap-2.5 border-b border-[#1a1b28]">
+        <div className="w-7 h-7 rounded-[8px] bg-[#e8b04b]/12 border border-[#e8b04b]/25 flex items-center justify-center">
+          <${I} name="ShieldCheck" size=${14} style=${{color:'#e8b04b'}}/>
         </div>
-        <span className="font-[700] text-[13px]">Admin Panel</span>
+        <div className="flex flex-col leading-none">
+          <span className="font-[750] text-[12.5px] text-zinc-100 display">Control Room</span>
+          <span className="text-[9.5px] text-zinc-500 mt-[3px]">Zedith Admin</span>
+        </div>
       </div>
-      <nav className="px-2 pt-3 space-y-[2px] flex-1 overflow-y-auto">
-        ${adminPages.map(p=>html`
-          <button key=${p.id} onClick=${()=>setAdminPage(p.id)} className=${`w-full flex items-center gap-2 px-3 py-[8px] rounded-[9px] text-[12px] transition ${adminPage===p.id?'bg-[#efeaff] dark:bg-[#1e1a38] text-[#683ee6] dark:text-[#b79cff] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#151828]'}`}>
-            <${I} name=${p.icon} size=${15}/>${p.label}
-          </button>
-        `)}
+      <nav className="px-2 pt-3 space-y-[1px] flex-1 overflow-y-auto">
+        ${adminPages.map(p=>{
+          const active = adminPage===p.id;
+          return html`
+          <button key=${p.id} onClick=${()=>setAdminPage(p.id)} className=${`relative w-full flex items-center gap-2.5 pl-3 pr-3 py-[9px] rounded-[8px] text-[12px] transition-colors ${active?'bg-[#161725] text-[#f0c876]':'text-zinc-500 hover:text-zinc-300 hover:bg-[#12131f]'}`}>
+            ${active ? html`<span className="absolute left-0 top-[6px] bottom-[6px] w-[2.5px] rounded-full bg-[#e8b04b]"></span>` : null}
+            <${I} name=${p.icon} size=${14.5} style=${active?{color:'#e8b04b'}:{}}/>
+            <span className=${active?'font-[600]':'font-[500]'}>${p.label}</span>
+          </button>`;
+        })}
       </nav>
-      <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
-        <div className="text-[10px] text-zinc-400 text-center">Admin: ${ADMIN_EMAIL}</div>
+      <div className="p-3 border-t border-[#1a1b28] flex items-center gap-2">
+        <span className="w-[6px] h-[6px] rounded-full bg-[#3ecf8e] pulse-dot"></span>
+        <div className="text-[9.5px] text-zinc-500 mono truncate">${ADMIN_EMAIL}</div>
       </div>
     </aside>
     <!-- Admin content -->
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-6 bg-[#0a0b12]">
       ${renderPage()}
     </div>
   </div>`;
@@ -2330,35 +2341,43 @@ function AdminDashboard({card, transactions}){
 
   return html`
   <div>
-    <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1">
-      <${I} name="LayoutDashboard" size=${20}/> Admin Dashboard
+    <div className="flex items-center justify-between mb-1">
+      <div className="text-[18px] font-[750] display flex items-center gap-2 text-zinc-100">
+        <${I} name="LayoutDashboard" size=${18} style=${{color:'#e8b04b'}}/> Admin Dashboard
+      </div>
     </div>
-    <div className="text-[12px] text-zinc-500 mb-5">Real-time platform overview — ${ADMIN_EMAIL}</div>
+    <div className="text-[12px] text-zinc-500 mb-4">Real-time platform overview — <span className="mono">${ADMIN_EMAIL}</span></div>
+
+    <div className="flex items-center gap-2 bg-[#0f1911] border border-[#1c3324] rounded-[10px] px-3.5 py-2 mb-5 w-fit">
+      <span className="w-[7px] h-[7px] rounded-full bg-[#3ecf8e] pulse-dot"></span>
+      <span className="text-[11.5px] font-[600] text-[#6fdba8]">All systems operational</span>
+      <span className="text-[11px] text-zinc-500 mono">· ${users.online} online now</span>
+    </div>
 
     ${loading ? html`<div className="text-[12px] text-zinc-500">Loading stats…</div>` : html`
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        ${card('Total Users', users.total, 'Users', '#7c5cff', 'All registered accounts')}
-        ${card('Active Users', users.active, 'Activity', '#10b981', 'With profile')}
-        ${card('Online Now', users.online, 'Wifi', '#3b82f6', 'Estimated')}
-        ${card('New Today', users.new_today, 'UserPlus', '#f59e0b', 'Signed up today')}
+        ${card('Total Users', users.total, 'Users', '#e8b04b', 'All registered accounts')}
+        ${card('Active Users', users.active, 'Activity', '#3ecf8e', 'With profile')}
+        ${card('Online Now', users.online, 'Wifi', '#5b9dff', 'Estimated')}
+        ${card('New Today', users.new_today, 'UserPlus', '#e8b04b', 'Signed up today')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', '#8b5cf6', `${todayTx.length} transactions`)}
-        ${card('Total Credits Used', totalCreditsSpent.toLocaleString(), 'TrendingUp', '#ef4444', 'All time')}
-        ${card('AI Requests', aiRequests.toString(), 'MessageSquare', '#06b6d4', 'Text & code')}
-        ${card('Image Generations', imageGens.toString(), 'Image', '#ec4899', 'All time')}
+        ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', '#c98bf0', `${todayTx.length} transactions`)}
+        ${card('Total Credits Used', totalCreditsSpent.toLocaleString(), 'TrendingUp', '#ef5b5b', 'All time')}
+        ${card('AI Requests', aiRequests.toString(), 'MessageSquare', '#5bc8e8', 'Text & code')}
+        ${card('Image Generations', imageGens.toString(), 'Image', '#e85ba3', 'All time')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        ${card('Voice Generations', voiceGens.toString(), 'AudioLines', '#14b8a6', 'All time')}
-        ${card('Free Plan', (users.free||0).toString(), 'Send', '#64748b', 'Users')}
-        ${card('Pro Plan', (users.pro||0).toString(), 'Zap', '#7c5cff', 'Users')}
-        ${card('Elite Plan', (users.elite||0).toString(), 'Crown', '#f59e0b', 'Users')}
+        ${card('Voice Generations', voiceGens.toString(), 'AudioLines', '#3ecf8e', 'All time')}
+        ${card('Free Plan', (users.free||0).toString(), 'Send', '#6b7280', 'Users')}
+        ${card('Pro Plan', (users.pro||0).toString(), 'Zap', '#e8b04b', 'Users')}
+        ${card('Elite Plan', (users.elite||0).toString(), 'Crown', '#f0c876', 'Users')}
       </div>
     `}
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-        <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="TrendingUp" size=${15}/> Credit Usage (Last 7 days)</div>
+      <div className="bg-[#12131e] border border-[#1e2030] rounded-[12px] p-5">
+        <div className="font-[650] text-[13px] mb-4 flex items-center gap-2 text-zinc-200"><${I} name="TrendingUp" size=${14} style=${{color:'#e8b04b'}}/> Credit Usage (Last 7 days)</div>
         <div className="h-[140px] flex items-end gap-[6px]">
           ${Array.from({length:7},(_,i)=>{
             const d=new Date(Date.now()-((6-i)*86400000));
@@ -2368,50 +2387,50 @@ function AdminDashboard({card, transactions}){
             const h=Math.max(4, Math.round((Math.min(sum,maxCredits)/maxCredits)*120));
             return html`
               <div key=${i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="text-[9px] text-zinc-500">${sum>0?sum:''}</div>
-                <div className="w-full rounded-t-md bg-[#7c5cff]" style=${{height:h+'px'}}></div>
-                <div className="text-[9px] text-zinc-400">${['M','T','W','T','F','S','S'][d.getDay()]}</div>
+                <div className="text-[9px] text-zinc-500 mono">${sum>0?sum:''}</div>
+                <div className="w-full rounded-t-[3px] bg-[#e8b04b]/70" style=${{height:h+'px'}}></div>
+                <div className="text-[9px] text-zinc-500">${['M','T','W','T','F','S','S'][d.getDay()]}</div>
               </div>`;
           })}
         </div>
       </div>
-      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-        <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="PieChart" size=${15}/> Feature Breakdown</div>
+      <div className="bg-[#12131e] border border-[#1e2030] rounded-[12px] p-5">
+        <div className="font-[650] text-[13px] mb-4 flex items-center gap-2 text-zinc-200"><${I} name="PieChart" size=${14} style=${{color:'#e8b04b'}}/> Feature Breakdown</div>
         ${[
-          ['Text AI', transactions.filter(t=>['text_short','text_medium','text_long','code'].includes(t.feature)).length, '#7c5cff'],
-          ['Vision', transactions.filter(t=>t.feature==='vision').length, '#3b82f6'],
-          ['Image Gen', imageGens, '#ec4899'],
-          ['Voice', voiceGens, '#14b8a6'],
+          ['Text AI', transactions.filter(t=>['text_short','text_medium','text_long','code'].includes(t.feature)).length, '#e8b04b'],
+          ['Vision', transactions.filter(t=>t.feature==='vision').length, '#5b9dff'],
+          ['Image Gen', imageGens, '#e85ba3'],
+          ['Voice', voiceGens, '#3ecf8e'],
         ].map(([name,count,color])=>html`
-          <div key=${name} className="flex items-center gap-3 mb-2">
-            <div className="text-[11px] w-16 text-zinc-600 dark:text-zinc-400">${name}</div>
-            <div className="flex-1 h-[6px] bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+          <div key=${name} className="flex items-center gap-3 mb-2.5">
+            <div className="text-[11px] w-16 text-zinc-400">${name}</div>
+            <div className="flex-1 h-[5px] bg-[#1c1e2e] rounded-full overflow-hidden">
               <div className="h-full rounded-full" style=${{width:Math.min(100,count*2)+'%', background:color}}></div>
             </div>
-            <div className="text-[11px] font-[600] w-8 text-right">${count}</div>
+            <div className="text-[11px] font-[600] w-8 text-right mono text-zinc-300">${count}</div>
           </div>
         `)}
       </div>
     </div>
 
-    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-      <div className="font-[650] text-[13px] mb-3 flex items-center gap-2"><${I} name="Activity" size=${15}/> Recent Transactions</div>
+    <div className="bg-[#12131e] border border-[#1e2030] rounded-[12px] p-5">
+      <div className="font-[650] text-[13px] mb-4 flex items-center gap-2 text-zinc-200"><${I} name="Activity" size=${14} style=${{color:'#e8b04b'}}/> Recent Transactions</div>
       ${transactions.length===0 ? html`<div className="text-[12px] text-zinc-500">No transactions yet.</div>` : html`
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead><tr className="border-b border-zinc-100 dark:border-zinc-800">
-              <th className="text-left py-2 text-zinc-500 font-[600]">Feature</th>
-              <th className="text-left py-2 text-zinc-500 font-[600]">Credits</th>
-              <th className="text-left py-2 text-zinc-500 font-[600]">Balance</th>
-              <th className="text-left py-2 text-zinc-500 font-[600]">Time</th>
+            <thead><tr className="border-b border-[#1e2030]">
+              <th className="text-left py-2 text-zinc-500 font-[600] text-[10.5px] uppercase tracking-wide">Feature</th>
+              <th className="text-left py-2 text-zinc-500 font-[600] text-[10.5px] uppercase tracking-wide">Credits</th>
+              <th className="text-left py-2 text-zinc-500 font-[600] text-[10.5px] uppercase tracking-wide">Balance</th>
+              <th className="text-left py-2 text-zinc-500 font-[600] text-[10.5px] uppercase tracking-wide">Time</th>
             </tr></thead>
             <tbody>
               ${transactions.slice(0,15).map(t=>html`
-                <tr key=${t.id} className="border-b border-zinc-50 dark:border-zinc-900">
-                  <td className="py-2 font-[500]">${t.feature}</td>
-                  <td className="py-2 text-red-500 font-[600]">-${t.credits_spent}</td>
-                  <td className="py-2 text-zinc-500">${t.remaining_balance?.toLocaleString()}</td>
-                  <td className="py-2 text-zinc-400">${new Date(t.created_at).toLocaleString()}</td>
+                <tr key=${t.id} className="border-b border-[#171826]">
+                  <td className="py-2 font-[500] text-zinc-300">${t.feature}</td>
+                  <td className="py-2 text-[#ef5b5b] font-[600] mono">-${t.credits_spent}</td>
+                  <td className="py-2 text-zinc-500 mono">${t.remaining_balance?.toLocaleString()}</td>
+                  <td className="py-2 text-zinc-500 mono text-[11px]">${new Date(t.created_at).toLocaleString()}</td>
                 </tr>
               `)}
             </tbody>
