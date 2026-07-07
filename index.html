@@ -91,6 +91,64 @@ function toast(msg,type='ok'){
   root.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(5px)'; setTimeout(()=>el.remove(),200)},2400);
 }
+
+function ConfirmDialog({title, message, confirmLabel='Confirm', danger=false, onConfirm, onClose}){
+  return html`
+    <div className="fixed inset-0 z-[500] bg-black/55 flex items-center justify-center p-4 fade-in" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="w-full max-w-[360px] bg-white dark:bg-[#181b2a] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-lg p-5">
+        <div className="font-[700] text-[15px] mb-2">${title}</div>
+        <div className="text-[13px] text-zinc-500 mb-5">${message}</div>
+        <div className="flex justify-end gap-2">
+          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12.5px]">Cancel</button>
+          <button onClick=${()=>{ onConfirm(); onClose(); }} className=${`px-[14px] py-[8px] rounded-xl text-white text-[12.5px] font-[600] ${danger?'bg-red-600 hover:bg-red-700':'bg-[#7c5cff] hover:bg-[#6b48f5]'}`}>${confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function PromptDialog({title, placeholder='', onSubmit, onClose}){
+  const [val,setVal]=useState('');
+  return html`
+    <div className="fixed inset-0 z-[500] bg-black/55 flex items-center justify-center p-4 fade-in" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="w-full max-w-[360px] bg-white dark:bg-[#181b2a] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-lg p-5">
+        <div className="font-[700] text-[15px] mb-3">${title}</div>
+        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[13px] mb-4"/>
+        <div className="flex justify-end gap-2">
+          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12.5px]">Cancel</button>
+          <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12.5px] font-[600]">Send</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function CustomSelect({value, onChange, options, className=''}){
+  const [open,setOpen]=useState(false);
+  const ref=useRef(null);
+  useEffect(()=>{
+    const onDoc=(e)=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return ()=>document.removeEventListener('mousedown', onDoc);
+  },[]);
+  const opts = options.map(o => typeof o === 'string' ? {label:o, value:o} : o);
+  const current = opts.find(o=>o.value===value);
+  return html`
+    <div ref=${ref} className="relative inline-block">
+      <button type="button" onClick=${()=>setOpen(o=>!o)} className=${`flex items-center justify-between gap-2 ${className}`}>
+        <span className="truncate">${current?.label ?? value}</span>
+        <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform ${open?'rotate-180':''}`}/>
+      </button>
+      ${open ? html`
+        <div className="absolute right-0 z-50 mt-1 min-w-full w-max max-h-[240px] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] shadow-lg py-1 fade-in">
+          ${opts.map(o=>html`
+            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full text-left px-3 py-[8px] text-[12.5px] whitespace-nowrap hover:bg-zinc-100 dark:hover:bg-zinc-800 ${o.value===value?'text-[#7c5cff] font-[600]':'text-zinc-700 dark:text-zinc-200'}`}>${o.label}</button>
+          `)}
+        </div>
+      ` : null}
+    </div>
+  `;
+}
 function copyText(t){
   if(navigator.clipboard && window.isSecureContext){
     navigator.clipboard.writeText(t).then(()=>toast('Copied')).catch(()=>fallbackCopy(t));
@@ -309,10 +367,10 @@ function App(){
         credits_reset_at: nowIso, created_at:nowIso
       };
       const created = await supabase.from('profiles').insert(fresh).select().single();
-      if(created.error){ toast('Failed to load profile','err'); return; }
+      if(created.error){ console.error('profile insert error:', created.error); toast('Failed to load profile: '+created.error.message,'err'); return; }
       data = created.data;
     } else if(error){
-      toast('Failed to load profile','err'); return;
+      console.error('profile select error:', error); toast('Failed to load profile: '+error.message,'err'); return;
     } else if(adminUser && (data.credits==null || data.credits < 999999999)){
       const patch={credits:999999999, monthly_credits:999999999};
       const upd = await supabase.from('profiles').update(patch).eq('id',user.id).select().single();
@@ -392,7 +450,7 @@ function App(){
   async function saveSettings(newSettings){
     if(!user) return;
     const {error}=await supabase.from('settings').upsert({user_id:user.id, data:newSettings}, {onConflict:'user_id'});
-    if(error) toast('Settings save failed','err');
+    if(error){ console.error('settings save error:', error); toast('Settings save failed: '+error.message,'err'); }
   }
 
   async function updateProfileCredits(newCredits){
@@ -467,13 +525,13 @@ function App(){
         await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
         const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:`Here’s your generated image for: "${imgPrompt}"`, ts:Date.now()}];
         setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
-        await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+        const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
         addNotification('Image generated', imgPrompt.slice(0,60));
         return;
       }catch(e){
         const errMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'text', text:'Image generation failed: '+e.message, error:true, ts:Date.now()}];
         setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:errMessages, updated_at:new Date().toISOString()}:c));
-        await supabase.from('chats').update({messages:errMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+        const {error:e2}=await supabase.from('chats').update({messages:errMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e2) console.error('chat save error:', e2);
         return;
       }
     }
@@ -500,13 +558,13 @@ function App(){
       const assistantMsg={id:uid('m'), role:'assistant', text:answer, ts:Date.now(), model, tried, liked:0, error:!!error};
       const finalMessages=[...updatedChat.messages, assistantMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
-      await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
       if(!error) addNotification('Zedith replied', answer.slice(0,70));
     }catch(e){
       const errMsg={id:uid('m'), role:'assistant', text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, ts:Date.now()};
       const finalMessages=[...updatedChat.messages, errMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
-      await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
     }
   }
 
@@ -515,7 +573,7 @@ function App(){
     if(!chat) return;
     const updated={...chat, ...patch, updated_at:new Date().toISOString()};
     setChats(cs=>cs.map(c=>c.id===chatId?updated:c));
-    await supabase.from('chats').update(updated).eq('id',chatId);
+    const {error:e3}=await supabase.from('chats').update(updated).eq('id',chatId); if(e3) console.error('chat save error:', e3);
   }
 
   async function updateMessage(chatId, msgId, patch){
@@ -591,10 +649,12 @@ function App(){
   const recentChats = chats.slice(0,5).map(c=>({t:c.title||'Untitled', ago:formatDate(c.created_at)}));
   const growth={views:0,change:0};
 
+  const settingsSaveTimer = useRef(null);
   const updateSettings=(patch)=>{
     const ns={...settings,...patch};
     setSettings(ns);
-    saveSettings(ns);
+    clearTimeout(settingsSaveTimer.current);
+    settingsSaveTimer.current = setTimeout(()=>saveSettings(ns), 600);
   };
 
   const openNotifications=()=>setModule('notifications');
@@ -832,7 +892,26 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const [webSearch,setWebSearch]=useState(settings?.webSearch ?? true);
   const [attached,setAttached]=useState(null);
   const [loading,setLoading]=useState(false);
+  const [listening,setListening]=useState(false);
+  const recogRef=useRef(null);
   const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
+
+  const toggleVoiceInput = ()=>{
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){ toast('Voice input is not supported in this browser','err'); return; }
+    if(listening){ recogRef.current?.stop(); return; }
+    const recog = new SR();
+    recog.lang = 'en-IN'; recog.interimResults = true; recog.continuous = false;
+    recog.onresult = (e)=>{
+      const transcript = Array.from(e.results).map(r=>r[0].transcript).join('');
+      setInput(transcript);
+    };
+    recog.onerror = ()=>{ setListening(false); };
+    recog.onend = ()=>{ setListening(false); };
+    recogRef.current = recog;
+    recog.start();
+    setListening(true);
+  };
 
   const messages = chat?.messages || [];
 
@@ -994,7 +1073,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
             <${I} name="Globe" size=${13}/><span className="hidden sm:inline">Search</span>
           </button>
           <div className="flex-1"></div>
-          <button onClick=${()=>{}} className="w-[33px] h-[33px] rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0"><${I} name="Mic" size=${14}/></button>
+          <button onClick=${toggleVoiceInput} title=${listening?'Stop listening':'Voice input'} className=${`w-[33px] h-[33px] rounded-full border flex items-center justify-center shrink-0 ${listening?'border-red-400 bg-red-50 dark:bg-red-950/30 text-red-500 animate-pulse':'border-zinc-200 dark:border-zinc-700'}`}><${I} name="Mic" size=${14}/></button>
           <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[#7c5cff] hover:bg-[#6b48f5] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0">
             <${I} name="ArrowUp" size=${17}/>
           </button>
@@ -1013,6 +1092,8 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
 // ---------- Project Detail View ----------
 function ProjectDetailView({project, projects, updateProject, deleteProject, uploadProjectFile, onChat, onBack, addNotification}){
   const [tab,setTab]=useState('Files');
+  const [showInvite,setShowInvite]=useState(false);
+  const [showDeleteConfirm,setShowDeleteConfirm]=useState(false);
   const fileRef=useRef(null);
   if(!project) return html`<div className="flex-1 flex items-center justify-center text-zinc-500">Project not found</div>`;
 
@@ -1055,7 +1136,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <button onClick=${()=>{ const email=prompt('Invite by email:'); if(email){ const nm=[...members,{id:uid('m'),name:email,role:'Editor'}]; updateProject(project.id,{members:nm}); toast('Invitation sent to '+email); } }} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
+        <button onClick=${()=>setShowInvite(true)} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
           <${I} name="UserPlus" size=${14}/> Add members
         </button>
         <button onClick=${()=>{ copyText(window.location.href); toast('Project link copied'); }} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
@@ -1138,18 +1219,18 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
               <input value=${project.title} onChange=${e=>updateProject(project.id,{title:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
             </div>
             <div><div className="text-zinc-500 mb-1">Category</div>
-              <select value=${project.cat} onChange=${e=>updateProject(project.id,{cat:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a]">
-                <option>YouTube</option><option>Instagram</option><option>TikTok</option><option>Podcast</option>
-              </select>
+              <${CustomSelect} value=${project.cat} onChange=${v=>updateProject(project.id,{cat:v})} options=${['YouTube','Instagram','TikTok','Podcast']} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a]"/>
             </div>
             <div><div className="text-zinc-500 mb-1">Description</div>
               <textarea value=${project.desc||''} onChange=${e=>updateProject(project.id,{desc:e.target.value})} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"></textarea>
             </div>
-            <button onClick=${()=>{ if(confirm('Delete this project?')){ deleteProject(project.id); onBack(); } }} className="text-red-600 text-[12px] font-[600]">Delete Project</button>
+            <button onClick=${()=>setShowDeleteConfirm(true)} className="text-red-600 text-[12px] font-[600]">Delete Project</button>
           </div>
         </div>
       `}
     </div>
+    ${showInvite ? html`<${PromptDialog} title="Invite by email" placeholder="teammate@email.com" onSubmit=${email=>{ const nm=[...members,{id:uid('m'),name:email,role:'Editor'}]; updateProject(project.id,{members:nm}); toast('Invitation sent to '+email); }} onClose=${()=>setShowInvite(false)}/>` : null}
+    ${showDeleteConfirm ? html`<${ConfirmDialog} title="Delete this project?" message="This action cannot be undone." confirmLabel="Delete" danger=${true} onConfirm=${()=>{ deleteProject(project.id); onBack(); }} onClose=${()=>setShowDeleteConfirm(false)}/>` : null}
   </div>`;
 }
 
@@ -1229,9 +1310,7 @@ function CreateProjectModal({onClose,onCreate}){
         </div>
         <div>
           <div className="text-[#7c5cff] font-[600] text-[11.5px]">3. Project Type</div>
-          <select value=${cat} onChange=${e=>setCat(e.target.value)} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] text-[12px]">
-            <option>YouTube</option><option>Instagram</option><option>TikTok</option><option>Podcast</option>
-          </select>
+          <${CustomSelect} value=${cat} onChange=${setCat} options=${['YouTube','Instagram','TikTok','Podcast']} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] text-[12px]"/>
         </div>
       </div>
       <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
@@ -1370,16 +1449,16 @@ function NewContentModal({onClose,onCreate}){
         <div><div className="text-zinc-500 mb-1">Title</div><input value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. 10 AI Tools for YouTube" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/></div>
         <div className="grid grid-cols-2 gap-3">
           <div><div className="text-zinc-500 mb-1">Platform</div>
-            <select value=${platform} onChange=${e=>setPlatform(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option>YouTube</option><option>Instagram</option><option>TikTok</option></select>
+            <${CustomSelect} value=${platform} onChange=${setPlatform} options=${['YouTube','Instagram','TikTok']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"/>
           </div>
           <div><div className="text-zinc-500 mb-1">Type</div>
-            <select value=${type} onChange=${e=>setType(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option value="video">Video</option><option value="short">Short</option><option value="post">Post</option></select>
+            <${CustomSelect} value=${type} onChange=${setType} options=${[{label:'Video',value:'video'},{label:'Short',value:'short'},{label:'Post',value:'post'}]} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"/>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><div className="text-zinc-500 mb-1">Date</div><input type="date" value=${date} onChange=${e=>setDate(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/></div>
           <div><div className="text-zinc-500 mb-1">Status</div>
-            <select value=${status} onChange=${e=>setStatus(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"><option>Draft</option><option>Scheduled</option><option>Published</option></select>
+            <${CustomSelect} value=${status} onChange=${setStatus} options=${['Draft','Scheduled','Published']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524]"/>
           </div>
         </div>
       </div>
@@ -1426,9 +1505,7 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
         <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
         <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search history…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none"/>
       </div>
-      <select value=${sort} onChange=${e=>setSort(e.target.value)} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12px]">
-        <option>Newest</option><option>Oldest</option><option>Name</option>
-      </select>
+      <${CustomSelect} value=${sort} onChange=${setSort} options=${['Newest','Oldest','Name']} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12px]"/>
       <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden text-[12px]">
         <button onClick=${()=>setLayout('list')} className=${`px-3 py-[8px] ${layout==='list'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="List" size=${14}/></button>
         <button onClick=${()=>setLayout('grid')} className=${`px-3 py-[8px] ${layout==='grid'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="LayoutGrid" size=${14}/></button>
@@ -1683,15 +1760,15 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
     </button>`;
   return html`
   <div className="flex-1 h-full bg-[#f6f6fa] dark:bg-[#10121b] overflow-y-auto">
-    <div className="px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#141725]">
+    <div className="px-4 sm:px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#141725]">
       <div className="text-[22px] font-[800] display">Settings</div>
       <div className="text-[12px] text-zinc-500">Manage your account, preferences and everything about your Zedith experience.</div>
     </div>
-    <div className="px-7 py-5 grid grid-cols-12 gap-5 max-w-[1180px]">
-      <div className="col-span-8 space-y-4">
+    <div className="px-4 sm:px-7 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-[1180px]">
+      <div className="lg:col-span-8 space-y-4">
         <div className="bg-white dark:bg-[#171a2a] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5">
           <div className="font-[650] mb-3">Profile Information</div>
-          <div className="grid grid-cols-2 gap-3 text-[12px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
             <div><div className="text-zinc-500 mb-1">Display Name</div>
               <input value=${settings.displayName} onChange=${e=>upd('displayName',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
             </div>
@@ -1714,11 +1791,9 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
             <div><div className="font-[550]">Default AI Model</div><div className="text-[11px] text-zinc-500">Zedith auto-rotates all 27 free models</div></div>
             <div className="text-[11px] px-3 py-[6px] rounded-xl bg-zinc-100 dark:bg-zinc-800 font-[600]">Auto – Best Free</div>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div><div className="font-[550]">Response Style</div><div className="text-[11px] text-zinc-500">How should Zedith respond?</div></div>
-            <select value=${settings.responseStyle} onChange=${e=>upd('responseStyle', e.target.value)} className="border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-[6px] text-[11.5px] bg-white dark:bg-[#14182a]">
-              <option>Balanced</option><option>Creative</option><option>Precise</option>
-            </select>
+            <${CustomSelect} value=${settings.responseStyle} onChange=${v=>upd('responseStyle', v)} options=${['Balanced','Creative','Precise']} className="border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-[6px] text-[11.5px] bg-white dark:bg-[#14182a]"/>
           </div>
           ${[
             ['aiMemory','AI Memory','Allow Zedith to remember your chats.'],
@@ -1745,7 +1820,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
           </div>
         </div>
       </div>
-      <div className="col-span-4 space-y-4">
+      <div className="lg:col-span-4 space-y-4">
         <div className="bg-white dark:bg-[#171a2a] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-4 text-[12px]">
           <div className="font-[650] mb-2">Account</div>
           <div className="text-zinc-500 text-[11px] space-y-1">
