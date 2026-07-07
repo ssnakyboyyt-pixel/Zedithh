@@ -277,18 +277,30 @@ function App(){
 
   async function loadProfile(){
     let {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    const adminUser = isAdmin(user);
+    const planCreditsFor = (plan)=> PLAN_CREDITS[plan||'free'] ?? 20000;
     if(!data && !error){
-      const adminUser = isAdmin(user);
+      const nowIso=new Date().toISOString();
       const fresh = {
         id:user.id, email:user.email||'', display_name:'', username:'', bio:'',
         plan:'free', credits: adminUser ? 999999999 : 20000, monthly_credits: adminUser ? 999999999 : 20000,
-        created_at:new Date().toISOString()
+        credits_reset_at: nowIso, created_at:nowIso
       };
       const created = await supabase.from('profiles').insert(fresh).select().single();
       if(created.error){ toast('Failed to load profile','err'); return; }
       data = created.data;
     } else if(error){
       toast('Failed to load profile','err'); return;
+    } else if(!adminUser){
+      const now=new Date();
+      const lastReset = data.credits_reset_at ? new Date(data.credits_reset_at) : null;
+      const isNewMonth = !lastReset || now.getUTCFullYear()!==lastReset.getUTCFullYear() || now.getUTCMonth()!==lastReset.getUTCMonth();
+      if(isNewMonth){
+        const full = planCreditsFor(data.plan);
+        const patch={credits:full, monthly_credits:full, credits_reset_at:now.toISOString()};
+        const upd = await supabase.from('profiles').update(patch).eq('id',user.id).select().single();
+        if(!upd.error) data = upd.data;
+      }
     }
     setProfile(data);
     setSettings(s=>({...s, displayName:data.display_name||'', username:data.username||'', email:data.email||user.email||'', bio:data.bio||''}));
@@ -493,7 +505,7 @@ function App(){
       created_at:new Date().toISOString(), updated_at:new Date().toISOString()
     };
     const {data,error}=await supabase.from('projects').insert(proj).select();
-    if(error){ toast('Failed to create project','err'); return; }
+    if(error){ console.error('createProject error:', error); toast('Failed to create project: '+(error.message||error.hint||'unknown error'),'err'); return; }
     setProjects(ps=>[proj,...ps]);
     addNotification('Project created', proj.title);
     return proj.id;
@@ -1220,7 +1232,7 @@ function PlannerView({items, createPlannerItem}){
   const toggleCheck=(id)=> setChecks(cs=>cs.map(c=>c.id===id?{...c,done:!c.done}:c));
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto flex gap-5">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-4 sm:p-6 overflow-y-auto flex flex-col lg:flex-row gap-5">
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -1289,7 +1301,7 @@ function PlannerView({items, createPlannerItem}){
       `}
     </div>
 
-    <aside className="w-[280px] shrink-0 space-y-4">
+    <aside className="w-full lg:w-[280px] shrink-0 space-y-4">
       <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
         <div className="font-[650] text-[13px] mb-3">Publishing Checklist</div>
         <div className="space-y-2">
