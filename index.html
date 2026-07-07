@@ -223,6 +223,8 @@ Accuracy: never hallucinate. If information may be outdated, clearly say so. Pre
 
 User experience: make every interaction feel premium, fast, clear, and intelligent. Reduce unnecessary complexity. Help users accomplish their goals with the least friction possible.
 
+Formatting: the chat UI renders Markdown, so use it to make answers scannable. Use **bold** for key terms and important points, ## or ### headings to break up longer answers into sections, "-" bullet lists or "1." numbered lists for steps and options, and \`inline code\` or \`\`\`code blocks\`\`\` for code/commands. Don't over-format short conversational replies — save headings and lists for answers that are genuinely long or structured (scripts, plans, comparisons, tutorials).
+
 Zedith is more than an AI assistant — it is an intelligent operating system where chat, workspaces, projects, files, images, voice, planning, and productivity come together in one seamless experience. Your goal is not simply to answer questions — it is to help users build, create, and achieve more through AI.
 
 --- Creator-specific operational rules ---
@@ -287,6 +289,80 @@ async function ttsFetch(text, voiceName='Brian'){
   const blob=await res.blob(); return URL.createObjectURL(blob);
 }
 
+
+// ---------- Lightweight Markdown Renderer ----------
+// Supports: **bold**, *italic*, # headings (1-3), - / * bullet lists, 1. numbered lists,
+// `inline code`, ```code blocks```, and paragraph line breaks. No external deps.
+function renderInlineMarkdown(text){
+  if(!text) return null;
+  const parts=[];
+  // split on **bold**, *italic*, `code` while keeping delimiters
+  const re=/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+  let lastIndex=0, match, key=0;
+  while((match=re.exec(text))){
+    if(match.index>lastIndex) parts.push(text.slice(lastIndex,match.index));
+    const token=match[0];
+    if(token.startsWith('**')) parts.push(html`<strong key=${key++} className="font-[700]">${token.slice(2,-2)}</strong>`);
+    else if(token.startsWith('`')) parts.push(html`<code key=${key++} className="px-[5px] py-[1px] rounded-[5px] bg-zinc-200 dark:bg-zinc-700 text-[12px] font-mono">${token.slice(1,-1)}</code>`);
+    else parts.push(html`<em key=${key++}>${token.slice(1,-1)}</em>`);
+    lastIndex=match.index+token.length;
+  }
+  if(lastIndex<text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+function MarkdownText({text, className=''}){
+  if(!text) return null;
+  const lines = text.split('\n');
+  const blocks=[]; // {type:'p'|'h1'|'h2'|'h3'|'ul'|'ol'|'code', content or items}
+  let i=0;
+  while(i<lines.length){
+    const line=lines[i];
+    if(/^```/.test(line.trim())){
+      const codeLines=[]; i++;
+      while(i<lines.length && !/^```/.test(lines[i].trim())){ codeLines.push(lines[i]); i++; }
+      i++; // skip closing ```
+      blocks.push({type:'code', content:codeLines.join('\n')});
+      continue;
+    }
+    const h3=line.match(/^###\s+(.*)/); const h2=line.match(/^##\s+(.*)/); const h1=line.match(/^#\s+(.*)/);
+    if(h3){ blocks.push({type:'h3', content:h3[1]}); i++; continue; }
+    if(h2){ blocks.push({type:'h2', content:h2[1]}); i++; continue; }
+    if(h1){ blocks.push({type:'h1', content:h1[1]}); i++; continue; }
+    if(/^\s*[-*]\s+/.test(line)){
+      const items=[];
+      while(i<lines.length && /^\s*[-*]\s+/.test(lines[i])){ items.push(lines[i].replace(/^\s*[-*]\s+/,'')); i++; }
+      blocks.push({type:'ul', items});
+      continue;
+    }
+    if(/^\s*\d+\.\s+/.test(line)){
+      const items=[];
+      while(i<lines.length && /^\s*\d+\.\s+/.test(lines[i])){ items.push(lines[i].replace(/^\s*\d+\.\s+/,'')); i++; }
+      blocks.push({type:'ol', items});
+      continue;
+    }
+    if(line.trim()===''){ i++; continue; }
+    // accumulate paragraph lines until a blank line or a new block starts
+    const paraLines=[line]; i++;
+    while(i<lines.length && lines[i].trim()!=='' && !/^```/.test(lines[i].trim()) && !/^#{1,3}\s/.test(lines[i]) && !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+\.\s+/.test(lines[i])){
+      paraLines.push(lines[i]); i++;
+    }
+    blocks.push({type:'p', content:paraLines.join('\n')});
+  }
+  return html`
+    <div className=${className}>
+      ${blocks.map((b,bi)=>{
+        if(b.type==='h1') return html`<div key=${bi} className="text-[17px] font-[800] display mt-3 mb-1 first:mt-0">${renderInlineMarkdown(b.content)}</div>`;
+        if(b.type==='h2') return html`<div key=${bi} className="text-[15px] font-[750] display mt-3 mb-1 first:mt-0">${renderInlineMarkdown(b.content)}</div>`;
+        if(b.type==='h3') return html`<div key=${bi} className="text-[13.6px] font-[700] mt-2 mb-1 first:mt-0">${renderInlineMarkdown(b.content)}</div>`;
+        if(b.type==='code') return html`<pre key=${bi} className="bg-zinc-900 dark:bg-black/40 text-zinc-100 rounded-[10px] p-3 my-2 overflow-x-auto text-[12px] font-mono leading-[1.5]"><code>${b.content}</code></pre>`;
+        if(b.type==='ul') return html`<ul key=${bi} className="list-disc pl-5 my-1 space-y-[3px]">${b.items.map((it,ii)=>html`<li key=${ii} className="text-[13.6px] leading-[1.6]">${renderInlineMarkdown(it)}</li>`)}</ul>`;
+        if(b.type==='ol') return html`<ol key=${bi} className="list-decimal pl-5 my-1 space-y-[3px]">${b.items.map((it,ii)=>html`<li key=${ii} className="text-[13.6px] leading-[1.6]">${renderInlineMarkdown(it)}</li>`)}</ol>`;
+        return html`<div key=${bi} className="text-[13.6px] leading-[1.7] whitespace-pre-wrap">${renderInlineMarkdown(b.content)}</div>`;
+      })}
+    </div>
+  `;
+}
 
 // ---------- App ----------
 function App(){
@@ -654,9 +730,10 @@ function App(){
   const startNewChat=()=>{ setActiveChatId(null); setActiveProjectId(null); setViewProjectId(null); setModule('chat'); };
   const openProject=(pid)=>{ setActiveProjectId(pid); setActiveChatId(null); setViewProjectId(pid); setModule('project-detail'); };
   const openChatForProject=(pid)=>{ setActiveProjectId(pid); setActiveChatId(null); setViewProjectId(null); setModule('chat'); };
+  const openChat=(cid)=>{ setActiveChatId(cid); setActiveProjectId(null); setViewProjectId(null); setModule('chat'); };
 
   const activeChat = useMemo(()=> chats.find(c=>c.id===activeChatId) || null, [chats, activeChatId]);
-  const recentChats = chats.slice(0,5).map(c=>({t:c.title||'Untitled', ago:formatDate(c.created_at)}));
+  const recentChats = chats.slice(0,5).map(c=>({id:c.id, t:c.title||'Untitled', ago:formatDate(c.created_at)}));
   const growth={views:0,change:0};
 
   const settingsSaveTimer = useRef(null);
@@ -682,8 +759,8 @@ function App(){
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
       case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} onOpenProject=${openProject} />`;
       case 'planner': return html`<${PlannerView} items=${plannerItems} createPlannerItem=${createPlannerItem} />`;
-      case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} />`;
-      case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" />`;
+      case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
+      case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
       case 'analytics': return html`<${AnalyticsView} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
@@ -722,7 +799,7 @@ function App(){
     ` : null}
     <div className="flex-1 flex min-w-0 h-full">
       ${renderModule()}
-      ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} />` : null}
+      ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} onOpenChat=${openChat} />` : null}
       <!-- note: 'picks' module renders its own right-side ad sidebar internally, no RightRail here -->
     </div>
     ${toolModal ? html`<${ToolModal} tool=${toolModal} onClose=${()=>setToolModal(null)} onSend=${sendMessage} />` : null}
@@ -824,7 +901,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
 }
 
 // ---------- Right Rail ----------
-function RightRail({chats, growth, openTool, setModule}){
+function RightRail({chats, growth, openTool, setModule, onOpenChat}){
   return html`
   <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfbfe] dark:bg-[#10121c] border-l border-zinc-200 dark:border-[#1e2336] p-[16px] space-y-[14px]">
       <div className="bg-white dark:bg-[#181b2b] rounded-[14px] border border-zinc-200 dark:border-[#262b44] p-[14px]">
@@ -876,10 +953,10 @@ function RightRail({chats, growth, openTool, setModule}){
       ${chats.length===0 ? html`<div className="text-[11.5px] text-zinc-500">No chats yet. Start a new conversation.</div>` : html`
         <div className="space-y-[9px] text-[12px]">
           ${chats.map(c=> html`
-            <div key=${c.t} className="flex justify-between gap-2">
+            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="w-full flex justify-between gap-2 text-left hover:text-[#7c5cff] transition">
               <span className="truncate text-zinc-700 dark:text-zinc-300">${c.t}</span>
               <span className="text-zinc-400 text-[11px] shrink-0">${c.ago}</span>
-            </div>
+            </button>
           `)}
         </div>
       `}
@@ -1031,7 +1108,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                       </div>
                     </div>
                   ` : html`
-                    <div className="text-[13.6px] leading-[1.7] whitespace-pre-wrap">${m.text}</div>
+                    <${MarkdownText} text=${m.text} className="text-zinc-800 dark:text-zinc-100"/>
                   `}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
@@ -1486,7 +1563,7 @@ function NewContentModal({onClose,onCreate}){
 }
 
 // ---------- History ----------
-function HistoryView({chats, updateChat, projects, voiceHistory, filter: initialFilter='all'}){
+function HistoryView({chats, updateChat, projects, voiceHistory, filter: initialFilter='all', onOpenChat}){
   const [query,setQuery]=useState('');
   const [tab,setTab]=useState(initialFilter==='saved'?'Saved':'All');
   const [sort,setSort]=useState('Newest');
@@ -1541,7 +1618,7 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
     ` : html`
       <div className=${layout==='grid'?'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-[10px] max-w-[900px]'}>
         ${items.map(it=> html`
-          <div key=${it.id} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-[14px] flex gap-3">
+          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-[14px] flex gap-3 ${it.type==='chat'?'cursor-pointer hover:border-[#7c5cff] transition':''}`}>
             <div className="w-[34px] h-[34px] rounded-[9px] bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center">
               <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[#7c5cff]"/>
             </div>
@@ -1551,7 +1628,7 @@ function HistoryView({chats, updateChat, projects, voiceHistory, filter: initial
             </div>
             <div className="flex flex-col items-end gap-1">
               <div className="text-[11px] text-zinc-400">${formatDate(it.created_at)}</div>
-              ${it.type==='chat' ? html`<button onClick=${()=>toggleSaved(it.id)} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${14}/></button>`:null}
+              ${it.type==='chat' ? html`<button onClick=${e=>{ e.stopPropagation(); toggleSaved(it.id); }} className="text-zinc-400 hover:text-[#7c5cff]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${14}/></button>`:null}
             </div>
           </div>
         `)}
