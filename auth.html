@@ -135,7 +135,9 @@ tailwind.config = {
           location.href = 'index.html';
         }
       } catch(err){
-        showMessage(err.message, 'err');
+        console.error('Signup error object:', err);
+        const msg = (err && err.message) ? err.message : JSON.stringify(err);
+        showMessage(msg, 'err');
         submitBtn.disabled = false;
         submitBtn.textContent = mode==='signup'?'Create account':'Log in';
       }
