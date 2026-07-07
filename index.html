@@ -243,6 +243,12 @@ ${smart?'Think step-by-step, deep reasoning.':''}
 Response style: ${responseStyle}.`;
 }
 
+function buildSearchContextBlock(results){
+  if(!results || !results.length) return '';
+  const lines = results.map((r,i)=>`[${i+1}] ${r.title}\nURL: ${r.url}\n${r.snippet}`).join('\n\n');
+  return `\n\n--- Live web search results (real, current) ---\n${lines}\n\nWhen you use information from these results, cite it as a real markdown link using the exact URL given above, like this: [short source name](https://actual-url-from-above). Never invent a URL or use a placeholder domain — only use the exact URLs listed above. Cite only the results you actually used.`;
+}
+
 // ---------- OpenRouter (via secure server proxy — key never exposed to browser) ----------
 const FREE_TEXT_MODELS = [
   'deepseek/deepseek-r1:free','openai/gpt-oss-120b:free','qwen/qwen3-coder:free',
@@ -280,7 +286,91 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null}={}){
   };
 }
 
+async function realWebSearch(query){
+  try{
+    const r = await fetch('/api/search', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query, max_results: 5 })
+    });
+    const d = await r.json().catch(()=>null);
+    if(!r.ok || !d) return { results: [], error: `HTTP ${r.status}` };
+    return { results: d.results || [], error: d.error || null };
+  }catch(e){
+    return { results: [], error: 'network error: '+e.message };
+  }
+}
+
 function imageGenUrl(prompt){ return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${Math.floor(Math.random()*99999)}&model=flux`; }
+
+// ---------- Real thumbnail composer: generates AI background art, then bakes
+// the actual title/heading text onto it with Canvas so it looks like a real
+// YouTube thumbnail instead of a random stock-style AI portrait. ----------
+async function composeThumbnail(bgPrompt, titleText){
+  const bgUrl = imageGenUrl(bgPrompt);
+  const img = await new Promise((resolve,reject)=>{
+    const im=new Image();
+    im.crossOrigin='anonymous';
+    im.onload=()=>resolve(im);
+    im.onerror=()=>reject(new Error('background image failed to load'));
+    im.src=bgUrl;
+  });
+
+  const W=1280, H=720;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, W, H);
+
+  // Dark gradient scrim at the bottom so text stays readable over any art.
+  const grad = ctx.createLinearGradient(0, H*0.42, 0, H);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H*0.42, W, H*0.58);
+
+  // Fit title text into the lower third, wrapping and auto-shrinking to fit.
+  const maxWidth = W - 100;
+  let fontSize = 92;
+  const title = (titleText||'').trim().toUpperCase();
+  let lines=[];
+  while(fontSize > 36){
+    ctx.font = `800 ${fontSize}px 'Arial Black', Arial, sans-serif`;
+    const words = title.split(/\s+/);
+    lines=[]; let cur='';
+    for(const w of words){
+      const test = cur ? cur+' '+w : w;
+      if(ctx.measureText(test).width > maxWidth && cur){ lines.push(cur); cur=w; }
+      else cur=test;
+    }
+    if(cur) lines.push(cur);
+    if(lines.length<=3) break;
+    fontSize -= 4;
+  }
+
+  const lineHeight = fontSize*1.12;
+  const totalTextHeight = lines.length*lineHeight;
+  let y = H - 60 - totalTextHeight + lineHeight*0.8;
+
+  ctx.textAlign='left';
+  ctx.textBaseline='alphabetic';
+  for(const line of lines){
+    ctx.font = `800 ${fontSize}px 'Arial Black', Arial, sans-serif`;
+    ctx.lineJoin='round';
+    ctx.strokeStyle='rgba(0,0,0,0.85)';
+    ctx.lineWidth = fontSize*0.12;
+    ctx.strokeText(line, 50, y);
+    ctx.fillStyle='#ffffff';
+    ctx.fillText(line, 50, y);
+    y += lineHeight;
+  }
+
+  // Small accent bar + brand tag so it reads as a designed thumbnail.
+  ctx.fillStyle='#7c5cff';
+  ctx.fillRect(50, H-24, 90, 8);
+
+  return canvas.toDataURL('image/png');
+}
 async function ttsFetch(text, voiceName='Brian'){
   const map={Brian:'Brian',Amy:'Amy',Emma:'Emma',Joey:'Joey'};
   const v=map[voiceName]||'Brian';
@@ -296,13 +386,19 @@ async function ttsFetch(text, voiceName='Brian'){
 function renderInlineMarkdown(text){
   if(!text) return null;
   const parts=[];
-  // split on **bold**, *italic*, `code` while keeping delimiters
-  const re=/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+  // split on [label](url) links, **bold**, *italic*, `code` while keeping delimiters
+  const re=/(\[[^\]]+\]\((https?:\/\/[^\s)]+)\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
   let lastIndex=0, match, key=0;
   while((match=re.exec(text))){
     if(match.index>lastIndex) parts.push(text.slice(lastIndex,match.index));
     const token=match[0];
-    if(token.startsWith('**')) parts.push(html`<strong key=${key++} className="font-[700]">${token.slice(2,-2)}</strong>`);
+    if(token.startsWith('[')){
+      const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+      const label = linkMatch ? linkMatch[1] : token;
+      const url = linkMatch ? linkMatch[2] : '#';
+      parts.push(html`<a key=${key++} href=${url} target="_blank" rel="noopener noreferrer" className="text-[#7c5cff] underline hover:text-[#6a4ce0] break-all">${label}</a>`);
+    }
+    else if(token.startsWith('**')) parts.push(html`<strong key=${key++} className="font-[700]">${token.slice(2,-2)}</strong>`);
     else if(token.startsWith('`')) parts.push(html`<code key=${key++} className="px-[5px] py-[1px] rounded-[5px] bg-zinc-200 dark:bg-zinc-700 text-[12px] font-mono">${token.slice(1,-1)}</code>`);
     else parts.push(html`<em key=${key++}>${token.slice(1,-1)}</em>`);
     lastIndex=match.index+token.length;
@@ -607,8 +703,18 @@ function App(){
       setChats(cs=>cs.map(c=>c.id===chatId?chatWithPlaceholder:c));
       try{
         let imgPrompt=text.replace(/^(generate|create|make)\s+(an?\s+)?image\s+(of\s+)?/i,'').trim()||text;
-        const url=imageGenUrl(imgPrompt+', youtube thumbnail, vibrant, high detail');
-        await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
+        const isThumbnail = /thumbnail/i.test(text);
+        let url;
+        if(isThumbnail){
+          // Pull a likely title out of the request (text after "about"/"title"/"topic is", or quoted text, else the whole prompt).
+          const titleMatch = text.match(/(?:titled?|title(?:d)?\s*[:\-]?|topic\s+is|about)\s*["“]?([^"”\n]{3,80})["”]?$/i) || text.match(/["“]([^"”]{3,80})["”]/);
+          const titleText = (titleMatch ? titleMatch[1] : imgPrompt).trim();
+          const bgPrompt = `${imgPrompt}, cinematic youtube thumbnail background, bold composition, vibrant colors, dramatic lighting, no text, no words, no letters`;
+          url = await composeThumbnail(bgPrompt, titleText);
+        } else {
+          url=imageGenUrl(imgPrompt+', high quality, vibrant, high detail');
+          await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
+        }
         const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:`Here’s your generated image for: "${imgPrompt}"`, ts:Date.now()}];
         setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
         const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
@@ -637,7 +743,13 @@ function App(){
     if(attachment?.type==='image'){
       userContent=[{type:'text', text:text||'Analyze this image for YouTube – thumbnail score, CTR tips, hook ideas.'},{type:'image_url', image_url:{url:attachment.dataUrl}}];
     }
-    const sys = buildSystemPrompt({webSearch, smart, responseStyle: settings.responseStyle}) + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
+    let searchContext = '';
+    if(webSearch && text && text.trim()){
+      const {results, error:searchErr} = await realWebSearch(text);
+      if(results.length) searchContext = buildSearchContextBlock(results);
+      else if(searchErr) console.error('web search failed:', searchErr);
+    }
+    const sys = buildSystemPrompt({webSearch, smart, responseStyle: settings.responseStyle}) + searchContext + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
     const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
     try{
       const {text:answer, model, tried, error} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref});
