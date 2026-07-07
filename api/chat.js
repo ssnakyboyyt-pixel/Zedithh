@@ -1,7 +1,9 @@
 // api/chat.js
 // Vercel Serverless Function — runs on the server, never in the browser.
-// Tries Groq first (fast, generous free tier), then Gemini, then OpenRouter
-// as a last resort. Keeps all API keys secret on the server side.
+// Fallback chain: Groq -> Cerebras -> Gemini -> OpenRouter.
+// All four have genuinely free tiers with NO credit card required, which
+// matters a lot when the person running this can't add a card themselves.
+// Keeps all API keys secret on the server side.
 //
 // IMPORTANT: messages sent from the client can have `content` as either:
 //   - a plain string (normal text message), or
@@ -20,7 +22,7 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
     failures.push('groq: skipped (free Groq models here do not support image input)');
     return null;
   }
-  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  const models = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'];
   for (const model of models) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -40,6 +42,39 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
       failures.push(`groq/${model}: empty response`);
     } catch (e) {
       failures.push(`groq/${model}: ${e.message}`);
+    }
+  }
+  return null;
+}
+
+// ---------- Cerebras (OpenAI-compatible, no card needed, 1M free tokens/day) ----------
+async function tryCerebras(messages, temperature, max_tokens, failures) {
+  const key = process.env.CEREBRAS_API_KEY;
+  if (!key) return null;
+  if (hasImage(messages)) {
+    failures.push('cerebras: skipped (no vision support on free-tier models)');
+    return null;
+  }
+  const models = ['llama3.1-8b', 'llama-3.3-70b'];
+  for (const model of models) {
+    try {
+      const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, temperature, max_tokens }),
+      });
+      if (!r.ok) {
+        let bodyText = '';
+        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        failures.push(`cerebras/${model}: HTTP ${r.status} ${bodyText}`);
+        continue;
+      }
+      const data = await r.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text && text.trim()) return { text: text.trim(), model: `cerebras/${model}` };
+      failures.push(`cerebras/${model}: empty response`);
+    } catch (e) {
+      failures.push(`cerebras/${model}: ${e.message}`);
     }
   }
   return null;
@@ -163,8 +198,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'messages array is required' });
   }
 
-  if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
-    return res.status(500).json({ error: 'Server has no AI provider keys configured (GROQ_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY)' });
+  if (!process.env.GROQ_API_KEY && !process.env.CEREBRAS_API_KEY && !process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    return res.status(500).json({ error: 'Server has no AI provider keys configured (GROQ_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY)' });
   }
 
   const needsVision = hasImage(messages);
@@ -177,6 +212,7 @@ export default async function handler(req, res) {
     if (!result) result = await tryOpenRouter(messages, temperature, max_tokens, models, failures, true);
   } else {
     result = await tryGroq(messages, temperature, max_tokens, failures);
+    if (!result) result = await tryCerebras(messages, temperature, max_tokens, failures);
     if (!result) result = await tryGemini(messages, temperature, max_tokens, failures);
     if (!result) result = await tryOpenRouter(messages, temperature, max_tokens, models, failures, false);
   }
