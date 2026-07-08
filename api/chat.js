@@ -36,7 +36,7 @@ function toTextOnlyMessages(messages) {
 }
 
 // Wrap a fetch with a hard timeout so one hung provider can't stall the whole chain.
-async function fetchWithTimeout(url, options, ms = 15000) {
+async function fetchWithTimeout(url, options, ms = 8000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
   try {
@@ -47,10 +47,10 @@ async function fetchWithTimeout(url, options, ms = 15000) {
 }
 
 // Retry once on 429 (rate limit) with a short backoff before giving up on a model.
-async function fetchWithRetry(url, options, ms = 15000) {
+async function fetchWithRetry(url, options, ms = 8000, allowRetry = true) {
   let r = await fetchWithTimeout(url, options, ms);
-  if (r.status === 429) {
-    await new Promise(res => setTimeout(res, 1200));
+  if (r.status === 429 && allowRetry) {
+    await new Promise(res => setTimeout(res, 800));
     r = await fetchWithTimeout(url, options, ms);
   }
   return r;
@@ -156,7 +156,7 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) { failures.push('gemini: no GEMINI_API_KEY set on server'); return null; }
   // gemini-1.5-flash is deprecated/404s on v1beta now — use current model names.
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest'];
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
   const systemMsg = messages.find(m => m.role === 'system');
   const contents = toGeminiContents(messages);
   for (const model of models) {
@@ -176,7 +176,7 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      });
+      }, 8000, false);
       if (!r.ok) {
         let bodyText = '';
         try { bodyText = (await r.text()).slice(0, 300); } catch (_) {}
@@ -239,6 +239,8 @@ async function tryOpenRouter(messages, temperature, max_tokens, models, failures
   }
   return null;
 }
+
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
