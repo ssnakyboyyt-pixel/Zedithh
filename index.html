@@ -266,20 +266,37 @@ function buildSearchContextBlock(results){
 }
 
 // ---------- OpenRouter (via secure server proxy — key never exposed to browser) ----------
-const FREE_TEXT_MODELS = [
+// NORMAL mode: fast, lightweight models — fine for chat/summaries/translation, not for hard reasoning.
+const NORMAL_TEXT_MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free','mistralai/mistral-small-3.1-24b-instruct:free',
+  'google/gemma-3-27b-it:free','qwen/qwen-2.5-72b-instruct:free'
+];
+// SMART mode: real reasoning-focused models only. If ALL of these fail, we do NOT
+// silently fall back to weak Normal models — see callOR — so "Smart" never quietly
+// downgrades to dumb without telling the user.
+const SMART_TEXT_MODELS = [
   'deepseek/deepseek-r1:free','openai/gpt-oss-120b:free','qwen/qwen3-coder:free',
-  'meta-llama/llama-3.3-70b-instruct:free','nvidia/nemotron-3-ultra-550b-a55b:free',
-  'mistralai/mistral-small-3.1-24b-instruct:free','google/gemma-3-27b-it:free',
-  'deepseek/deepseek-chat-v3-0324:free','qwen/qwen-2.5-72b-instruct:free'
+  'deepseek/deepseek-chat-v3-0324:free'
 ];
 const FREE_VISION_MODELS = [
   'meta-llama/llama-4-maverick:free','meta-llama/llama-4-scout:free','google/gemma-3-27b-it:free'
 ];
-const SMART_FIRST = ['deepseek/deepseek-r1:free','openai/gpt-oss-120b:free','qwen/qwen3-coder:free'];
+// Simple heuristic: route messages that look like code/logic/math to Smart models
+// even in Normal mode, since these are exactly the categories that break on weak models.
+function looksLikeHardReasoning(text){
+  if(!text) return false;
+  const t = text.toLowerCase();
+  return /```|error|typeerror|stack trace|debug|function\s*\(|def\s|class\s|regex|algorithm/.test(t)
+    || /\b(solve|prove|puzzle|riddle|logic|calculate|equation|step[- ]by[- ]step)\b/.test(t)
+    || /\b(farmer|wolf|goat|cabbage|river crossing)\b/.test(t);
+}
 
-async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false}={}){
-  const poolBase = vision ? [...FREE_VISION_MODELS, ...FREE_TEXT_MODELS] : FREE_TEXT_MODELS;
-  const pool = [...new Set([...(modelPref?[modelPref]:[]), ...(smart?SMART_FIRST:[]), ...poolBase])];
+async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText=''}={}){
+  const wantsSmart = smart || looksLikeHardReasoning(userText);
+  const poolBase = vision
+    ? [...FREE_VISION_MODELS, ...NORMAL_TEXT_MODELS]
+    : (wantsSmart ? SMART_TEXT_MODELS : NORMAL_TEXT_MODELS);
+  const pool = [...new Set([...(modelPref?[modelPref]:[]), ...poolBase])];
   let debugInfo = 'unknown';
   try{
     const r = await fetch('/api/chat', {
@@ -288,7 +305,7 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
       body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: 1300 })
     });
     const d = await r.json().catch(()=>null);
-    if (r.ok && d?.text) return { text: d.text.trim(), model: d.model, tried: d.tried || 1 };
+    if (r.ok && d?.text) return { text: d.text.trim(), model: d.model, tried: d.tried || 1, usedSmart: wantsSmart };
     if (d?.error && typeof d.error === 'string') debugInfo = d.error;
     else if (!r.ok) debugInfo = `HTTP ${r.status}`;
     else debugInfo = `all ${d?.tried||pool.length} models returned empty (likely OpenRouter daily free-tier limit — 50/day without $10 credit purchased, 1000/day with it)`;
@@ -297,9 +314,10 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
 
   // Honest fallback: never pretend to have analyzed an image or fabricate unrelated
   // "creator draft" content as if it answered the question. Say plainly what failed.
+  const modeLabel = wantsSmart ? 'Smart (deep reasoning) models' : 'standard models';
   const text = hasImage
     ? `⚠️ I couldn't analyze your image right now — all ${pool.length} available AI models are temporarily unavailable (rate limits/capacity).\n\nI'm not going to guess what's in the image, since I haven't actually seen it. Please try again in about 60 seconds, or enable Smart mode which sometimes has separate capacity.\n\nDebug info: ${debugInfo}`
-    : `⚠️ Zedith AI is at capacity right now (tried ${pool.length} free models) and couldn't generate a real answer to your message.\n\nDebug info: ${debugInfo}\n\nTip: enable Smart mode for a different model pool, or try again in 60s. I'd rather tell you this failed than give you an unrelated canned answer.`;
+    : `⚠️ Zedith AI is at capacity right now — all ${pool.length} ${modeLabel} failed, so this response did NOT get real reasoning applied.\n\nDebug info: ${debugInfo}\n\nTip: try again in 60s. I'd rather tell you this failed than give you a fake or unrelated answer.`;
 
   return { text, model:'offline-fallback', tried: pool.length, error:true };
 }
@@ -771,10 +789,11 @@ function App(){
       if(results.length){ searchContext = buildSearchContextBlock(results); searchSucceeded = true; }
       else if(searchErr){ console.error('web search failed:', searchErr); searchFailedNote = '\n\nNote: live web search was attempted but failed or returned no results. Do NOT claim to have searched — tell the user you couldn\'t retrieve current web results and answer from general knowledge with that caveat.'; }
     }
-    const sys = buildSystemPrompt({webSearch: searchSucceeded, smart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
+    const effectiveSmart = smart || looksLikeHardReasoning(text);
+    const sys = buildSystemPrompt({webSearch: searchSucceeded, smart: effectiveSmart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
     const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
     try{
-      const {text:answer, model, tried, error} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref, hasImage: !!attachment});
+      const {text:answer, model, tried, error} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref, hasImage: !!attachment, userText: text});
       const assistantMsg={id:uid('m'), role:'assistant', text:answer, ts:Date.now(), model, tried, liked:0, error:!!error};
       const finalMessages=[...updatedChat.messages, assistantMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
