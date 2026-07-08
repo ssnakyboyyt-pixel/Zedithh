@@ -235,7 +235,7 @@ Before giving a specific recommendation (strategy, format, upload schedule, mone
 
 Response quality: always provide complete answers, clear explanations, logical structure, actionable advice, practical examples. Never intentionally shorten useful answers. Never pad responses with unnecessary text.
 
-Image understanding: ${hasImage ? 'An image was attached to this conversation (likely a thumbnail or content asset). Analyze it carefully and describe only what is actually visible — do not guess at details you cannot clearly see. Read visible text exactly as written. Never identify unknown real people.' : 'No image was successfully provided in this turn — do not describe or reference any image content.'}
+Image understanding: ${hasImage ? 'An image was attached to this conversation (likely a thumbnail or content asset). Analyze it carefully and describe only what is actually visible — do not guess at details you cannot clearly see. Read visible text exactly as written. Never identify unknown real people. Give your OWN direct analysis and score — never suggest external websites, apps, or third-party tools (like logo-review sites or ranking tools) for further analysis; you are the analysis.' : 'No image was successfully provided in this turn — do not describe or reference any image content.'}
 
 Voice: support speech understanding, speech generation, natural conversations. Maintain context throughout the conversation.
 
@@ -829,6 +829,8 @@ function App(){
     let searchContext = '';
     let searchSucceeded = false;
     let searchFailedNote = '';
+    let searchDebug = '';
+    let searchSources = [];
     if(webSearch && text && text.trim()){
       // Use the raw query first; Tavily handles natural language fine, but very
       // long conversational messages can dilute relevance, so cap what we send.
@@ -837,9 +839,11 @@ function App(){
       if(results.length){
         searchContext = buildSearchContextBlock(results);
         searchSucceeded = true;
+        searchSources = results.map(r=>({title:r.title, url:r.url}));
       } else {
         // Whether it errored or just returned zero hits, tell the model a
         // search WAS attempted so it never falsely claims "I can't search".
+        searchDebug = 'search: ' + (searchErr || 'no results returned');
         console.error('web search returned no usable results:', searchErr || 'empty result set');
         searchFailedNote = '\n\nNote: a live web search WAS attempted for this message but it failed or returned no usable results. Do not claim search is unavailable or off — it was on. Tell the user the search didn\'t turn up current results and answer from general knowledge with that caveat.';
       }
@@ -849,7 +853,8 @@ function App(){
     const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
     try{
       const {text:answer, model, tried, error, debugInfo} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref, hasImage: !!attachment, userText: text});
-      const assistantMsg={id:uid('m'), role:'assistant', text:answer, ts:Date.now(), model, tried, liked:0, error:!!error, debugInfo: error ? debugInfo : null};
+      const combinedDebug = [error?debugInfo:null, searchDebug||null].filter(Boolean).join(' | ') || null;
+      const assistantMsg={id:uid('m'), role:'assistant', text:answer, ts:Date.now(), model, tried, liked:0, error:!!error, debugInfo: combinedDebug, sources: searchSources.length ? searchSources : null};
       const finalMessages=[...updatedChat.messages, assistantMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
       const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
@@ -1360,6 +1365,17 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                   ` : html`
                     <${MarkdownText} text=${m.text} className="text-zinc-800 dark:text-zinc-100"/>
                   `}
+                  ${m.sources && m.sources.length ? html`
+                    <div className="flex flex-wrap gap-[6px] mt-[10px]">
+                      ${m.sources.map((s,si)=> html`
+                        <a key=${si} href=${s.url} target="_blank" rel="noopener noreferrer"
+                           className="flex items-center gap-[5px] max-w-[220px] bg-zinc-100 dark:bg-[#20233a] hover:bg-zinc-200 dark:hover:bg-[#282c47] border border-zinc-200 dark:border-zinc-700 rounded-full px-[10px] py-[5px] text-[11px] text-zinc-600 dark:text-zinc-300 transition no-underline">
+                          <${I} name="Globe" size=${11} className="shrink-0 text-[#7c5cff]"/>
+                          <span className="truncate">${(()=>{ try{ return new URL(s.url).hostname.replace('www.',''); }catch{ return s.title||s.url; } })()}</span>
+                        </a>
+                      `)}
+                    </div>
+                  `:null}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
                       <button onClick=${()=>copyText(m.text||m.prompt||'')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Copy" size=${13}/> Copy</button>
@@ -1374,7 +1390,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                       <button onClick=${()=>{ updateChat(chat.id, {saved:!chat.saved}); toast(chat.saved?'Removed from saved':'Saved chat ✓'); }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name=${chat.saved?'BookmarkCheck':'Bookmark'} size=${13}/> ${chat.saved?'Saved':''}</button>
                       ${m.model ? html`<span className="text-[10px] text-zinc-400">• ${String(m.model).split('/').pop()} ${m.tried?`· ${m.tried} tried`:''}</span>`:null}
                     </div>
-                    ${m.error && m.debugInfo && isAdminUser ? html`
+                    ${m.debugInfo && isAdminUser ? html`
                       <div className="mt-[6px] text-[10.5px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-[8px] px-[8px] py-[5px] max-w-[560px] break-words">
                         Admin debug: ${m.debugInfo}
                       </div>
