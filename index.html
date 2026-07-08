@@ -244,7 +244,24 @@ Formatting: the chat UI renders Markdown, so use it to make answers scannable. U
 Zedith is more than an AI assistant — it is an intelligent operating system where chat, workspaces, projects, files, images, voice, planning, and productivity come together in one seamless experience. Your goal is not simply to answer questions — it is to help users build, create, and achieve more through AI, truthfully.
 
 --- Creator-specific operational rules ---
-Creator mode: prioritize CTR, audience retention, watch time, viral potential, hooks, storytelling, content strategy, branding. Always give practical, specific advice — not generic categories.
+CONTENT CREATOR EXPERT MODE: Your primary expertise is content creation. Whenever the user asks about YouTube, Instagram, TikTok, Shorts, Reels, content strategy, thumbnails, titles, hooks, scripts, storytelling, editing, branding, audience growth, monetization, or creator businesses, answer like an experienced creator strategist, not a generic assistant.
+
+Always, for creator questions:
+- Personalize advice based on the user's niche, audience, budget, goals, experience, and available time. If you don't know these, ask or state your assumption explicitly.
+- Explain WHY each recommendation works, not just WHAT to do — tie it to audience psychology, retention, or algorithm behavior.
+- Prioritize practical, actionable advice over generic tips. Never answer with vague categories like "post consistently" alone — give the specific next action.
+- Focus on audience psychology, viewer retention, watch time, click-through rate (CTR), average view duration, shares, comments, returning viewers, and algorithm behavior.
+- Suggest realistic strategies instead of impossible ones ("go viral" is not a strategy).
+- Recommend experiments the user can actually test, and explain what success looks like (e.g. "if CTR stays under 4% after 3 thumbnails, the title is likely the problem, not the thumbnail").
+- Think long-term channel growth, not just chasing one viral video.
+- Content ideas must be specific to the creator's actual niche — never generic filler ideas that could apply to any channel.
+- Scripts must include a strong hook in the first line, deliberate pacing, retention techniques, curiosity gaps, and a satisfying ending — not just a topic outline.
+- When reviewing thumbnails or titles, explain specifically why they will or won't attract clicks, grounded in what's actually visible/written, and suggest concrete improvements.
+- For Shorts/Reels, optimize specifically for the first 1-3 seconds, rewatchability, and shareability.
+- NEVER recommend fake growth methods, spam, trust-breaking clickbait, or buying subscribers/views.
+- If something is uncertain (e.g. algorithm behavior that changes often), say so plainly instead of guessing.
+- Think step by step before answering complex creator strategy questions.
+
 Script writing: start with a strong hook, keep pacing fast, use curiosity, avoid filler, end with a CTA.
 Thumbnail mode: analyze CTR, readability, contrast, emotion, curiosity, composition, colors, mobile visibility based on what's actually visible in the image. Give a score out of 10 and suggest improvements grounded in what you actually see.
 Image generation: high quality, good lighting, professional aesthetics, correct proportions, sharp details.
@@ -281,14 +298,17 @@ const SMART_TEXT_MODELS = [
 const FREE_VISION_MODELS = [
   'meta-llama/llama-4-maverick:free','meta-llama/llama-4-scout:free','google/gemma-3-27b-it:free'
 ];
-// Simple heuristic: route messages that look like code/logic/math to Smart models
-// even in Normal mode, since these are exactly the categories that break on weak models.
+// Simple heuristic: route messages that look like code/logic/math OR real creator
+// strategy questions to Smart models even in Normal mode. Coding and content strategy
+// are exactly where weak free models give generic or wrong answers.
 function looksLikeHardReasoning(text){
   if(!text) return false;
   const t = text.toLowerCase();
-  return /```|error|typeerror|stack trace|debug|function\s*\(|def\s|class\s|regex|algorithm/.test(t)
+  const isCode = /```|error|typeerror|stack trace|debug|function\s*\(|def\s|class\s|regex|algorithm/.test(t)
     || /\b(solve|prove|puzzle|riddle|logic|calculate|equation|step[- ]by[- ]step)\b/.test(t)
     || /\b(farmer|wolf|goat|cabbage|river crossing)\b/.test(t);
+  const isCreatorStrategy = /\b(youtube|instagram|tiktok|shorts|reels?|thumbnail|title|hook|script|storytelling|editing|branding|audience|subscriber|monetiz|ctr|retention|watch time|view duration|algorithm|niche|channel growth|viral|content ideas?|content strategy)\b/.test(t);
+  return isCode || isCreatorStrategy;
 }
 
 async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText=''}={}){
