@@ -54,6 +54,12 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn .22s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.modal-in{animation:modalIn .24s cubic-bezier(.2,.9,.3,1)}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.overlay-in{animation:overlayIn .18s ease}
+.modal-panel{background:#ffffff;border:1px solid rgba(24,17,58,0.08);box-shadow:0 24px 60px -12px rgba(30,15,80,0.22),0 2px 8px rgba(30,15,80,0.06)}
+.dark .modal-panel{background:#181b2b;border:1px solid #262a42;box-shadow:0 24px 60px -12px rgba(0,0,0,0.6),0 2px 10px rgba(0,0,0,0.3)}
 @media (max-width:767px){ input, textarea, select { font-size:16px !important; } }
 </style>
 <script type="importmap">
@@ -100,21 +106,29 @@ function uid(prefix='x'){ return prefix+'_'+Date.now().toString(36)+'_'+Math.ran
 function toast(msg,type='ok'){
   const root=document.getElementById('toast-root');
   const el=document.createElement('div');
-  el.className=`px-3 py-2 rounded-xl text-[12px] shadow-lg fade-in ${type==='err'?'bg-red-600 text-white':'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'}`;
-  el.textContent=msg;
+  el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[#1a1d2e]/95 border-[#7c5cff]/25 text-white'}`;
+  el.style.transition='opacity .2s ease, transform .2s ease';
+  const dot=document.createElement('span');
+  dot.className=`w-[6px] h-[6px] rounded-full shrink-0 ${type==='err'?'bg-white':'bg-[#a487ff]'}`;
+  const label=document.createElement('span');
+  label.textContent=msg;
+  el.appendChild(dot); el.appendChild(label);
   root.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(5px)'; setTimeout(()=>el.remove(),200)},2400);
 }
 
 function ConfirmDialog({title, message, confirmLabel='Confirm', danger=false, onConfirm, onClose}){
   return html`
-    <div className="fixed inset-0 z-[500] bg-black/55 flex items-center justify-center p-4 fade-in" onClick=${onClose}>
-      <div onClick=${e=>e.stopPropagation()} className="w-full max-w-[360px] bg-white dark:bg-[#181b2a] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-lg p-5">
-        <div className="font-[700] text-[15px] mb-2">${title}</div>
-        <div className="text-[13px] text-zinc-500 mb-5">${message}</div>
+    <div className="fixed inset-0 z-[500] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full max-w-[360px] rounded-[20px] p-5">
+        <div className=${`w-9 h-9 rounded-[10px] flex items-center justify-center mb-3 ${danger?'bg-red-500/12 border border-red-500/25':'bg-[#7c5cff]/12 border border-[#7c5cff]/25'}`}>
+          <${I} name=${danger?'AlertTriangle':'HelpCircle'} size=${16} className=${danger?'text-red-500':'text-[#7c5cff]'}/>
+        </div>
+        <div className="font-[700] text-[15px] mb-1.5">${title}</div>
+        <div className="text-[13px] text-zinc-500 mb-5 leading-relaxed">${message}</div>
         <div className="flex justify-end gap-2">
-          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12.5px]">Cancel</button>
-          <button onClick=${()=>{ onConfirm(); onClose(); }} className=${`px-[14px] py-[8px] rounded-xl text-white text-[12.5px] font-[600] ${danger?'bg-red-600 hover:bg-red-700':'bg-[#7c5cff] hover:bg-[#6b48f5]'}`}>${confirmLabel}</button>
+          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12.5px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
+          <button onClick=${()=>{ onConfirm(); onClose(); }} className=${`px-[14px] py-[8px] rounded-xl text-white text-[12.5px] font-[600] shadow-sm transition-colors ${danger?'bg-red-600 hover:bg-red-700':'bg-[#7c5cff] hover:bg-[#6b48f5]'}`}>${confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -124,39 +138,44 @@ function ConfirmDialog({title, message, confirmLabel='Confirm', danger=false, on
 function PromptDialog({title, placeholder='', onSubmit, onClose}){
   const [val,setVal]=useState('');
   return html`
-    <div className="fixed inset-0 z-[500] bg-black/55 flex items-center justify-center p-4 fade-in" onClick=${onClose}>
-      <div onClick=${e=>e.stopPropagation()} className="w-full max-w-[360px] bg-white dark:bg-[#181b2a] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-lg p-5">
+    <div className="fixed inset-0 z-[500] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full max-w-[360px] rounded-[20px] p-5">
         <div className="font-[700] text-[15px] mb-3">${title}</div>
-        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[13px] mb-4"/>
+        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[13px] mb-4 focus:border-[#7c5cff] focus:ring-1 focus:ring-[#7c5cff]/30 transition-colors"/>
         <div className="flex justify-end gap-2">
-          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12.5px]">Cancel</button>
-          <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12.5px] font-[600]">Send</button>
+          <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12.5px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
+          <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12.5px] font-[600] shadow-sm transition-colors">Send</button>
         </div>
       </div>
     </div>
   `;
 }
 
-function CustomSelect({value, onChange, options, className=''}){
+function CustomSelect({value, onChange, options, className='', panelClassName='', align='right'}){
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
   useEffect(()=>{
     const onDoc=(e)=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onEsc=(e)=>{ if(e.key==='Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
-    return ()=>document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    return ()=>{ document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onEsc); };
   },[]);
   const opts = options.map(o => typeof o === 'string' ? {label:o, value:o} : o);
   const current = opts.find(o=>o.value===value);
   return html`
     <div ref=${ref} className="relative inline-block">
-      <button type="button" onClick=${()=>setOpen(o=>!o)} className=${`flex items-center justify-between gap-2 ${className}`}>
+      <button type="button" onClick=${()=>setOpen(o=>!o)} className=${`flex items-center justify-between gap-2 transition-colors ${open?'border-[#7c5cff]! ring-1 ring-[#7c5cff]/30':''} ${className}`}>
         <span className="truncate">${current?.label ?? value}</span>
-        <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform ${open?'rotate-180':''}`}/>
+        <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform duration-200 ${open?'rotate-180 text-[#7c5cff] opacity-100':''}`}/>
       </button>
       ${open ? html`
-        <div className="absolute right-0 z-50 mt-1 min-w-full w-max max-h-[240px] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] shadow-lg py-1 fade-in">
+        <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[#2a2f4a] bg-white/95 dark:bg-[#181b2b]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
           ${opts.map(o=>html`
-            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full text-left px-3 py-[8px] text-[12.5px] whitespace-nowrap hover:bg-zinc-100 dark:hover:bg-zinc-800 ${o.value===value?'text-[#7c5cff] font-[600]':'text-zinc-700 dark:text-zinc-200'}`}>${o.label}</button>
+            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[#7c5cff] font-[650] bg-[#7c5cff]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#222642]'}`}>
+              <span className="truncate">${o.label}</span>
+              ${o.value===value ? html`<${I} name="Check" size=${13} className="shrink-0 text-[#7c5cff]"/>` : null}
+            </button>
           `)}
         </div>
       ` : null}
@@ -1187,12 +1206,14 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
 // ---------- Coming Soon Modal ----------
 function ComingSoonModal({plan,onClose}){
   return html`
-  <div className="fixed inset-0 z-[400] bg-black/55 flex items-center justify-center p-4" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#181b2b] w-[420px] max-w-[96vw] rounded-[20px] shadow-2xl p-6 text-center" onClick=${e=>e.stopPropagation()}>
-      <div className="w-12 h-12 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] flex items-center justify-center mx-auto mb-3"><${I} name="Rocket" size={22} className="text-[#7c5cff]"/></div>
-      <div className="font-[700] text-[18px]">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
-      <div className="text-[13px] text-zinc-500 mt-2">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
-      <button onClick=${onClose} className="mt-5 px-5 py-2 rounded-xl bg-[#7c5cff] text-white text-sm font-semibold">Got it</button>
+  <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[420px] max-w-[96vw] rounded-[22px] p-6 text-center" onClick=${e=>e.stopPropagation()}>
+      <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-[#7c5cff]/18 to-[#a056ff]/10 border border-[#7c5cff]/25 flex items-center justify-center mx-auto mb-4">
+        <${I} name="Rocket" size=${24} className="text-[#7c5cff]"/>
+      </div>
+      <div className="font-[750] text-[18px] display">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
+      <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
+      <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
     </div>
   </div>`;
 }
@@ -1327,17 +1348,17 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           ${messages.map((m,idx)=> html`
             <div key=${m.id||idx} className="fade-in">
               ${m.role==='user' ? html`
-                <div className="flex justify-end items-end gap-[8px]">
-                  <div className="bg-gradient-to-br from-[#7c5cff] to-[#5b3df0] dark:from-[#3a2f6e] dark:to-[#241f44] text-white dark:text-zinc-100 px-[16px] py-[12px] rounded-[16px] rounded-br-[5px] max-w-[72%] text-[13.3px] leading-relaxed whitespace-pre-wrap shadow-[0_4px_14px_rgba(124,92,255,0.25)] dark:shadow-[0_4px_14px_rgba(0,0,0,0.35)]">
+                <div className="flex justify-end">
+                  <div className="relative bg-gradient-to-br from-[#8a68ff] via-[#7c5cff] to-[#5b3df0] dark:from-[#4b3d8f] dark:via-[#372c66] dark:to-[#211a3d] text-white px-[17px] py-[13px] rounded-[20px] rounded-br-[6px] max-w-[72%] text-[13.5px] leading-[1.55] whitespace-pre-wrap shadow-[0_6px_20px_rgba(124,92,255,0.28),0_1px_2px_rgba(124,92,255,0.15)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-white/10 dark:ring-white/[0.06]">
                     ${m.attachment?.type==='image' ? html`
-                      <div className="relative mb-[8px] -mx-[2px]">
-                        <img src=${m.attachment.dataUrl} className="max-h-[210px] w-full object-cover rounded-[12px] border border-white/20 shadow-md"/>
+                      <div className="relative mb-[8px] -mx-[3px] -mt-[1px]">
+                        <img src=${m.attachment.dataUrl} className="max-h-[210px] w-full object-cover rounded-[14px] border border-white/20 shadow-md"/>
                         <span className="absolute bottom-[6px] left-[6px] flex items-center gap-[4px] bg-black/55 backdrop-blur-sm text-white text-[9.5px] font-[600] px-[7px] py-[3px] rounded-full">
                           <${I} name="Image" size=${10}/> Image
                         </span>
                       </div>
                     `:null}
-                    ${m.text}
+                    <span className="[text-wrap:pretty]">${m.text}</span>
                   </div>
                 </div>
               ` : html`
@@ -1669,11 +1690,11 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
 function CreateProjectModal({onClose,onCreate}){
   const [name,setName]=useState(''); const [desc,setDesc]=useState(''); const [icon,setIcon]=useState('FolderKanban'); const [color,setColor]=useState('#7c5cff'); const [cat,setCat]=useState('YouTube');
   return html`
-  <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#181b2b] w-[740px] max-w-[96vw] rounded-[18px] shadow-2xl" onClick=${e=>e.stopPropagation()}>
-      <div className="px-5 py-[14px] border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-        <div className="font-[700]">Create New Project</div>
-        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+  <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-[3px] flex items-center justify-center overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[740px] max-w-[96vw] rounded-[20px]" onClick=${e=>e.stopPropagation()}>
+      <div className="px-5 py-[16px] border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="font-[700] text-[15px]">Create New Project</div>
+        <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="p-5 grid grid-cols-3 gap-5 text-[12px]">
         <div className="col-span-2 space-y-3">
@@ -1698,8 +1719,8 @@ function CreateProjectModal({onClose,onCreate}){
         </div>
       </div>
       <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
-        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
-        <button onClick=${()=>onCreate({title:name, cat, icon, color, desc})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600]">Create Project</button>
+        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
+        <button onClick=${()=>onCreate({title:name, cat, icon, color, desc})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12px] font-[600] shadow-sm transition-colors">Create Project</button>
       </div>
     </div>
   </div>`;
@@ -1823,11 +1844,11 @@ function PlannerView({items, createPlannerItem}){
 function NewContentModal({onClose,onCreate}){
   const [title,setTitle]=useState(''); const [platform,setPlatform]=useState('YouTube'); const [type,setType]=useState('video'); const [date,setDate]=useState(new Date().toISOString().split('T')[0]); const [status,setStatus]=useState('Draft');
   return html`
-  <div className="fixed inset-0 z-[130] bg-black/50 flex items-center justify-center" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#181b2b] w-[520px] max-w-[96vw] rounded-[18px] shadow-2xl p-5" onClick=${e=>e.stopPropagation()}>
+  <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-[3px] flex items-center justify-center overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[520px] max-w-[96vw] rounded-[20px] p-5" onClick=${e=>e.stopPropagation()}>
       <div className="flex items-center justify-between mb-4">
-        <div className="font-[700]">New Content</div>
-        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+        <div className="font-[700] text-[15px]">New Content</div>
+        <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="space-y-3 text-[12px]">
         <div><div className="text-zinc-500 mb-1">Title</div><input value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. 10 AI Tools for YouTube" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none"/></div>
@@ -1847,8 +1868,8 @@ function NewContentModal({onClose,onCreate}){
         </div>
       </div>
       <div className="flex justify-end gap-2 mt-5">
-        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
-        <button onClick=${()=>onCreate({title:title||'Untitled', platform, type, date, status})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600]">Schedule</button>
+        <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
+        <button onClick=${()=>onCreate({title:title||'Untitled', platform, type, date, status})} className="px-[14px] py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12px] font-[600] shadow-sm transition-colors">Schedule</button>
       </div>
     </div>
   </div>`;
@@ -2358,17 +2379,17 @@ function ToolModal({tool,onClose,onSend}){
     onClose();
   };
   return html`
-  <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#181b2b] w-[480px] max-w-[96vw] rounded-[18px] shadow-2xl p-5" onClick=${e=>e.stopPropagation()}>
+  <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[480px] max-w-[96vw] rounded-[20px] p-5" onClick=${e=>e.stopPropagation()}>
       <div className="flex items-center justify-between mb-3">
         <div className="font-[700] text-[15px]">${tool}</div>
-        <button onClick=${onClose}><${I} name="X" size=${16}/></button>
+        <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="text-[12px] text-zinc-500 mb-3">${prompts[tool]}</div>
-      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[12.5px]"></textarea>
+      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#121524] outline-none text-[12.5px] focus:border-[#7c5cff] focus:ring-1 focus:ring-[#7c5cff]/30 transition-colors"></textarea>
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick=${onClose} className="px-4 py-[8px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Cancel</button>
-        <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12px] font-[600] disabled:opacity-50">Run in Chat</button>
+        <button onClick=${onClose} className="px-4 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
+        <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white text-[12px] font-[600] shadow-sm disabled:opacity-50 transition-colors">Run in Chat</button>
       </div>
     </div>
   </div>`;
@@ -2699,7 +2720,7 @@ function AdminUsers(){
                     <span className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${u.suspended ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>${u.suspended?'Suspended':'Active'}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick=${()=>setSelectedUser(u)} className="text-[#7c5cff] hover:underline text-[11px] font-[600]">Manage</button>
+                    <button onClick=${()=>setSelectedUser(u)} className="text-[#e8b04b] hover:underline text-[11px] font-[600]">Manage</button>
                   </td>
                 </tr>
               `)}
@@ -2717,11 +2738,11 @@ function AdminUsers(){
     `}
 
     ${selectedUser ? html`
-      <div className="fixed inset-0 z-[500] bg-black/60 flex items-center justify-center p-4" onClick=${()=>setSelectedUser(null)}>
-        <div className="bg-white dark:bg-[#181b2a] w-full max-w-[540px] rounded-[20px] shadow-2xl p-6 max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
+      <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${()=>setSelectedUser(null)}>
+        <div className="modal-panel modal-in w-full max-w-[540px] rounded-[20px] p-6 max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <div className="font-[700] text-[16px]">Manage User</div>
-            <button onClick=${()=>setSelectedUser(null)}><${I} name="X" size=${18}/></button>
+            <button onClick=${()=>setSelectedUser(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${18}/></button>
           </div>
           <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#141727] rounded-xl mb-4">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center text-white font-[700]">${(selectedUser.display_name||selectedUser.email||'?')[0].toUpperCase()}</div>
@@ -2737,7 +2758,7 @@ function AdminUsers(){
               <div className="font-[650] mb-2">Plan</div>
               <div className="flex gap-2 flex-wrap">
                 ${['free','pro','elite'].map(pk=>html`
-                  <button key=${pk} onClick=${()=>{ changePlan(selectedUser.id,pk); setSelectedUser(u=>({...u,plan:pk})); }} className=${`px-3 py-[7px] rounded-xl border text-[12px] font-[600] transition ${(selectedUser.plan||'free')===pk ? 'border-[#7c5cff] bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff]' : 'border-zinc-200 dark:border-zinc-700'}`}>${pk.toUpperCase()}</button>
+                  <button key=${pk} onClick=${()=>{ changePlan(selectedUser.id,pk); setSelectedUser(u=>({...u,plan:pk})); }} className=${`px-3 py-[7px] rounded-xl border text-[12px] font-[600] transition ${(selectedUser.plan||'free')===pk ? 'border-[#e8b04b] bg-[#fbf3e2] dark:bg-[#2a2413] text-[#b3822f] dark:text-[#e8b04b]' : 'border-zinc-200 dark:border-zinc-700'}`}>${pk.toUpperCase()}</button>
                 `)}
               </div>
             </div>
@@ -2788,7 +2809,7 @@ function AdminSubscriptions({planConfig, setPlanConfig}){
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
       ${[
         {k:'free',label:'Free',color:'#64748b'},
-        {k:'pro',label:'Pro',color:'#7c5cff'},
+        {k:'pro',label:'Pro',color:'#e8b04b'},
         {k:'elite',label:'Elite',color:'#f59e0b'},
       ].map(({k,label,color})=>html`
         <div key=${k} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
@@ -2816,7 +2837,7 @@ function AdminSubscriptions({planConfig, setPlanConfig}){
         </div>
       `)}
     </div>
-    <button onClick=${save} disabled=${saving} className="px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Plan Config'}</button>
+    <button onClick=${save} disabled=${saving} className="px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Plan Config'}</button>
   </div>`;
 }
 
@@ -2871,7 +2892,7 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
             <input type="number" value=${v} onChange=${e=>setCosts(c=>({...c,[k]:parseFloat(e.target.value)||0}))} className="w-28 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] text-[12px] outline-none"/>
           </div>
         `)}
-        <button onClick=${save} disabled=${saving} className="w-full mt-2 py-[9px] rounded-xl bg-[#7c5cff] text-white text-[12.5px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Costs'}</button>
+        <button onClick=${save} disabled=${saving} className="w-full mt-2 py-[9px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Costs'}</button>
       </div>
       <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-3">Credits by Feature</div>
@@ -2879,7 +2900,7 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
           <div key=${k} className="flex items-center gap-3 mb-2">
             <div className="text-[11px] text-zinc-500 w-24 truncate">${k}</div>
             <div className="flex-1 h-[6px] bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-              <div className="h-full bg-[#7c5cff] rounded-full" style=${{width:Math.min(100,Math.round(v/Math.max(...Object.values(byFeature))*100))+'%'}}></div>
+              <div className="h-full bg-[#e8b04b] rounded-full" style=${{width:Math.min(100,Math.round(v/Math.max(...Object.values(byFeature))*100))+'%'}}></div>
             </div>
             <div className="text-[11px] font-[600]">${v.toLocaleString()}</div>
           </div>
@@ -2902,7 +2923,7 @@ function AdminAIModels(){
     {id:'7', name:'Groq Llama', provider:'Groq', enabled:false, default:false, cost:5, experimental:false},
     {id:'8', name:'Together Mistral', provider:'Together AI', enabled:false, default:false, cost:8, experimental:true},
   ]);
-  const provColors={'OpenAI':'#10a37f','OpenRouter':'#7c5cff','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'#8b5cf6','DeepSeek':'#06b6d4'};
+  const provColors={'OpenAI':'#10a37f','OpenRouter':'#e8b04b','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'#8b5cf6','DeepSeek':'#06b6d4'};
 
   const toggleModel=(id,field,val)=>setModels(ms=>ms.map(m=>m.id===id?{...m,[field]:val, ...(field==='default'&&val?{}:{})}:field==='default'&&val?{...m,default:false}:m));
   const setDefault=(id)=>setModels(ms=>ms.map(m=>({...m,default:m.id===id})));
@@ -2934,15 +2955,15 @@ function AdminAIModels(){
               <tr key=${m.id} className="border-b border-zinc-50 dark:border-zinc-900">
                 <td className="px-4 py-3 font-[600]">${m.name}</td>
                 <td className="px-4 py-3">
-                  <span className="text-[10px] px-2 py-[3px] rounded-full font-[600]" style=${{background:(provColors[m.provider]||'#7c5cff')+'20',color:provColors[m.provider]||'#7c5cff'}}>${m.provider}</span>
+                  <span className="text-[10px] px-2 py-[3px] rounded-full font-[600]" style=${{background:(provColors[m.provider]||'#e8b04b')+'20',color:provColors[m.provider]||'#e8b04b'}}>${m.provider}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick=${()=>toggleModel(m.id,'enabled',!m.enabled)} className=${`w-10 h-5 rounded-full relative transition ${m.enabled?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+                  <button onClick=${()=>toggleModel(m.id,'enabled',!m.enabled)} className=${`w-10 h-5 rounded-full relative transition ${m.enabled?'bg-[#e8b04b]':'bg-zinc-300 dark:bg-zinc-700'}`}>
                     <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${m.enabled?'left-[22px]':'left-[2px]'}`}></span>
                   </button>
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick=${()=>setDefault(m.id)} className=${`w-4 h-4 rounded-full border-2 transition ${m.default?'border-[#7c5cff] bg-[#7c5cff]':'border-zinc-400'}`}></button>
+                  <button onClick=${()=>setDefault(m.id)} className=${`w-4 h-4 rounded-full border-2 transition ${m.default?'border-[#e8b04b] bg-[#e8b04b]':'border-zinc-400'}`}></button>
                 </td>
                 <td className="px-4 py-3">
                   <input type="number" value=${m.cost} onChange=${e=>toggleModel(m.id,'cost',parseInt(e.target.value)||0)} className="w-16 px-2 py-[4px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
@@ -2956,7 +2977,7 @@ function AdminAIModels(){
         </table>
       </div>
     </div>
-    <button onClick=${()=>toast('Model config saved')} className="mt-4 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600]">Save Model Config</button>
+    <button onClick=${()=>toast('Model config saved')} className="mt-4 px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600]">Save Model Config</button>
   </div>`;
 }
 
@@ -2969,10 +2990,10 @@ function AdminAnalytics(){
     <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="TrendingUp" size=${20}/> Analytics</div>
     <div className="text-[12px] text-zinc-500 mb-4">Platform-wide analytics and reporting.</div>
     <div className="flex gap-4 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
-      ${tabs.map(t=>html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+      ${tabs.map(t=>html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#e8b04b] border-b-2 border-[#e8b04b] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
     </div>
     <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-8 text-center">
-      <${I} name="TrendingUp" size=${32} className="mx-auto text-[#7c5cff] mb-3"/>
+      <${I} name="TrendingUp" size=${32} className="mx-auto text-[#e8b04b] mb-3"/>
       <div className="font-[700] text-[15px] mb-1">${tab} Analytics</div>
       <div className="text-[12px] text-zinc-500">Analytics data will populate as users interact with the platform. Connect your analytics provider to see detailed reports.</div>
     </div>
@@ -2991,7 +3012,7 @@ function AdminSecurity(){
     <div className="text-[12px] text-zinc-500 mb-5">Activity logs, audit trail, and security events.</div>
 
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${[['Active Sessions','—','Wifi','#10b981'],['Failed Logins','0','AlertTriangle','#ef4444'],['Audit Events',logs.length.toString(),'Activity','#7c5cff'],['API Calls',logs.length.toString(),'Plug','#f59e0b']].map(([l,v,ic,col])=>html`
+      ${[['Active Sessions','—','Wifi','#10b981'],['Failed Logins','0','AlertTriangle','#ef4444'],['Audit Events',logs.length.toString(),'Activity','#e8b04b'],['API Calls',logs.length.toString(),'Plug','#f59e0b']].map(([l,v,ic,col])=>html`
         <div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[11px] text-zinc-500">${l}</div>
@@ -3009,7 +3030,7 @@ function AdminSecurity(){
           ${logs.map(l=>html`
             <div key=${l.id} className="flex items-center justify-between text-[11.5px] p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#efeaff] dark:bg-[#221d3a] flex items-center justify-center"><${I} name="Activity" size=${12} className="text-[#7c5cff]"/></div>
+                <div className="w-6 h-6 rounded-lg bg-[#faf1de] dark:bg-[#241f10] flex items-center justify-center"><${I} name="Activity" size=${12} className="text-[#e8b04b]"/></div>
                 <span className="font-[500]">${l.feature} request</span>
               </div>
               <span className="text-zinc-400">${new Date(l.created_at).toLocaleString()}</span>
@@ -3110,7 +3131,7 @@ function AdminNotifications(){
           <div className="text-[11px] text-zinc-500 mb-1">Message</div>
           <textarea value=${msg} onChange=${e=>setMsg(e.target.value)} placeholder="Your announcement message…" className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"></textarea>
         </div>
-        <button onClick=${sendAnnouncement} disabled=${sending} className="px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${sending?'Sending…':'Send to All Users'}</button>
+        <button onClick=${sendAnnouncement} disabled=${sending} className="px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${sending?'Sending…':'Send to All Users'}</button>
       </div>
     </div>
 
@@ -3169,7 +3190,7 @@ function AdminSettings(){
           ${Object.entries(features).map(([k,v])=>html`
             <div key=${k} className="flex items-center justify-between">
               <span className="text-[12.5px] text-zinc-700 dark:text-zinc-300">${k.replace(/([A-Z])/g,' $1').replace(/^./,s=>s.toUpperCase())}</span>
-              <button onClick=${()=>setFeatures(f=>({...f,[k]:!v}))} className=${`w-10 h-5 rounded-full relative transition ${v?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+              <button onClick=${()=>setFeatures(f=>({...f,[k]:!v}))} className=${`w-10 h-5 rounded-full relative transition ${v?'bg-[#e8b04b]':'bg-zinc-300 dark:bg-zinc-700'}`}>
                 <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${v?'left-[22px]':'left-[2px]'}`}></span>
               </button>
             </div>
@@ -3209,7 +3230,7 @@ function AdminSettings(){
         </div>
       </div>
     </div>
-    <button onClick=${save} disabled=${saving} className="mt-5 px-5 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Settings'}</button>
+    <button onClick=${save} disabled=${saving} className="mt-5 px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Settings'}</button>
   </div>`;
 }
 
@@ -3346,11 +3367,7 @@ function ZedithPicksView(){
             <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
             <input value=${search} onChange=${e=>setSearch(e.target.value)} placeholder="Search tools, categories, tags…" className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none"/>
           </div>
-          <select value=${sortBy} onChange=${e=>setSortBy(e.target.value)} className="px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none">
-            <option value="featured">Featured</option>
-            <option value="new">Newest</option>
-            <option value="popular">Most Popular</option>
-          </select>
+          <${CustomSelect} value=${sortBy} onChange=${setSortBy} options=${[{label:'Featured',value:'featured'},{label:'Newest',value:'new'},{label:'Most Popular',value:'popular'}]} className="px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#1a1d2e] text-[12.5px] outline-none"/>
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">
@@ -3384,8 +3401,8 @@ function ZedithPicksView(){
     </aside>
 
     ${selected ? html`
-      <div className="fixed inset-0 z-[500] bg-black/60 flex items-center justify-center p-4" onClick=${()=>setSelected(null)}>
-        <div className="bg-white dark:bg-[#181b2a] w-full max-w-[620px] rounded-[20px] shadow-2xl p-6 max-h-[88vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
+      <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${()=>setSelected(null)}>
+        <div className="modal-panel modal-in w-full max-w-[620px] rounded-[22px] p-6 max-h-[88vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-[12px] bg-zinc-100 dark:bg-[#141727] flex items-center justify-center overflow-hidden shrink-0">
@@ -3396,7 +3413,7 @@ function ZedithPicksView(){
                 <div className="text-[11.5px] text-zinc-400">${catName(selected.category_id)}</div>
               </div>
             </div>
-            <button onClick=${()=>setSelected(null)}><${I} name="X" size=${18}/></button>
+            <button onClick=${()=>setSelected(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"><${I} name="X" size=${18}/></button>
           </div>
 
           <div className="flex items-center gap-1 text-[12.5px] text-amber-500 font-[600] mb-3">
@@ -3486,14 +3503,14 @@ function AdminPicks(){
 
     <div className="flex gap-4 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
       ${[['products','Products'],['categories','Categories'],['analytics','Analytics']].map(([id,label])=>html`
-        <button key=${id} onClick=${()=>setTab(id)} className=${`pb-[10px] ${tab===id?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${label}</button>
+        <button key=${id} onClick=${()=>setTab(id)} className=${`pb-[10px] ${tab===id?'text-[#e8b04b] border-b-2 border-[#e8b04b] font-[600]':'text-zinc-500'}`}>${label}</button>
       `)}
     </div>
 
     ${tab==='products' ? html`
       <div className="flex justify-between items-center mb-4">
         <div className="text-[12px] text-zinc-500">${products.length} products</div>
-        <button onClick=${()=>setEditing('new')} className="px-4 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12.5px] font-[600] flex items-center gap-1.5"><${I} name="Plus" size=${14}/>Add Product</button>
+        <button onClick=${()=>setEditing('new')} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] flex items-center gap-1.5"><${I} name="Plus" size=${14}/>Add Product</button>
       </div>
 
       ${loading ? html`<div className="text-zinc-500 text-[12px]">Loading…</div>` : html`
@@ -3516,7 +3533,7 @@ function AdminPicks(){
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-[#141727] flex items-center justify-center overflow-hidden shrink-0">
-                          ${p.logo_url ? html`<img src=${p.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${12} className="text-[#7c5cff]"/>`}
+                          ${p.logo_url ? html`<img src=${p.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${12} className="text-[#e8b04b]"/>`}
                         </div>
                         <div className="font-[600] truncate max-w-[160px]">${p.name}</div>
                         ${p.is_featured ? html`<${I} name="Star" size=${12} className="text-amber-400 fill-amber-400"/>`:null}
@@ -3530,7 +3547,7 @@ function AdminPicks(){
                     <td className="px-4 py-3">${(p.website_clicks||0)+(p.affiliate_clicks||0)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button onClick=${()=>setEditing(p)} className="text-[#7c5cff] hover:underline text-[11px] font-[600]">Edit</button>
+                        <button onClick=${()=>setEditing(p)} className="text-[#e8b04b] hover:underline text-[11px] font-[600]">Edit</button>
                         <button onClick=${()=>duplicateProduct(p)} className="text-zinc-500 hover:underline text-[11px] font-[600]">Duplicate</button>
                         ${p.status==='published' ? html`<button onClick=${()=>toggleStatus(p,'hidden')} className="text-amber-600 hover:underline text-[11px] font-[600]">Hide</button>` : html`<button onClick=${()=>toggleStatus(p,'published')} className="text-emerald-600 hover:underline text-[11px] font-[600]">Publish</button>`}
                         <button onClick=${()=>setConfirm({msg:'Delete '+p.name+'? This cannot be undone.', onConfirm:()=>deleteProduct(p.id)})} className="text-red-500 hover:underline text-[11px] font-[600]">Delete</button>
@@ -3576,7 +3593,7 @@ function AdminPicksCategories({categories,setCategories}){
       <div className="flex gap-2">
         <input value=${newName} onChange=${e=>setNewName(e.target.value)} placeholder="Category name" className="flex-1 px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
         <input value=${newIcon} onChange=${e=>setNewIcon(e.target.value)} placeholder="Lucide icon name" className="w-[160px] px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
-        <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#7c5cff] text-white text-[12.5px] font-[600]">Add</button>
+        <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600]">Add</button>
       </div>
     </div>
     <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden">
@@ -3587,7 +3604,7 @@ function AdminPicksCategories({categories,setCategories}){
         <tbody>
           ${categories.map(c=>html`
             <tr key=${c.id} className="border-b border-zinc-50 dark:border-zinc-900">
-              <td className="px-4 py-3 font-[600] flex items-center gap-2"><${I} name=${c.icon} size=${14} className="text-[#7c5cff]"/>${c.name}</td>
+              <td className="px-4 py-3 font-[600] flex items-center gap-2"><${I} name=${c.icon} size=${14} className="text-[#e8b04b]"/>${c.name}</td>
               <td className="px-4 py-3 text-zinc-500">${c.icon}</td>
               <td className="px-4 py-3"><button onClick=${()=>deleteCategory(c.id)} className="text-red-500 hover:underline text-[11px] font-[600]">Delete</button></td>
             </tr>
@@ -3618,7 +3635,7 @@ function AdminPicksAnalytics({products,catName}){
   return html`
   <div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${card('Total Views',totalViews.toLocaleString(),'Eye','#7c5cff')}
+      ${card('Total Views',totalViews.toLocaleString(),'Eye','#e8b04b')}
       ${card('Website Clicks',totalWebsiteClicks.toLocaleString(),'ExternalLink','#10b981')}
       ${card('Affiliate Clicks',totalAffiliateClicks.toLocaleString(),'Link','#f59e0b')}
       ${card('Conversion Rate',conversionRate+'%','TrendingUp','#3b82f6')}
@@ -3693,26 +3710,24 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
   const toggle = (label,key) => html`
     <div className="flex items-center justify-between">
       <span className="text-[12.5px] text-zinc-700 dark:text-zinc-300">${label}</span>
-      <button onClick=${()=>set(key,!form[key])} className=${`w-10 h-5 rounded-full relative transition ${form[key]?'bg-[#7c5cff]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+      <button onClick=${()=>set(key,!form[key])} className=${`w-10 h-5 rounded-full relative transition ${form[key]?'bg-[#e8b04b]':'bg-zinc-300 dark:bg-zinc-700'}`}>
         <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${form[key]?'left-[22px]':'left-[2px]'}`}></span>
       </button>
     </div>`;
 
   return html`
-  <div className="fixed inset-0 z-[500] bg-black/60 flex items-center justify-center p-4" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#181b2a] w-full max-w-[720px] rounded-[20px] shadow-2xl p-6 max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
+  <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-full max-w-[720px] rounded-[20px] p-6 max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
       <div className="flex items-center justify-between mb-4">
         <div className="font-[700] text-[16px]">${isNew?'Add Product':'Edit Product'}</div>
-        <button onClick=${onClose}><${I} name="X" size=${18}/></button>
+        <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${18}/></button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         ${field('Product Name','name')}
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Category</div>
-          <select value=${form.category_id} onChange=${e=>set('category_id',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]">
-            ${categories.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
-          </select>
+          <${CustomSelect} value=${form.category_id} onChange=${v=>set('category_id',v)} options=${categories.map(c=>({label:c.name,value:c.id}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
         </div>
         ${field('Logo URL','logo_url')}
         ${field('Banner Image URL','banner_url')}
@@ -3723,12 +3738,7 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
         ${field('Display Order','display_order','number')}
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Status</div>
-          <select value=${form.status} onChange=${e=>set('status',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]">
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="hidden">Hidden</option>
-          </select>
+          <${CustomSelect} value=${form.status} onChange=${v=>set('status',v)} options=${[{label:'Draft',value:'draft'},{label:'Published',value:'published'},{label:'Scheduled',value:'scheduled'},{label:'Hidden',value:'hidden'}]} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none text-[12.5px]"/>
         </div>
       </div>
 
@@ -3766,7 +3776,7 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
 
       <div className="flex gap-2">
         <button onClick=${onClose} className="flex-1 py-[10px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[13px] font-[600]">Cancel</button>
-        <button onClick=${save} disabled=${saving} className="flex-1 py-[10px] rounded-xl bg-[#7c5cff] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':(isNew?'Create Product':'Save Changes')}</button>
+        <button onClick=${save} disabled=${saving} className="flex-1 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':(isNew?'Create Product':'Save Changes')}</button>
       </div>
     </div>
   </div>`;
