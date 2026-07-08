@@ -208,7 +208,11 @@ If the user asks something unrelated to content creation — general coding help
 --- HARD ANTI-HALLUCINATION RULES (highest priority, never break these) ---
 1. NEVER invent facts, statistics, names, dates, URLs, or sources. If you don't know something, say "I'm not certain about that" or "I don't have reliable information on this" instead of guessing.
 2. NEVER invent a URL or source link. Only cite a URL if it was explicitly given to you in this conversation (e.g. in search results below). A plausible-looking made-up link is worse than no link — never do it.
-3. If asked about current platform trends, algorithm changes, or anything time-sensitive and no live search results are provided to you below, say plainly: "I don't have live web access for this right now — here's what I know as of my training, which may be outdated," then answer with that caveat. Do not pretend to have searched.
+3. If asked about current platform trends, algorithm changes, or anything time-sensitive:
+   - If live search results ARE provided below, you DO have real-time web access for this turn — use them, cite the URLs, and never claim you can't search.
+   - If NO search results are provided below AND you were told search failed or returned nothing, say plainly: "I tried to search but couldn't retrieve results just now — here's what I know as of training, which may be outdated."
+   - If NO search results are provided below AND you were not told a search was attempted, say plainly: "Web search is off for this message — here's what I know as of my training, which may be outdated. Turn on Search if you'd like me to check current sources."
+   Never say "I can't search" or "I don't have web access" as a blanket statement when search was actually enabled and attempted for this message — check what you were actually told below before choosing which of the three cases applies.
 4. Match your confidence language to your actual certainty: state something plainly only when you're confident it's correct; say "I think" / "likely" when inferring; say "I'm not sure, but" when genuinely uncertain — especially about algorithm behavior, which changes often and you can't verify live.
 5. If you are told an image was attached but no image content was actually provided to you, or image analysis failed, say plainly that you could not analyze the image — never invent a description of colors, objects, text, or content you did not actually receive.
 
@@ -319,13 +323,15 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
   } catch(e){ debugInfo = 'network error: '+e.message; console.error('Zedith AI network error:', e); }
 
   // Honest fallback: never pretend to have analyzed an image or fabricate unrelated
-  // "creator draft" content as if it answered the question. Say plainly what failed.
-  const modeLabel = wantsSmart ? 'Smart (deep reasoning) models' : 'standard models';
+  // "creator draft" content as if it answered the question. Say plainly what failed,
+  // in plain non-technical language — raw error/debug JSON never goes in the
+  // user-facing message; it's only kept in the browser console for developers.
+  console.error('Zedith AI fallback triggered — debug info:', debugInfo);
   const text = hasImage
-    ? `⚠️ I couldn't analyze your image right now — all ${pool.length} available AI models are temporarily unavailable (rate limits/capacity).\n\nI'm not going to guess what's in the image, since I haven't actually seen it. Please try again in about 60 seconds, or enable Smart mode which sometimes has separate capacity.\n\nDebug info: ${debugInfo}`
-    : `⚠️ Zedith AI is at capacity right now — all ${pool.length} ${modeLabel} failed, so this response did NOT get real reasoning applied.\n\nDebug info: ${debugInfo}\n\nTip: try again in 60s. I'd rather tell you this failed than give you a fake or unrelated answer.`;
+    ? `Hmm, I'm having trouble seeing your image right now — maybe the image upload isn't going through properly on my end at the moment. I don't want to guess what's in it and give you off-base feedback, so mind giving it another try in a bit? If it keeps happening, re-uploading the image or trying a slightly smaller file sometimes helps.`
+    : `I'm having trouble putting together a response right now — our AI service is temporarily at capacity. I'd rather tell you this honestly than guess or make something up. Please try again in about a minute.`;
 
-  return { text, model:'offline-fallback', tried: pool.length, error:true };
+  return { text, model:'offline-fallback', tried: pool.length, error:true, debugInfo };
 }
 
 async function realWebSearch(query){
@@ -733,9 +739,22 @@ function App(){
     if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
 
     const lower=(text||'').toLowerCase();
-    const wantsImage = /(\/image|generate image|create image|make.*image|draw |thumbnail|picture of|image of|imagine )/.test(lower);
+    // Only trigger image GENERATION on explicit generation commands.
+    // Previously the word "thumbnail" alone triggered this, so analysis
+    // questions like "rate this thumbnail" or "explain my thumbnail CTR"
+    // were hijacked into generating a picture instead of answering.
+    const wantsImage = /^\s*\/image\b/.test(lower)
+      || /\b(generate|create|make|draw)\s+(me\s+)?(an?\s+)?(new\s+)?(image|picture|thumbnail|art|illustration|photo)\b/.test(lower)
+      || /\b(image|picture|thumbnail)\s+of\b/.test(lower)
+      || /\bimagine\s+(a|an|the)\b/.test(lower);
 
-    if(wantsImage && !attachment){
+    // A question is never a generation request, even if it contains
+    // "image" or "thumbnail" — and an attached image is clearly meant
+    // for analysis, not generation.
+    const looksLikeQuestion = /\?/.test(text||'')
+      || /^(what|why|how|is|does|can|should|explain|analyze|analyse|rate|review|tell me|list|rank|does this|can you (tell|explain|analyze|rate|review))\b/i.test((text||'').trim());
+
+    if(wantsImage && !attachment && !looksLikeQuestion){
       const cost = estimateCreditCost({text, feature:'image_gen', smart, creditCosts});
       const ok = await deductCredits(cost, 'image_gen', {prompt:text});
       if(!ok){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
@@ -791,9 +810,19 @@ function App(){
     let searchSucceeded = false;
     let searchFailedNote = '';
     if(webSearch && text && text.trim()){
-      const {results, error:searchErr} = await realWebSearch(text);
-      if(results.length){ searchContext = buildSearchContextBlock(results); searchSucceeded = true; }
-      else if(searchErr){ console.error('web search failed:', searchErr); searchFailedNote = '\n\nNote: live web search was attempted but failed or returned no results. Do NOT claim to have searched — tell the user you couldn\'t retrieve current web results and answer from general knowledge with that caveat.'; }
+      // Use the raw query first; Tavily handles natural language fine, but very
+      // long conversational messages can dilute relevance, so cap what we send.
+      const searchQuery = text.trim().length > 300 ? text.trim().slice(0, 300) : text.trim();
+      const {results, error:searchErr} = await realWebSearch(searchQuery);
+      if(results.length){
+        searchContext = buildSearchContextBlock(results);
+        searchSucceeded = true;
+      } else {
+        // Whether it errored or just returned zero hits, tell the model a
+        // search WAS attempted so it never falsely claims "I can't search".
+        console.error('web search returned no usable results:', searchErr || 'empty result set');
+        searchFailedNote = '\n\nNote: a live web search WAS attempted for this message but it failed or returned no usable results. Do not claim search is unavailable or off — it was on. Tell the user the search didn\'t turn up current results and answer from general knowledge with that caveat.';
+      }
     }
     const effectiveSmart = smart || looksLikeHardReasoning(text);
     const sys = buildSystemPrompt({webSearch: searchSucceeded, smart: effectiveSmart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
@@ -1150,6 +1179,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const [webSearch,setWebSearch]=useState(settings?.webSearch ?? true);
   const [attached,setAttached]=useState(null);
   const [loading,setLoading]=useState(false);
+  const [loadingHasImage,setLoadingHasImage]=useState(false);
   const [listening,setListening]=useState(false);
   const recogRef=useRef(null);
   const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
@@ -1181,8 +1211,9 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     if(loading) return;
     setLoading(true); setInput('');
     const att=attached; setAttached(null);
+    setLoadingHasImage(!!att && att.type==='image');
     try{ await onSend({text, attachment:att, smart, webSearch, modelPref:'auto'}); }
-    finally{ setLoading(false); }
+    finally{ setLoading(false); setLoadingHasImage(false); }
   };
 
   const pickFile = (e)=>{
@@ -1295,7 +1326,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
               `}
             </div>
           `)}
-          ${loading ? html`<div className="text-[12.5px] text-zinc-500 flex items-center gap-2"><${I} name="Loader2" size=${14} className="animate-spin"/> Zedith is thinking${smart?' deeply':''}…</div>`:null}
+          ${loading ? html`<div className="text-[12.5px] text-zinc-500 flex items-center gap-2"><${I} name="Loader2" size=${14} className="animate-spin"/> ${loadingHasImage ? 'Zedith is analyzing your image…' : `Zedith is thinking${smart?' deeply':''}…`}</div>`:null}
         </div>
       `}
     </div>

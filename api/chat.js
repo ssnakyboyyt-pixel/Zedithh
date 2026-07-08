@@ -155,7 +155,8 @@ function toGeminiContents(messages) {
 async function tryGemini(messages, temperature, max_tokens, failures) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+  // gemini-1.5-flash is deprecated/404s on v1beta now — use current model names.
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest'];
   const systemMsg = messages.find(m => m.role === 'system');
   const contents = toGeminiContents(messages);
   for (const model of models) {
@@ -197,7 +198,14 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
 async function tryOpenRouter(messages, temperature, max_tokens, models, failures, needsVision) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return null;
-  const visionModels = ['meta-llama/llama-4-maverick:free', 'meta-llama/llama-4-scout:free', 'google/gemma-3-27b-it:free'];
+  const visionModels = [
+    'meta-llama/llama-4-maverick:free',
+    'meta-llama/llama-4-scout:free',
+    'google/gemma-3-27b-it:free',
+    'google/gemini-2.0-flash-exp:free',
+    'qwen/qwen2.5-vl-32b-instruct:free',
+    'mistralai/mistral-small-3.2-24b-instruct:free',
+  ];
   const textModels = ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'];
   const pool = needsVision
     ? visionModels
