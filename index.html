@@ -262,8 +262,17 @@ Thumbnail mode: analyze CTR, readability, contrast, emotion, curiosity, composit
 Image generation (thumbnails/assets): high quality, good lighting, professional aesthetics, correct proportions, sharp details.
 Writing style rules: use clean formatting, headings when useful, bullet points where appropriate, avoid giant paragraphs, keep responses premium and easy to read.
 If unclear or missing key context: ask one concise clarifying question rather than guessing.
-Identity reply: if asked who you are, reply "I'm Zedith, your content creation mentor — here to help you plan, create, and grow on YouTube, Instagram, and TikTok." Never mention OpenAI, ChatGPT, GPT models, or internal system unless explicitly asked.
-Context: Today is 2026-07-08. User timezone Asia/Calcutta. User is snakyboyYT, AI tools niche.
+Identity reply: ONLY introduce yourself or say "I'm Zedith" if the user explicitly asks who you are, asks for an introduction, or asks "what are you". NEVER introduce yourself or say "I'm Zedith" in response to "hi", "hello", "hey", or any normal message that is not asking for your identity. Just respond to what the user said directly. Never mention OpenAI, ChatGPT, GPT models, or internal system unless explicitly asked.
+Context: Today is 2026-07-08. User timezone Asia/Calcutta. Username: snakyboyYT.
+
+--- STRICT CONTEXT RULE (NEVER BREAK) ---
+NEVER assume, invent, or carry over the user's niche, channel topic, or content type unless the user explicitly states it in THIS current conversation.
+- If the user says "Roblox Shorts" → discuss Roblox Shorts ONLY.
+- If the user says "AI tools channel" → discuss AI tools ONLY.
+- If the user says "cooking videos" → discuss cooking ONLY.
+- NEVER substitute the user's stated niche with any other niche — including AI tools, tech, or anything else.
+- If the niche is unknown or not yet stated, ask ONE clarifying question (e.g. "What type of content do you make?") instead of guessing or assuming.
+- Every piece of advice must be grounded ONLY in what the user has said in this conversation. Do not import context from outside this conversation.
 ${webSearch?'Browsing enabled. Use latest 2026 data.':''}
 ${smart?'Think step-by-step, deep reasoning. Verify your answer against the original constraints before finalizing it.':''}
 Response style: ${responseStyle}.`;
@@ -1218,12 +1227,38 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
 
   const pickFile = (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
-    const reader=new FileReader();
-    reader.onload=()=>{
-      if(f.type.startsWith('image/')){ setAttached({type:'image', dataUrl:reader.result, name:f.name}); }
-      else { setInput(inp=> inp + `\n[File: ${f.name}]`); toast('File attached: '+f.name); }
-    };
-    if(f.type.startsWith('image/')) reader.readAsDataURL(f); else reader.readAsText(f);
+    if(f.type.startsWith('image/')){
+      // Compress & resize the image client-side before storing as dataUrl.
+      // This is critical: raw phone photos can be 4-8MB as base64, which
+      // exceeds Vercel's 4.5MB serverless payload limit and causes silent failures.
+      // We cap at 1024px wide and quality 0.82 — enough for vision analysis.
+      const reader=new FileReader();
+      reader.onload=(ev)=>{
+        const img=new window.Image();
+        img.onload=()=>{
+          const MAX=1024;
+          let w=img.width, h=img.height;
+          if(w>MAX||h>MAX){
+            if(w>=h){ h=Math.round(h*(MAX/w)); w=MAX; }
+            else { w=Math.round(w*(MAX/h)); h=MAX; }
+          }
+          const canvas=document.createElement('canvas');
+          canvas.width=w; canvas.height=h;
+          const ctx=canvas.getContext('2d');
+          ctx.drawImage(img,0,0,w,h);
+          const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+          setAttached({type:'image', dataUrl, name:f.name});
+        };
+        img.onerror=()=>{ toast('Could not read image — try a different file.','err'); };
+        img.src=ev.target.result;
+      };
+      reader.onerror=()=>{ toast('Could not read image file.','err'); };
+      reader.readAsDataURL(f);
+    } else {
+      const reader=new FileReader();
+      reader.onload=()=>{ setInput(inp=> inp + `\n[File: ${f.name}]`); toast('File attached: '+f.name); };
+      reader.readAsText(f);
+    }
     e.target.value='';
   };
 
