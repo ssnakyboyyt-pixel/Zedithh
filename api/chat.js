@@ -75,7 +75,7 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
       });
       if (!r.ok) {
         let bodyText = '';
-        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        try { bodyText = (await r.text()).slice(0, 300); } catch (_) {}
         failures.push(`groq/${model}: HTTP ${r.status} ${bodyText}`);
         continue;
       }
@@ -109,7 +109,7 @@ async function tryCerebras(messages, temperature, max_tokens, failures) {
       });
       if (!r.ok) {
         let bodyText = '';
-        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        try { bodyText = (await r.text()).slice(0, 300); } catch (_) {}
         failures.push(`cerebras/${model}: HTTP ${r.status} ${bodyText}`);
         continue;
       }
@@ -179,7 +179,7 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
       });
       if (!r.ok) {
         let bodyText = '';
-        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        try { bodyText = (await r.text()).slice(0, 300); } catch (_) {}
         failures.push(`gemini/${model}: HTTP ${r.status} ${bodyText}`);
         continue;
       }
@@ -201,11 +201,10 @@ async function tryOpenRouter(messages, temperature, max_tokens, models, failures
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) { failures.push('openrouter: no OPENROUTER_API_KEY set on server'); return null; }
   const visionModels = [
-    'meta-llama/llama-4-maverick:free',
-    'meta-llama/llama-4-scout:free',
-    'google/gemma-3-27b-it:free',
-    'google/gemini-2.0-flash-exp:free',
-    'qwen/qwen2.5-vl-32b-instruct:free',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'nvidia/nemotron-nano-12b-v2-vl:free',
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
     'mistralai/mistral-small-3.2-24b-instruct:free',
   ];
   const textModels = ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'];
@@ -226,7 +225,7 @@ async function tryOpenRouter(messages, temperature, max_tokens, models, failures
       });
       if (!r.ok) {
         let bodyText = '';
-        try { bodyText = (await r.text()).slice(0, 200); } catch (_) {}
+        try { bodyText = (await r.text()).slice(0, 300); } catch (_) {}
         failures.push(`openrouter/${model}: HTTP ${r.status} ${bodyText}`);
         continue;
       }
@@ -277,7 +276,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     text: null,
-    error: failures.join(' | ').slice(0, 800),
+    error: failures.join(' | ').slice(0, 1500),
     tried: failures.length,
   });
 }
