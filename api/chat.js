@@ -59,7 +59,7 @@ async function fetchWithRetry(url, options, ms = 15000) {
 // ---------- Groq (OpenAI-compatible, but the free text models have NO vision support) ----------
 async function tryGroq(messages, temperature, max_tokens, failures) {
   const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
+  if (!key) { failures.push('groq: no GROQ_API_KEY set on server'); return null; }
   if (hasImage(messages)) {
     failures.push('groq: skipped (free Groq models here do not support image input)');
     return null;
@@ -93,7 +93,7 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
 // ---------- Cerebras (OpenAI-compatible, no card needed, 1M free tokens/day) ----------
 async function tryCerebras(messages, temperature, max_tokens, failures) {
   const key = process.env.CEREBRAS_API_KEY;
-  if (!key) return null;
+  if (!key) { failures.push('cerebras: no CEREBRAS_API_KEY set on server'); return null; }
   if (hasImage(messages)) {
     failures.push('cerebras: skipped (no vision support on free-tier models)');
     return null;
@@ -154,7 +154,7 @@ function toGeminiContents(messages) {
 
 async function tryGemini(messages, temperature, max_tokens, failures) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
+  if (!key) { failures.push('gemini: no GEMINI_API_KEY set on server'); return null; }
   // gemini-1.5-flash is deprecated/404s on v1beta now — use current model names.
   const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest'];
   const systemMsg = messages.find(m => m.role === 'system');
@@ -186,7 +186,9 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
       const data = await r.json();
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('');
       if (text && text.trim()) return { text: text.trim(), model: `gemini/${model}` };
-      failures.push(`gemini/${model}: empty response`);
+      const blockReason = data?.promptFeedback?.blockReason;
+      const finishReason = data?.candidates?.[0]?.finishReason;
+      failures.push(`gemini/${model}: empty response${blockReason ? ` (blocked: ${blockReason})` : ''}${finishReason ? ` (finish: ${finishReason})` : ''}`);
     } catch (e) {
       failures.push(`gemini/${model}: ${e.message}`);
     }
@@ -197,7 +199,7 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
 // ---------- OpenRouter (OpenAI-compatible; vision models accept the array-content shape as-is) ----------
 async function tryOpenRouter(messages, temperature, max_tokens, models, failures, needsVision) {
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
+  if (!key) { failures.push('openrouter: no OPENROUTER_API_KEY set on server'); return null; }
   const visionModels = [
     'meta-llama/llama-4-maverick:free',
     'meta-llama/llama-4-scout:free',
