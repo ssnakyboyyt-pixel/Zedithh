@@ -151,6 +151,39 @@ function PromptDialog({title, placeholder='', onSubmit, onClose}){
   `;
 }
 
+// Bottom-sheet source list, styled after Gemini/Perplexity-style "Sources" panels:
+// a drag handle, "Sources" header, then each result as favicon + domain + bold
+// title + snippet + date. Real data only — favicon comes from the actual domain,
+// title/snippet/date come straight from the search result, nothing invented.
+function SourcesSheet({sources, onClose}){
+  const domainOf = (url)=>{ try{ return new URL(url).hostname.replace('www.',''); }catch{ return url; } };
+  const faviconOf = (url)=>{ try{ return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`; }catch{ return null; } };
+  return html`
+    <div className="fixed inset-0 z-[500] bg-black/50 flex items-end sm:items-center sm:justify-center overlay-in" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full sm:max-w-[480px] sm:rounded-[20px] rounded-t-[20px] max-h-[82vh] flex flex-col">
+        <div className="flex justify-center pt-2.5 pb-1 sm:hidden"><div className="w-9 h-[4px] rounded-full bg-zinc-300 dark:bg-zinc-700"></div></div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100 dark:border-zinc-800">
+          <div className="font-[700] text-[15px]">Sources</div>
+          <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
+        </div>
+        <div className="overflow-y-auto flex-1 divide-y divide-zinc-100 dark:divide-zinc-800">
+          ${sources.map((s,i)=>html`
+            <a key=${i} href=${s.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-4 hover:bg-zinc-50 dark:hover:bg-[#171a2a] transition-colors no-underline">
+              <div className="flex items-center gap-2 mb-1.5">
+                ${faviconOf(s.url) ? html`<img src=${faviconOf(s.url)} className="w-4 h-4 rounded-sm" onError=${e=>{e.target.style.display='none';}}/>` : null}
+                <span className="text-[12px] text-zinc-500">${domainOf(s.url)}</span>
+              </div>
+              <div className="font-[700] text-[15px] text-zinc-900 dark:text-zinc-100 leading-snug mb-1">${s.title||domainOf(s.url)}</div>
+              ${s.snippet ? html`<div className="text-[13px] text-zinc-500 leading-snug line-clamp-2">${s.snippet}</div>` : null}
+              ${s.date ? html`<div className="text-[11.5px] text-zinc-400 mt-1.5">${s.date}</div>` : null}
+            </a>
+          `)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function CustomSelect({value, onChange, options, className='', panelClassName='', align='right'}){
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
@@ -239,10 +272,11 @@ If the user asks something unrelated to content creation — general coding help
 1. NEVER invent facts, statistics, names, dates, URLs, or sources. If you don't know something, say "I'm not certain about that" or "I don't have reliable information on this" instead of guessing.
 2. NEVER invent a URL or source link. Only cite a URL if it was explicitly given to you in this conversation (e.g. in search results below). A plausible-looking made-up link is worse than no link — never do it.
 3. If asked about current platform trends, algorithm changes, or anything time-sensitive:
-   - If live search results ARE provided below, you DO have real-time web access for this turn — use them, cite the URLs, and never claim you can't search.
+   - If live search results ARE provided below, you DO have real-time web access for this turn — use them, cite the URLs, and never claim you can't search or couldn't retrieve results. Summarize what you found confidently; don't hedge with "I couldn't find reliable information" when results are clearly present below.
    - If NO search results are provided below AND you were told search failed or returned nothing, say plainly: "I tried to search but couldn't retrieve results just now — here's what I know as of training, which may be outdated."
    - If NO search results are provided below AND you were not told a search was attempted, say plainly: "Web search is off for this message — here's what I know as of my training, which may be outdated. Turn on Search if you'd like me to check current sources."
    Never say "I can't search" or "I don't have web access" as a blanket statement when search was actually enabled and attempted for this message — check what you were actually told below before choosing which of the three cases applies.
+   When results ARE provided: prioritize official sources (official blogs, documentation, company announcements) over secondary sources, use secondary sources only to fill gaps official sources don't cover, and don't cite the same source twice. If results are incomplete or conflict with each other, say plainly what's confirmed vs uncertain and why, rather than picking one silently. Only say you found nothing reliable if that's genuinely true.
 4. Match your confidence language to your actual certainty: state something plainly only when you're confident it's correct; say "I think" / "likely" when inferring; say "I'm not sure, but" when genuinely uncertain — especially about algorithm behavior, which changes often and you can't verify live.
 5. If you are told an image was attached but no image content was actually provided to you, or image analysis failed, say plainly that you could not analyze the image — never invent a description of colors, objects, text, or content you did not actually receive.
 
@@ -254,7 +288,7 @@ Before giving a specific recommendation (strategy, format, upload schedule, mone
 
 Response quality: always provide complete answers, clear explanations, logical structure, actionable advice, practical examples. Never intentionally shorten useful answers. Never pad responses with unnecessary text.
 
-Image understanding: ${hasImage ? 'An image was attached to this conversation (likely a thumbnail or content asset). Analyze it carefully and describe only what is actually visible — do not guess at details you cannot clearly see. Read visible text exactly as written. Never identify unknown real people. Give your OWN direct analysis and score — never suggest external websites, apps, or third-party tools (like logo-review sites or ranking tools) for further analysis; you are the analysis.' : 'No image was successfully provided in this turn — do not describe or reference any image content.'}
+Image understanding: ${hasImage ? 'An image was attached to this conversation (likely a thumbnail, logo, banner, or content asset). Analyze it carefully and describe only what is actually visible — do not guess at details you cannot clearly see, and do not assume the creator\'s niche, goals, or audience unless the user explicitly stated it in this conversation. Read visible text exactly as written. Never identify unknown real people. Give specific, evidence-based feedback on composition, readability, visual hierarchy, branding, color contrast, spacing, and balance — every point must reference something actually visible in the image, not a generic tip like "use better colors" unless you tie it to what you see. If something can\'t be determined from the image, say so plainly ("Based on what I can see...") instead of guessing. Give your OWN direct analysis and score — never suggest external websites, apps, or third-party tools for further analysis; you are the analysis.' : 'No image was successfully provided in this turn — do not describe or reference any image content.'}
 
 Voice: support speech understanding, speech generation, natural conversations. Maintain context throughout the conversation.
 
@@ -1000,7 +1034,7 @@ function App(){
       if(results.length){
         searchContext = buildSearchContextBlock(results);
         searchSucceeded = true;
-        searchSources = results.map(r=>({title:r.title, url:r.url}));
+        searchSources = results.map(r=>({title:r.title, url:r.url, snippet:r.snippet||'', date:r.published_date||r.date||null}));
       } else {
         // Whether it errored or just returned zero hits, tell the model a
         // search WAS attempted so it never falsely claims "I can't search".
@@ -1374,6 +1408,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const [loading,setLoading]=useState(false);
   const [loadingHasImage,setLoadingHasImage]=useState(false);
   const [listening,setListening]=useState(false);
+  const [sourcesFor,setSourcesFor]=useState(null); // message id whose Sources sheet is open
   const recogRef=useRef(null);
   const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
 
@@ -1534,15 +1569,15 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                     <${MarkdownText} text=${m.text} className="text-zinc-800 dark:text-zinc-100"/>
                   `}
                   ${m.sources && m.sources.length ? html`
-                    <div className="flex flex-wrap gap-[6px] mt-[10px]">
-                      ${m.sources.map((s,si)=> html`
-                        <a key=${si} href=${s.url} target="_blank" rel="noopener noreferrer"
-                           className="flex items-center gap-[5px] max-w-[220px] bg-zinc-100 dark:bg-[#20233a] hover:bg-zinc-200 dark:hover:bg-[#282c47] border border-zinc-200 dark:border-zinc-700 rounded-full px-[10px] py-[5px] text-[11px] text-zinc-600 dark:text-zinc-300 transition no-underline">
-                          <${I} name="Globe" size=${11} className="shrink-0 text-[#7c5cff]"/>
-                          <span className="truncate">${(()=>{ try{ return new URL(s.url).hostname.replace('www.',''); }catch{ return s.title||s.url; } })()}</span>
-                        </a>
-                      `)}
-                    </div>
+                    <button onClick=${()=>setSourcesFor(m.id)} className="flex items-center gap-2 mt-[10px] px-1 py-1 rounded-full hover:bg-zinc-100 dark:hover:bg-[#20233a] transition-colors">
+                      <div className="flex -space-x-[6px]">
+                        ${m.sources.slice(0,3).map((s,si)=>{
+                          let favicon=null; try{ favicon = `https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=64`; }catch{}
+                          return favicon ? html`<img key=${si} src=${favicon} className="w-5 h-5 rounded-full border-2 border-white dark:border-[#0f111a] bg-white"/>` : html`<span key=${si} className="w-5 h-5 rounded-full border-2 border-white dark:border-[#0f111a] bg-zinc-200 dark:bg-zinc-700 inline-block"></span>`;
+                        })}
+                      </div>
+                      <span className="text-[12px] font-[550] text-zinc-600 dark:text-zinc-300">Sources</span>
+                    </button>
                   `:null}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
@@ -1622,6 +1657,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
         <span>🔒 Secure</span>
       </div>
     </div>
+    ${sourcesFor ? html`<${SourcesSheet} sources=${(messages.find(m=>m.id===sourcesFor)?.sources)||[]} onClose=${()=>setSourcesFor(null)}/>` : null}
   </div>`;
 }
 
