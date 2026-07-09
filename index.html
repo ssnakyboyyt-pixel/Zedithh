@@ -314,6 +314,8 @@ When real channel data is provided below, always use it exactly as given — nev
 - Example — User: "How many subscribers do I have?" → Good: "You currently have 6 subscribers." Example — User: "How many views do I have?" → Good: "You currently have 404 total channel views." Never answer a views question with the subscriber number or vice versa.
 - If the requested metric isn't in the data provided, say plainly: "I don't currently have access to that metric." Never make one up.
 - When asked generally about channel performance, don't return just one number — summarize: Subscribers, Total Views, Watch Time, Net 28-day growth, and the biggest opportunity area, using only real values you actually have.
+- The channel data block below contains many metrics for context — you are NOT required to mention all of them in every reply. Only cite a specific number (average view duration, engagement rate, health score, etc.) if the user actually asked about it, if it's directly necessary to answer their question, or if you're explicitly giving a full performance summary. Do not pad an unrelated answer (e.g. "how do I improve X") by asserting a specific stat as fact unless it's genuinely relevant and you state it as data, not filler.
+- If you reference a stat the user didn't ask for as supporting evidence (e.g. explaining why watch time is low), make clear it's real data you have — don't state it so casually it reads as a guess, and don't invent precision beyond what was given (the data gives you a computed estimate like avg view duration — say "roughly" / "about", not to the exact second, since it's derived from views and watch time, not measured directly per view).
 
 --- THUMBNAIL/IMAGE SCORING FORMAT ---
 When rating a thumbnail, always structure the reply with these sections: Overall Score, CTR Potential, Would I Click?, Strengths, Weaknesses, Actionable Improvements, Expected Performance. Ground every point in what's actually visible (text size/readability, color contrast, emotional impact, focal point, curiosity, mobile visibility, visual hierarchy) — never a generic line like "the colors are eye-catching" without explaining why it works (e.g. "the blue title contrasts well against the sky, making it readable even on mobile"). Every improvement must say exactly what to change (e.g. "increase the '500 Coins' text ~20% so it stays readable on smaller screens"), not just "improve the thumbnail."
@@ -410,7 +412,8 @@ function buildChannelContextBlock(insights){
   lines.push(`LIKES (last 28 days): ${i.likes}`);
   lines.push(`COMMENTS (last 28 days): ${i.comments}`);
   lines.push(`These are six separate metrics — never answer a question about one using the number from another.`);
-  lines.push(`Average view duration: ~${i.avgViewDurationSec}s. Engagement rate (likes+comments+shares / views): ${i.engagementRate}%.`);
+  lines.push(`Average view duration (ESTIMATED — computed as watch time ÷ views, not a directly measured per-video metric): ~${i.avgViewDurationSec}s. Only mention this if relevant or asked; phrase it as an estimate ("roughly ~Xs"), not an exact fact.`);
+  lines.push(`Engagement rate (likes+comments+shares / views): ${i.engagementRate}%.`);
   lines.push(`Views trend vs first half of period: ${i.viewsTrendPct>=0?'+':''}${i.viewsTrendPct}%.`);
   if(i.uploadGapEstimate!=null) lines.push(`Estimated upload gap: roughly every ${i.uploadGapEstimate} day(s), based on ${i.activeDays} active days out of ${i.totalDays}.`);
   if(i.bestVideo) lines.push(`Top performing video: "${i.bestVideo.title}" — ${i.bestVideo.views} views, ${i.bestVideo.likes} likes, ${i.bestVideo.comments} comments.`);
