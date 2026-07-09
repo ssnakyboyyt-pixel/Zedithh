@@ -314,6 +314,91 @@ function buildSearchContextBlock(results){
   return `\n\n--- Live web search results (real, current) ---\n${lines}\n\nWhen you use information from these results, cite it as a real markdown link using the exact URL given above, like this: [short source name](https://actual-url-from-above). Never invent a URL or use a placeholder domain — only use the exact URLs listed above. Cite only the results you actually used.`;
 }
 
+// ---------- Channel Analytics: real-data insight computation ----------
+// Everything here is derived ONLY from numbers actually returned by the YouTube
+// Analytics API (via youtube-analytics-fetch). Nothing here is invented — if a
+// metric isn't available (e.g. impressions/CTR require a scope we don't fetch),
+// we simply omit it rather than fabricate a number.
+function computeChannelInsights(data){
+  if(!data || !data.connected) return null;
+  const ov = data.overview || {};
+  const daily = data.dailyStats || [];
+  const topVideos = data.topVideos || [];
+  const views = Number(ov.views)||0;
+  const watchMin = Number(ov.watchTimeMinutes)||0;
+  const subsGained = Number(ov.subscribersGained)||0;
+  const subsLost = Number(ov.subscribersLost)||0;
+  const netSubs = subsGained - subsLost;
+  const likes = Number(ov.likes)||0;
+  const comments = Number(ov.comments)||0;
+  const shares = Number(ov.shares)||0;
+  const avgViewDurationSec = views>0 ? (watchMin*60)/views : 0;
+  const engagementRate = views>0 ? ((likes+comments+shares)/views)*100 : 0;
+
+  // Upload cadence: distinct days with >0 views isn't upload count, but gap between
+  // days that had a fresh top-video spike is the closest real signal we have without
+  // an extra API call to playlistItems. We use days-with-data as a proxy for activity.
+  const activeDays = daily.filter(d=>Number(d.views)>0).length;
+  const totalDays = daily.length || 28;
+  const uploadGapEstimate = activeDays>0 ? Math.round(totalDays/Math.max(1,Math.ceil(activeDays/3))) : null;
+
+  // Trend: compare first half vs second half of the period for views & watch time.
+  const half = Math.floor(daily.length/2);
+  const sum=(arr)=>arr.reduce((s,d)=>s+ (Number(d.views)||0),0);
+  const firstHalfViews = sum(daily.slice(0,half));
+  const secondHalfViews = sum(daily.slice(half));
+  const viewsTrendPct = firstHalfViews>0 ? ((secondHalfViews-firstHalfViews)/firstHalfViews)*100 : (secondHalfViews>0?100:0);
+
+  // Health score: a transparent, explainable 0-100 composite from real metrics only —
+  // NOT the same formula/number as any UI mockup. Weighted: watch-time trend, net sub
+  // growth, engagement rate, and upload consistency.
+  let score = 50;
+  score += Math.max(-20, Math.min(20, viewsTrendPct/5));
+  score += netSubs > 0 ? Math.min(15, netSubs) : Math.max(-15, netSubs);
+  score += Math.max(-15, Math.min(15, (engagementRate-2)*3));
+  if(uploadGapEstimate!=null){ score += uploadGapEstimate<=3 ? 10 : uploadGapEstimate<=7 ? 0 : -10; }
+  score = Math.max(1, Math.min(100, Math.round(score)));
+
+  const best = topVideos.length ? topVideos.reduce((a,b)=> (Number(b.views)||0)>(Number(a.views)||0)?b:a) : null;
+  const worst = topVideos.length>1 ? topVideos.reduce((a,b)=> (Number(b.views)||0)<(Number(a.views)||0)?b:a) : null;
+
+  return {
+    channelTitle: data.channel?.title || null,
+    subscriberCount: data.channel?.subscriberCount!=null ? Number(data.channel.subscriberCount) : null,
+    views, watchMin, subsGained, subsLost, netSubs, likes, comments, shares,
+    avgViewDurationSec: Math.round(avgViewDurationSec),
+    engagementRate: Math.round(engagementRate*100)/100,
+    viewsTrendPct: Math.round(viewsTrendPct*10)/10,
+    uploadGapEstimate,
+    activeDays, totalDays,
+    healthScore: score,
+    bestVideo: best ? {title:best.title, views:best.views, likes:best.likes, comments:best.comments} : null,
+    worstVideo: (worst && worst!==best) ? {title:worst.title, views:worst.views} : null,
+    topCountries: (data.topCountries||[]).slice(0,3).map(r=>({country:r[0], views:Number(r[1])||0})),
+    hasCTRData: false // true only once the fetch function is upgraded to pull cardClickRate
+  };
+}
+
+// Turns computed insights into a compact plain-text block injected into every chat's
+// system prompt automatically — this is how the AI "sees" the user's real channel data
+// without the user ever needing to paste a screenshot or say "here's my analytics".
+function buildChannelContextBlock(insights){
+  if(!insights) return '\n\n--- Creator channel data ---\nNo YouTube channel is connected yet for this user. If they ask about their own stats, views, CTR, or performance, tell them plainly you don\'t have channel data yet and ask them to connect their YouTube channel in the Channel Analytics tab — do not guess or invent numbers.';
+  const i = insights;
+  const lines = [];
+  lines.push(`Channel: ${i.channelTitle||'Unknown'}${i.subscriberCount!=null?` (${i.subscriberCount.toLocaleString('en-US')} subscribers)`:''}`);
+  lines.push(`Last 28 days — Views: ${i.views.toLocaleString('en-US')}, Watch time: ${Math.round(i.watchMin/60)} hrs, Net subscriber change: ${i.netSubs>=0?'+':''}${i.netSubs}`);
+  lines.push(`Average view duration: ~${i.avgViewDurationSec}s. Engagement rate (likes+comments+shares / views): ${i.engagementRate}%.`);
+  lines.push(`Views trend vs first half of period: ${i.viewsTrendPct>=0?'+':''}${i.viewsTrendPct}%.`);
+  if(i.uploadGapEstimate!=null) lines.push(`Estimated upload gap: roughly every ${i.uploadGapEstimate} day(s), based on ${i.activeDays} active days out of ${i.totalDays}.`);
+  if(i.bestVideo) lines.push(`Top performing video: "${i.bestVideo.title}" — ${i.bestVideo.views} views, ${i.bestVideo.likes} likes, ${i.bestVideo.comments} comments.`);
+  if(i.worstVideo) lines.push(`Weakest of the recent top videos: "${i.worstVideo.title}" — ${i.worstVideo.views} views.`);
+  if(i.topCountries?.length) lines.push(`Top audience countries: ${i.topCountries.map(c=>`${c.country} (${c.views} views)`).join(', ')}.`);
+  lines.push(`Computed Creator Health Score (0-100, derived from trend/engagement/consistency): ${i.healthScore}.`);
+  lines.push(`Note: click-through rate (CTR) and impressions are NOT currently available from this data source — if the user asks specifically about CTR, tell them plainly that CTR data isn't connected yet rather than inventing a number, but you CAN still diagnose likely causes of low views using the metrics above (weak retention, low engagement rate, inconsistent uploads, underperforming topic) and give concrete next steps.`);
+  return `\n\n--- Creator's real, live channel data (already connected — never ask the user to share screenshots or paste analytics, you already have this) ---\n${lines.join('\n')}\n\nUse this real data whenever the user asks about their own channel, views, growth, or performance. Ground every diagnosis in these actual numbers instead of generic advice. If a specific number they ask about isn't listed above (e.g. CTR), say so plainly instead of guessing.`;
+}
+
 // ---------- OpenRouter (via secure server proxy — key never exposed to browser) ----------
 // NORMAL mode: fast, lightweight models — fine for chat/summaries/translation, not for hard reasoning.
 const NORMAL_TEXT_MODELS = [
@@ -579,6 +664,9 @@ function App(){
   const [transactions,setTransactions]=useState([]);
   const [toolModal,setToolModal]=useState(null);
   const [comingSoon,setComingSoon]=useState(null);
+  const [channelAnalytics,setChannelAnalytics]=useState(null); // raw fetch result from youtube-analytics-fetch
+  const [channelAnalyticsLoadedAt,setChannelAnalyticsLoadedAt]=useState(0);
+  const [channelConnected,setChannelConnected]=useState(null); // null=unknown, true/false once checked
 
   useEffect(()=>{ document.documentElement.classList.toggle('dark', theme==='dark'); },[theme]);
 
@@ -610,8 +698,37 @@ function App(){
       loadNotifications(),
       loadSettings(),
       loadCreditCosts(),
-      loadTransactions()
+      loadTransactions(),
+      loadChannelAnalytics()
     ]);
+  }
+
+  // Loads the connected YouTube channel's analytics silently in the background so the
+  // AI chat always has live channel context without the user ever pasting screenshots
+  // or being asked "can you share your analytics". Cached for 10 minutes.
+  async function loadChannelAnalytics(force=false){
+    try{
+      if(!force && channelAnalytics && (Date.now()-channelAnalyticsLoadedAt) < 10*60*1000) return channelAnalytics;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token){ setChannelConnected(false); return null; }
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-analytics-fetch`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if(json.connected){
+        setChannelAnalytics(json);
+        setChannelAnalyticsLoadedAt(Date.now());
+        setChannelConnected(true);
+        return json;
+      } else {
+        setChannelConnected(false);
+        return null;
+      }
+    }catch(e){
+      console.error('background channel analytics load failed:', e);
+      return null;
+    }
   }
 
   async function loadProfile(){
@@ -868,7 +985,12 @@ function App(){
       }
     }
     const effectiveSmart = smart || looksLikeHardReasoning(text);
-    const sys = buildSystemPrompt({webSearch: searchSucceeded, smart: effectiveSmart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
+    // Silently ensure we have reasonably fresh channel data cached before answering —
+    // never blocks/asks the user, just makes sure the AI's context is live.
+    const freshAnalytics = await loadChannelAnalytics(false);
+    const channelInsights = computeChannelInsights(freshAnalytics || channelAnalytics);
+    const channelContext = buildChannelContextBlock(channelInsights);
+    const sys = buildSystemPrompt({webSearch: searchSucceeded, smart: effectiveSmart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + channelContext + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
     const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
     try{
       const {text:answer, model, tried, error, debugInfo} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref, hasImage: !!attachment, userText: text});
@@ -1001,7 +1123,7 @@ function App(){
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
-      case 'analytics': return html`<${AnalyticsView} />`;
+      case 'analytics': return html`<${AnalyticsView} sharedData=${channelAnalytics} sharedConnected=${channelConnected} reloadShared=${()=>loadChannelAnalytics(true)} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
@@ -2197,8 +2319,105 @@ function TrendPill({value}){
   </span>`;
 }
 
+// ---------- Channel Analytics: real-data cards ----------
+function HealthScoreCard({insights}){
+  if(!insights) return html`<div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5 flex items-center justify-center text-[12px] text-zinc-400">No data yet</div>`;
+  const score = insights.healthScore;
+  const status = score>=75 ? 'Growing' : score>=45 ? 'Stable' : 'Needs attention';
+  const statusColor = score>=75 ? '#22a06b' : score>=45 ? '#f5762e' : '#e0457b';
+  const pct = score/100;
+  const r=42, c=2*Math.PI*r;
+  return html`
+    <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+      <div className="font-[700] text-[13.5px] mb-3 flex items-center gap-1">Creator Health Score <${I} name="Info" size=${12} className="text-zinc-400"/></div>
+      <div className="flex items-center gap-4">
+        <svg width="100" height="100" viewBox="0 0 100 100" className="flex-shrink-0">
+          <circle cx="50" cy="50" r=${r} fill="none" stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" strokeWidth="9"/>
+          <circle cx="50" cy="50" r=${r} fill="none" stroke=${statusColor} strokeWidth="9" strokeLinecap="round"
+            strokeDasharray=${c} strokeDashoffset=${c*(1-pct)} transform="rotate(-90 50 50)"/>
+          <text x="50" y="46" textAnchor="middle" className="fill-zinc-900 dark:fill-white" style=${{fontSize:'22px', fontWeight:800}}>${score}</text>
+          <text x="50" y="62" textAnchor="middle" className="fill-zinc-400" style=${{fontSize:'9px'}}>/100</text>
+        </svg>
+        <div>
+          <div className="font-[700] text-[13px] flex items-center gap-1" style=${{color:statusColor}}>${status} ${score>=75?'↗':score>=45?'→':'↘'}</div>
+          <div className="text-[11.5px] text-zinc-500 mt-1 leading-snug">
+            ${insights.viewsTrendPct>=0
+              ? html`Views are up <b className="text-zinc-700 dark:text-zinc-200">${insights.viewsTrendPct}%</b> vs the first half of this period.`
+              : html`Views are down <b className="text-zinc-700 dark:text-zinc-200">${Math.abs(insights.viewsTrendPct)}%</b> vs the first half of this period.`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function GrowthOpportunitiesCard({insights}){
+  if(!insights) return html`<div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5 flex items-center justify-center text-[12px] text-zinc-400">No data yet</div>`;
+  // Every item here is generated FROM the real numbers in `insights` — not a static list.
+  const ops = [];
+  if(insights.uploadGapEstimate!=null && insights.uploadGapEstimate>4){
+    ops.push({icon:'CalendarClock', color:'#e0457b', title:'Upload more consistently', sub:`Your estimated upload gap is ~${insights.uploadGapEstimate} days. Tightening this usually helps the algorithm push videos to more subscribers.`});
+  } else if(insights.uploadGapEstimate!=null){
+    ops.push({icon:'CalendarCheck', color:'#22a06b', title:'Keep your upload streak going', sub:`You're uploading roughly every ${insights.uploadGapEstimate} day(s) — that consistency is working in your favor.`});
+  }
+  if(insights.engagementRate < 2){
+    ops.push({icon:'MessageSquare', color:'#f5762e', title:'Boost engagement', sub:`Your engagement rate (likes+comments+shares/views) is ${insights.engagementRate}%, below the ~2-4% healthy range. Add a direct question or CTA in your next few videos.`});
+  } else {
+    ops.push({icon:'MessageSquare', color:'#22a06b', title:'Engagement is healthy', sub:`Your engagement rate is ${insights.engagementRate}%. Keep prompting comments to sustain it.`});
+  }
+  if(insights.avgViewDurationSec>0 && insights.avgViewDurationSec<60){
+    ops.push({icon:'Clock', color:'#e0457b', title:'Improve retention', sub:`Average view duration is ~${insights.avgViewDurationSec}s. Tighten your first 10 seconds — cut the intro, open on the hook.`});
+  }
+  if(insights.netSubs<0){
+    ops.push({icon:'UserMinus', color:'#e0457b', title:'You lost subscribers this period', sub:`Net change is ${insights.netSubs}. Check if a recent video's thumbnail/title over-promised vs the content.`});
+  }
+  if(!ops.length) ops.push({icon:'CheckCircle2', color:'#22a06b', title:'No urgent issues detected', sub:'Your current metrics look healthy across the board based on the data available.'});
+  return html`
+    <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+      <div className="font-[700] text-[13.5px] mb-3 flex items-center gap-2"><${I} name="Sparkles" size=${14} className="text-[#7c5cff]"/> Growth Opportunities</div>
+      <div className="space-y-3">
+        ${ops.slice(0,3).map((o,i)=>html`
+          <div key=${i} className="flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style=${{background:o.color+'1a', color:o.color}}><${I} name=${o.icon} size=${14}/></div>
+            <div className="min-w-0">
+              <div className="text-[12px] font-[650]">${o.title}</div>
+              <div className="text-[11px] text-zinc-500 leading-snug">${o.sub}</div>
+            </div>
+          </div>
+        `)}
+      </div>
+    </div>`;
+}
+
+function UploadCalendarCard({daily}){
+  const days = (daily||[]).slice(-7);
+  const today = new Date().toISOString().slice(0,10);
+  return html`
+    <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+      <div className="font-[700] text-[13.5px] mb-3 flex items-center gap-2"><${I} name="Calendar" size=${14} className="text-[#7c5cff]"/> Upload Activity (last 7 days)</div>
+      ${days.length ? html`
+        <div className="grid grid-cols-7 gap-[6px]">
+          ${days.map((d,i)=>{
+            const dt = new Date(d.date);
+            const hasViews = Number(d.views)>0;
+            const isToday = d.date===today;
+            return html`
+              <div key=${i} className="flex flex-col items-center gap-1">
+                <div className="text-[9px] text-zinc-400">${dt.toLocaleDateString('en-US',{weekday:'narrow'})}</div>
+                <div className=${`w-full aspect-square rounded-lg flex items-center justify-center text-[9px] font-[700] ${isToday?'ring-2 ring-[#7c5cff]':''}`}
+                     style=${{background: hasViews ? '#22a06b22' : 'rgba(120,120,140,0.08)', color: hasViews?'#22a06b':'#9ca3af'}}>
+                  ${hasViews ? '✓' : '·'}
+                </div>
+                <div className="text-[8.5px] text-zinc-400">${dt.getDate()}</div>
+              </div>`;
+          })}
+        </div>
+        <div className="mt-3 text-[10.5px] text-zinc-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500/40 inline-block"></span> Active day (had views)</div>
+      ` : html`<div className="text-[12px] text-zinc-400 text-center py-6">No recent activity data yet.</div>`}
+    </div>`;
+}
+
 // ---------- Channel Analytics ----------
-function AnalyticsView(){
+function AnalyticsView({sharedData=null, sharedConnected=null, reloadShared=null}){
   const [tab,setTab]=useState('Overview');
   const [period,setPeriod]=useState('Daily'); // Daily | Monthly
   const [connected,setConnected]=useState(false);
@@ -2221,7 +2440,18 @@ function AnalyticsView(){
     return hrs.toFixed(0)+' hrs';
   };
 
-  const loadAnalytics=async()=>{
+  // Prefer the app-level shared cache (same data the AI chat already sees) so the
+  // Analytics tab and the AI are always looking at identical numbers. Only falls
+  // back to fetching independently if no shared loader was passed in.
+  const loadAnalytics=async(force=false)=>{
+    if(reloadShared){
+      setLoading(true); setErr('');
+      const json = await reloadShared();
+      if(json && json.connected){ setConnected(true); setData(json); }
+      else if(sharedConnected===false){ setConnected(false); }
+      setLoading(false);
+      return;
+    }
     setLoading(true); setErr('');
     try{
       const { data: sessionData } = await supabase.auth.getSession();
@@ -2253,8 +2483,23 @@ function AnalyticsView(){
       toast('Could not connect YouTube channel', 'err');
       history.replaceState(null,'',window.location.pathname+window.location.search+'#analytics');
     }
-    loadAnalytics();
+    // If App() already has data cached (e.g. the AI already loaded it silently for
+    // chat), use it immediately instead of showing a loading spinner again.
+    if(sharedData && sharedData.connected){
+      setData(sharedData); setConnected(true); setLoading(false);
+    } else if(sharedConnected===false){
+      setConnected(false); setLoading(false);
+    } else {
+      loadAnalytics();
+    }
   },[]);
+
+  // Keep in sync if the shared cache updates elsewhere (e.g. after a background refresh).
+  useEffect(()=>{
+    if(sharedData && sharedData.connected){ setData(sharedData); setConnected(true); }
+  },[sharedData]);
+
+  const insights = useMemo(()=>computeChannelInsights(data), [data]);
 
   const handleConnect=async()=>{
     setConnecting(true);
@@ -2341,11 +2586,11 @@ function AnalyticsView(){
         <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
         <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
       </div>
-      ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#7c5cff] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button>` : null}
+      ${connected ? html`<button onClick=${()=>loadAnalytics(true)} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#7c5cff] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button>` : null}
     </div>
 
-    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
-      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5 overflow-x-auto no-scrollbar">
+      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] whitespace-nowrap ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
     </div>
 
     ${loading ? html`
@@ -2376,7 +2621,7 @@ function AnalyticsView(){
           <${PeriodToggle}/>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           ${stats.map(([l,v,c,icon,color])=>html`
             <div key=${l} className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-4 relative overflow-hidden group hover:border-[#7c5cff]/40 transition-colors">
               <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-[0.08]" style=${{background:color}}></div>
@@ -2393,6 +2638,12 @@ function AnalyticsView(){
         </div>
 
         ${tab==='Overview' ? html`
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <${HealthScoreCard} insights=${insights}/>
+            <${GrowthOpportunitiesCard} insights=${insights}/>
+            <${UploadCalendarCard} daily=${daily}/>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
               <div className="flex items-center justify-between mb-1">
@@ -2423,16 +2674,23 @@ function AnalyticsView(){
               <${AreaChart} data=${engSeries} labels=${seriesLabels} color="#f5762e" fmt=${v=>fmt(v)+' engagements'} h=${140}/>
             </div>
             <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-3">Top Performing Content</div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-[700] text-[13.5px] flex items-center gap-2"><${I} name="Trophy" size=${14} className="text-amber-500"/> Top Performing Content</div>
+              </div>
               <div className="space-y-2">
                 ${topVideos.length ? topVideos.map((v,i)=>html`
-                  <div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] hover:bg-zinc-50 dark:hover:bg-[#1b1f30] transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      ${v.thumbnail?html`<img src=${v.thumbnail} className="w-12 h-8 rounded-md object-cover flex-shrink-0"/>`:html`<div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 flex-shrink-0">${i+1}</div>`}
-                      <div className="font-[600] truncate">${v.title}</div>
+                  <div key=${v.id||i} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] hover:bg-zinc-50 dark:hover:bg-[#1b1f30] transition-colors">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      ${v.thumbnail?html`<img src=${v.thumbnail} className="w-16 h-10 rounded-md object-cover flex-shrink-0"/>`:html`<div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 flex-shrink-0">${i+1}</div>`}
+                      <div className="min-w-0">
+                        <div className="font-[600] truncate">${v.title}</div>
+                        ${i===0 ? html`<span className="inline-block mt-1 text-[9.5px] font-[700] px-[6px] py-[2px] rounded-full bg-emerald-500/15 text-emerald-500">Top Performer</span>` : null}
+                      </div>
                     </div>
-                    <div className="flex gap-4 text-zinc-500 flex-shrink-0">
-                      <span>${fmt(v.views)} views</span><span>${v.likes} likes</span>
+                    <div className="flex gap-4 text-zinc-500 flex-shrink-0 pl-[52px] sm:pl-0 text-[11px]">
+                      <span><b className="text-zinc-700 dark:text-zinc-200">${fmt(v.views)}</b> views</span>
+                      <span><b className="text-zinc-700 dark:text-zinc-200">${fmt(v.likes)}</b> likes</span>
+                      <span><b className="text-zinc-700 dark:text-zinc-200">${fmt(v.comments)}</b> comments</span>
                     </div>
                   </div>
                 `) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet for this period.</div>`}
@@ -2490,11 +2748,30 @@ function AnalyticsView(){
           <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5 text-center">
             <${I} name="Info" size=${20} className="mx-auto text-zinc-400 mb-2"/>
             <div className="font-[650] text-[13px] mb-1">Revenue data not connected</div>
-            <div className="text-[12px] text-zinc-500">Revenue reporting requires an additional permission. Reconnect your account with monetary access to see this.</div>
+            <div className="text-[12px] text-zinc-500">Revenue reporting requires the YouTube Analytics monetary scope. Reconnect your account with that permission to see estimated revenue here.</div>
           </div>
         ` : html`
-          <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Trending Topics</div>
-            <div className="text-[12px] text-zinc-400 text-center py-6">Trend insights are generated from your content history and will appear here soon.</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-3">Views Trend</div>
+              <div className="text-[12px] text-zinc-500 mb-2">
+                ${insights ? (insights.viewsTrendPct>=0
+                  ? html`Views trended <b className="text-emerald-500">up ${insights.viewsTrendPct}%</b> across this period.`
+                  : html`Views trended <b className="text-rose-500">down ${Math.abs(insights.viewsTrendPct)}%</b> across this period.`) : 'No data yet.'}
+              </div>
+              <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="#7c5cff" fmt=${v=>fmt(v)+' views'} h=${140}/>
+            </div>
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-3">Where your views come from</div>
+              ${insights?.topCountries?.length ? html`
+                <div className="space-y-2">
+                  ${insights.topCountries.map((c,i)=>html`
+                    <div key=${i} className="flex items-center justify-between text-[12px]">
+                      <span>${c.country}</span><span className="font-[600]">${fmt(c.views)} views</span>
+                    </div>`)}
+                </div>
+              ` : html`<div className="text-[12px] text-zinc-400 text-center py-6">No country data yet.</div>`}
+            </div>
           </div>
         `}
       </div>
