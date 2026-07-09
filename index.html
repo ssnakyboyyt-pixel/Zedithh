@@ -2092,9 +2092,115 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   </div>`;
 }
 
+// ---------- Mini SVG Chart Primitives ----------
+function buildPath(vals, w, h, pad=6){
+  if(!vals.length) return {line:'', area:'', points:[]};
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals, 0);
+  const range = (max-min) || 1;
+  const stepX = vals.length>1 ? (w-pad*2)/(vals.length-1) : 0;
+  const points = vals.map((v,i)=>{
+    const x = pad + i*stepX;
+    const y = pad + (h-pad*2) * (1 - (v-min)/range);
+    return [x,y];
+  });
+  const line = points.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ');
+  const area = line + ` L${points[points.length-1][0].toFixed(2)},${h-pad} L${points[0][0].toFixed(2)},${h-pad} Z`;
+  return {line, area, points};
+}
+
+function AreaChart({data, w=640, h=180, color='#7c5cff', fmt=(v)=>v, labels=[]}){
+  const [hover,setHover]=useState(null);
+  const pad=10;
+  const vals = data.length? data : [0];
+  const {line, area, points} = buildPath(vals, w, h, pad);
+  const gid = 'g'+Math.random().toString(36).slice(2,8);
+  if(!data.length){
+    return html`<div style=${{height:h}} className="flex items-center justify-center text-[12px] text-zinc-400">No data for this period.</div>`;
+  }
+  return html`
+  <div className="relative">
+    <svg viewBox=${`0 0 ${w} ${h}`} className="w-full" style=${{height:h}} preserveAspectRatio="none" onMouseLeave=${()=>setHover(null)}>
+      <defs>
+        <linearGradient id=${gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color=${color} stop-opacity="0.32"/>
+          <stop offset="100%" stop-color=${color} stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${[0.25,0.5,0.75].map(f=>html`<line key=${f} x1="0" x2=${w} y1=${h*f} y2=${h*f} stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" stroke-width="1"/>`)}
+      <path d=${area} fill=${`url(#${gid})`} stroke="none"/>
+      <path d=${line} fill="none" stroke=${color} stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+      ${points.map((p,i)=>html`<circle key=${i} cx=${p[0]} cy=${p[1]} r=${hover===i?4:0} fill=${color} stroke="white" stroke-width="1.5"/>`)}
+      ${points.map((p,i)=>html`<rect key=${'h'+i} x=${p[0]-(w/points.length)/2} y="0" width=${w/points.length} height=${h} fill="transparent" onMouseEnter=${()=>setHover(i)}/>`)}
+    </svg>
+    ${hover!=null ? html`
+      <div className="absolute pointer-events-none px-2 py-1 rounded-lg bg-zinc-900 dark:bg-black text-white text-[10.5px] font-[600] shadow-lg -translate-x-1/2 -translate-y-full"
+        style=${{left:points[hover][0], top:Math.max(points[hover][1]-8,0)}}>
+        ${fmt(vals[hover])}${labels[hover]?html`<div className="text-[9px] font-[400] text-zinc-300 text-center">${labels[hover]}</div>`:null}
+      </div>
+    ` : null}
+  </div>`;
+}
+
+function BarSpark({data, w=640, h=140, color='#7c5cff', fmt=(v)=>v, labels=[]}){
+  const [hover,setHover]=useState(null);
+  if(!data.length){
+    return html`<div style=${{height:h}} className="flex items-center justify-center text-[12px] text-zinc-400">No data for this period.</div>`;
+  }
+  const max = Math.max(...data, 1);
+  const gap = 3;
+  const bw = (w/data.length) - gap;
+  return html`
+  <div className="relative">
+    <svg viewBox=${`0 0 ${w} ${h}`} className="w-full" style=${{height:h}} preserveAspectRatio="none" onMouseLeave=${()=>setHover(null)}>
+      ${data.map((v,i)=>{
+        const bh = Math.max((v/max)*(h-16), 2);
+        const x = i*(bw+gap);
+        const y = h - bh;
+        return html`<rect key=${i} x=${x} y=${y} width=${bw} height=${bh} rx="3" fill=${hover===i?color:color+'b3'} onMouseEnter=${()=>setHover(i)}/>`;
+      })}
+    </svg>
+    ${hover!=null ? html`
+      <div className="absolute pointer-events-none px-2 py-1 rounded-lg bg-zinc-900 dark:bg-black text-white text-[10.5px] font-[600] shadow-lg -translate-x-1/2"
+        style=${{left:(hover*(bw+gap))+bw/2, top:0}}>
+        ${fmt(data[hover])}${labels[hover]?html`<div className="text-[9px] font-[400] text-zinc-300 text-center">${labels[hover]}</div>`:null}
+      </div>
+    ` : null}
+  </div>`;
+}
+
+function Donut({segments, size=140, stroke=16}){
+  const total = segments.reduce((s,x)=>s+x.value,0) || 1;
+  const r = (size-stroke)/2;
+  const c = 2*Math.PI*r;
+  let offset = 0;
+  return html`
+  <svg width=${size} height=${size} viewBox=${`0 0 ${size} ${size}`}>
+    <g transform=${`rotate(-90 ${size/2} ${size/2})`}>
+      <circle cx=${size/2} cy=${size/2} r=${r} fill="none" stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" stroke-width=${stroke}/>
+      ${segments.map((s,i)=>{
+        const len = (s.value/total)*c;
+        const dash = `${len} ${c-len}`;
+        const el = html`<circle key=${i} cx=${size/2} cy=${size/2} r=${r} fill="none" stroke=${s.color} stroke-width=${stroke} stroke-dasharray=${dash} stroke-dashoffset=${-offset} stroke-linecap="butt"/>`;
+        offset += len;
+        return el;
+      })}
+    </g>
+  </svg>`;
+}
+
+function TrendPill({value}){
+  const n = Number(value)||0;
+  const up = n>=0;
+  return html`<span className=${`inline-flex items-center gap-[3px] text-[10.5px] font-[700] px-[7px] py-[2px] rounded-full ${up?'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10':'text-red-500 bg-red-50 dark:bg-red-500/10'}`}>
+    <${I} name=${up?'ArrowUpRight':'ArrowDownRight'} size=${10}/> ${Math.abs(n).toFixed(1)}%
+  </span>`;
+}
+
 // ---------- Channel Analytics ----------
 function AnalyticsView(){
   const [tab,setTab]=useState('Overview');
+  const [period,setPeriod]=useState('Daily'); // Daily | Monthly
   const [connected,setConnected]=useState(false);
   const [loading,setLoading]=useState(true);
   const [connecting,setConnecting]=useState(false);
@@ -2172,18 +2278,65 @@ function AnalyticsView(){
     }
   };
 
+  const daily = data?.dailyStats ?? [];
+
+  // Group daily stats into monthly buckets when Monthly view is selected
+  const monthly = useMemo(()=>{
+    if(!daily.length) return [];
+    const map = {};
+    daily.forEach(d=>{
+      const key = (d.date||'').slice(0,7); // YYYY-MM
+      if(!map[key]) map[key] = {date:key, views:0, watchTimeMinutes:0, subscribersGained:0, subscribersLost:0, likes:0, comments:0, shares:0};
+      map[key].views += Number(d.views)||0;
+      map[key].watchTimeMinutes += Number(d.watchTimeMinutes)||0;
+      map[key].subscribersGained += Number(d.subscribersGained)||0;
+      map[key].subscribersLost += Number(d.subscribersLost)||0;
+      map[key].likes += Number(d.likes)||0;
+      map[key].comments += Number(d.comments)||0;
+      map[key].shares += Number(d.shares)||0;
+    });
+    return Object.values(map);
+  },[daily]);
+
+  const series = period==='Daily' ? daily : monthly;
+  const seriesLabels = series.map(d=> period==='Daily'
+    ? new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    : new Date(d.date+'-01').toLocaleDateString('en-US',{month:'short',year:'2-digit'}));
+
+  // Rough % change vs first half -> second half of the series, for trend pills
+  const pctChange=(arr)=>{
+    if(arr.length<2) return 0;
+    const mid = Math.floor(arr.length/2);
+    const a = arr.slice(0,mid).reduce((s,v)=>s+v,0) || 0;
+    const b = arr.slice(mid).reduce((s,v)=>s+v,0) || 0;
+    if(a===0) return b>0?100:0;
+    return ((b-a)/a)*100;
+  };
+
+  const viewsSeries = series.map(d=>Number(d.views)||0);
+  const watchSeries = series.map(d=>Number(d.watchTimeMinutes)||0);
+  const engSeries = series.map(d=>(Number(d.likes)||0)+(Number(d.comments)||0)+(Number(d.shares)||0));
+  const netSubSeries = series.map(d=>(Number(d.subscribersGained)||0)-(Number(d.subscribersLost)||0));
+
   const stats = data ? [
-    ['Total Views', fmt(data.overview.views), ''],
-    ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), ''],
-    ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), ''],
-    ['Net Sub Change', (data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '') + (data.overview.subscribersGained - data.overview.subscribersLost), ''],
+    ['Total Views', fmt(data.overview.views), pctChange(viewsSeries), 'Eye', '#7c5cff'],
+    ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), pctChange(watchSeries), 'Clock', '#22c1c3'],
+    ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), pctChange(netSubSeries), 'Users', '#f5762e'],
+    ['Net Sub Change', (data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '') + fmt(data.overview.subscribersGained - data.overview.subscribersLost), pctChange(netSubSeries), 'UserPlus', '#22a06b'],
   ] : [];
 
   const topVideos = data?.topVideos ?? [];
 
+  const PeriodToggle = ()=> html`
+    <div className="flex items-center bg-zinc-100 dark:bg-[#1f2333] rounded-xl p-[3px] text-[11.5px]">
+      ${['Daily','Monthly'].map(p=>html`
+        <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[6px] rounded-[9px] font-[650] transition-all ${period===p?'bg-white dark:bg-[#2a2f4a] text-[#7c5cff] shadow-sm':'text-zinc-500'}`}>${p}</button>
+      `)}
+    </div>`;
+
   return html`
-  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
-    <div className="flex items-center justify-between">
+  <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#0f111a] p-6 overflow-y-auto">
+    <div className="flex items-center justify-between flex-wrap gap-3">
       <div>
         <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
         <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
@@ -2209,53 +2362,138 @@ function AnalyticsView(){
         <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
       </div>
     ` : html`
-      <div className="space-y-5 max-w-[1000px]">
-        ${data?.channel ? html`
-          <div className="flex items-center gap-3 mb-1">
-            ${data.channel.thumbnail ? html`<img src=${data.channel.thumbnail} className="w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700"/>` : null}
-            <div>
-              <div className="font-[700] text-[13.5px]">${data.channel.title}</div>
-              <div className="text-[11px] text-zinc-500">Last 28 days</div>
+      <div className="space-y-5 max-w-[1080px]">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          ${data?.channel ? html`
+            <div className="flex items-center gap-3">
+              ${data.channel.thumbnail ? html`<img src=${data.channel.thumbnail} className="w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700"/>` : null}
+              <div>
+                <div className="font-[700] text-[13.5px]">${data.channel.title}</div>
+                <div className="text-[11px] text-zinc-500">Last 28 days · ${period==='Daily'?'Daily breakdown':'Monthly breakdown'}</div>
+              </div>
+            </div>
+          ` : html`<div></div>`}
+          <${PeriodToggle}/>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          ${stats.map(([l,v,c,icon,color])=>html`
+            <div key=${l} className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-4 relative overflow-hidden group hover:border-[#7c5cff]/40 transition-colors">
+              <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-[0.08]" style=${{background:color}}></div>
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] text-zinc-500 font-[550]">${l}</div>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style=${{background:color+'1a', color}}>
+                  <${I} name=${icon} size=${13}/>
+                </div>
+              </div>
+              <div className="text-[22px] font-[800] display mt-1">${v}</div>
+              <div className="mt-1"><${TrendPill} value=${c}/></div>
+            </div>
+          `)}
+        </div>
+
+        ${tab==='Overview' ? html`
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <div className="font-[700] text-[13.5px]">Views Over Time</div>
+                  <div className="text-[11px] text-zinc-500">${period==='Daily'?'Daily':'Monthly'} views for the last 28 days</div>
+                </div>
+                <div className="text-[11px] px-2 py-1 rounded-lg font-[700]" style=${{background:'#7c5cff1a',color:'#7c5cff'}}>${fmt(viewsSeries.reduce((s,v)=>s+v,0))} total</div>
+              </div>
+              <div className="mt-3">
+                <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="#7c5cff" fmt=${v=>fmt(v)+' views'}/>
+              </div>
+              <div className="flex justify-between text-[10px] text-zinc-400 mt-1 px-1">
+                <span>${seriesLabels[0]||''}</span><span>${seriesLabels[seriesLabels.length-1]||''}</span>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-1">Watch Time</div>
+              <div className="text-[11px] text-zinc-500 mb-3">${period==='Daily'?'Daily':'Monthly'} minutes watched</div>
+              <${BarSpark} data=${watchSeries} labels=${seriesLabels} color="#22c1c3" fmt=${v=>fmtMinutes(v)} h=${150}/>
             </div>
           </div>
-        ` : null}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          ${stats.map(([l,v,c])=>html`<div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-4"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div>${c?html`<div className="text-[11px] text-emerald-600">${c}</div>`:null}</div>`)}
-        </div>
-        ${tab==='Overview' ? html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-            <div className="font-[650] text-[13px] mb-3">Top Performing Content</div>
-            <div className="space-y-2">
-              ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="flex items-center gap-3">${v.thumbnail?html`<img src=${v.thumbnail} className="w-12 h-8 rounded-md object-cover"/>`:html`<div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">${i+1}</div>`}<div className="font-[600] max-w-[280px] truncate">${v.title}</div></div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${v.likes} likes</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet for this period.</div>`}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-1">Engagement</div>
+              <div className="text-[11px] text-zinc-500 mb-3">Likes + comments + shares</div>
+              <${AreaChart} data=${engSeries} labels=${seriesLabels} color="#f5762e" fmt=${v=>fmt(v)+' engagements'} h=${140}/>
+            </div>
+            <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-3">Top Performing Content</div>
+              <div className="space-y-2">
+                ${topVideos.length ? topVideos.map((v,i)=>html`
+                  <div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] hover:bg-zinc-50 dark:hover:bg-[#1b1f30] transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      ${v.thumbnail?html`<img src=${v.thumbnail} className="w-12 h-8 rounded-md object-cover flex-shrink-0"/>`:html`<div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 flex-shrink-0">${i+1}</div>`}
+                      <div className="font-[600] truncate">${v.title}</div>
+                    </div>
+                    <div className="flex gap-4 text-zinc-500 flex-shrink-0">
+                      <span>${fmt(v.views)} views</span><span>${v.likes} likes</span>
+                    </div>
+                  </div>
+                `) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet for this period.</div>`}
+              </div>
             </div>
           </div>
         ` : tab==='Content' ? html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Content Performance</div>
-            ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="font-[600] max-w-[320px] truncate">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${fmtMinutes(v.watchTimeMinutes)}</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet.</div>`}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-3">Content Performance</div>
+              ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] mb-2"><div className="font-[600] max-w-[320px] truncate">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${fmtMinutes(v.watchTimeMinutes)}</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet.</div>`}
+            </div>
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-1">Views Trend</div>
+              <div className="text-[11px] text-zinc-500 mb-3">${period==='Daily'?'Daily':'Monthly'}</div>
+              <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="#7c5cff" fmt=${v=>fmt(v)+' views'} h=${160} w=${300}/>
+            </div>
           </div>
         ` : tab==='Audience' ? html`
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Age &amp; Gender</div>
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Age &amp; Gender</div>
               ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`<div key=${i} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-20 truncate">${row[0]} · ${row[1]}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#7c5cff] rounded-full" style=${{width:(Number(row[2])||0)+'%'}}></div></div><div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
             </div>
-            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Top Countries</div>
-              ${(data?.topCountries ?? []).length ? data.topCountries.map((row,i)=>html`<div key=${i} className="flex items-center justify-between mb-2 text-[12px]"><span>${row[0]}</span><span className="font-[600]">${fmt(row[1])} views</span></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Top Countries</div>
+              ${(data?.topCountries ?? []).length ? html`
+                <div className="flex items-center gap-4">
+                  <${Donut} segments=${data.topCountries.slice(0,5).map((row,i)=>({value:Number(row[1])||0, color:['#7c5cff','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}))}/>
+                  <div className="flex-1 space-y-[6px]">
+                    ${data.topCountries.slice(0,5).map((row,i)=>html`<div key=${i} className="flex items-center justify-between text-[11.5px]"><span className="flex items-center gap-2"><span className="w-[8px] h-[8px] rounded-full" style=${{background:['#7c5cff','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}}></span>${row[0]}</span><span className="font-[600]">${fmt(row[1])}</span></div>`)}
+                  </div>
+                </div>
+              ` : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
             </div>
           </div>
         ` : tab==='Engagement' ? html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Engagement Metrics</div>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              ${[['Likes',data?.overview.likes ?? 0],['Comments',data?.overview.comments ?? 0],['Shares',data?.overview.shares ?? 0]].map(([l,v])=>html`<div key=${l} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-xl"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[20px] font-[800] display mt-1">${fmt(v)}</div></div>`)}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-1">Engagement Over Time</div>
+              <div className="text-[11px] text-zinc-500 mb-3">Likes, comments &amp; shares combined</div>
+              <${AreaChart} data=${engSeries} labels=${seriesLabels} color="#f5762e" fmt=${v=>fmt(v)+' total'} h=${170}/>
+            </div>
+            <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5">
+              <div className="font-[700] text-[13.5px] mb-3">Breakdown</div>
+              <div className="space-y-3">
+                ${[['Likes',data?.overview.likes ?? 0,'#7c5cff'],['Comments',data?.overview.comments ?? 0,'#22c1c3'],['Shares',data?.overview.shares ?? 0,'#f5762e']].map(([l,v,color])=>html`
+                  <div key=${l} className="p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500"><span>${l}</span><span className="font-[700] text-[14px] text-zinc-900 dark:text-zinc-100">${fmt(v)}</span></div>
+                    <div className="mt-2 h-[6px] rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full" style=${{width:'100%',background:color}}></div></div>
+                  </div>
+                `)}
+              </div>
             </div>
           </div>
         ` : tab==='Revenue' ? html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 text-center">
+          <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5 text-center">
             <${I} name="Info" size=${20} className="mx-auto text-zinc-400 mb-2"/>
             <div className="font-[650] text-[13px] mb-1">Revenue data not connected</div>
             <div className="text-[12px] text-zinc-500">Revenue reporting requires an additional permission. Reconnect your account with monetary access to see this.</div>
           </div>
         ` : html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Trending Topics</div>
+          <div className="bg-white dark:bg-[#151827] border border-zinc-200 dark:border-[#262b42] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Trending Topics</div>
             <div className="text-[12px] text-zinc-400 text-center py-6">Trend insights are generated from your content history and will appear here soon.</div>
           </div>
         `}
