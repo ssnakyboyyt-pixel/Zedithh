@@ -151,6 +151,41 @@ function PromptDialog({title, placeholder='', onSubmit, onClose}){
   `;
 }
 
+// ---------- Sources bottom sheet (ChatGPT-style) ----------
+function faviconUrl(url){
+  try{ return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`; }catch{ return ''; }
+}
+function hostnameOf(url){
+  try{ return new URL(url).hostname.replace('www.',''); }catch{ return url; }
+}
+function SourcesSheet({sources, onClose}){
+  return html`
+    <div className="fixed inset-0 z-[500] bg-black/55 flex items-end sm:items-center justify-center" onClick=${onClose}>
+      <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full sm:max-w-[440px] sm:rounded-[20px] rounded-t-[20px] max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-center pt-2 pb-1 sm:hidden">
+          <div className="w-9 h-[4px] rounded-full bg-zinc-300 dark:bg-zinc-600"></div>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="font-[700] text-[14.5px]">Sources</div>
+          <button onClick=${onClose} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"><${I} name="X" size=${18}/></button>
+        </div>
+        <div className="overflow-y-auto px-4 py-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+          ${sources.map((s,si)=> html`
+            <a key=${si} href=${s.url} target="_blank" rel="noopener noreferrer" className="flex flex-col gap-1 py-3 no-underline group">
+              <div className="flex items-center gap-2 text-[11.5px] text-zinc-500">
+                <img src=${faviconUrl(s.url)} className="w-4 h-4 rounded-full bg-white object-contain" onError=${e=>e.target.style.visibility='hidden'}/>
+                <span>${hostnameOf(s.url)}</span>
+              </div>
+              <div className="font-[650] text-[13.5px] text-zinc-800 dark:text-zinc-100 group-hover:underline leading-snug">${s.title}</div>
+              ${s.snippet ? html`<div className="text-[12px] text-zinc-500 leading-relaxed line-clamp-2">${s.snippet}</div>` : null}
+            </a>
+          `)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function CustomSelect({value, onChange, options, className='', panelClassName='', align='right'}){
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
@@ -315,6 +350,16 @@ When analytics are incomplete, explicitly list the creator-specific unknowns tha
 --- WEB SEARCH FOCUS RULES ---
 When the user asks for "the biggest" or "the single most important" news/update, identify ONE item as the clear answer and lead with it — do not list several announcements as if they were equally the answer. You may briefly mention runner-ups afterward if relevant, but the direct answer must name one specific thing.
 Stay tightly scoped to what the user actually asked. Do not include tangential or off-topic items (e.g. unrelated general company AI news) unless the user's question was broad enough to warrant it. If in doubt, ask "the biggest news in X" means the biggest news specifically about X.
+When citing web search results, prioritize source quality and relevance over quantity: prefer official platform blogs (e.g. the YouTube Blog, Google Blog), official documentation, well-known creator-industry news outlets, and other primary/authoritative sources, over random unrelated videos, forum posts, or SEO content. Never dump every search result you were given — filter down to only the sources that are actually relevant to the question and that you actually used in the answer. Silently drop irrelevant hits rather than listing them.
+
+--- CONFIDENCE CALIBRATION ---
+Match the confidence of every claim to the strength of the evidence behind it. Use language like "the data suggests," "one likely explanation is," or "this can't be confirmed from what's provided" rather than flat, certain statements when the evidence is partial or circumstantial. Reserve fully confident, unhedged language for points that are directly and clearly supported by what the user gave you (or by search results actually retrieved). When information is incomplete, say so plainly rather than smoothing over the gap with confident-sounding phrasing — never sound certain without evidence to back it up.
+
+--- IMAGE FLOW ---
+Once you have successfully analyzed an uploaded image in this conversation, do not ask the user to upload it again in the same reply or immediately after — you already have it. Only ask for a re-upload if the image genuinely failed to come through.
+
+--- FINAL SELF-CHECK (apply silently before every response) ---
+Before finalizing any analytical response (analytics, thumbnails, strategy), quickly check: Did I state anything as fact without evidence? Is every conclusion actually supported by what was given? Did I flag missing data before concluding, in the right priority order? Did I explain the "why" behind every recommendation? Did I avoid generic filler advice? Did I connect related metrics instead of treating them in isolation? Did I filter out low-quality or irrelevant sources? If any check fails, revise before sending.
 
 Script writing: start with a strong hook, keep pacing fast, use curiosity, avoid filler, end with a CTA.
 Thumbnail mode: analyze CTR, readability, contrast, emotion, curiosity, composition, colors, mobile visibility based ONLY on what's actually visible in the image — never invent or exaggerate a visual flaw you can't clearly see, and never state a precise numeric CTR range from the thumbnail alone (CTR depends on audience, title, impressions, and competition, none of which a thumbnail image can tell you — you may say a thumbnail is likely to help or hurt CTR, but never quote exact percentages from image alone). Explicitly name the strongest positive design elements too (e.g. reward/progression cues, contrast, readability, emotional expression) — not just problems. When explaining visual hierarchy, explain WHY the eye is drawn where it is (contrast against background, size, face/eye placement, color saturation, position within the frame) rather than just stating what stands out. Give a score out of 10 and suggestions that are specific to this exact image (reference the actual colors/elements/text you saw), not generic image-improvement tips that could apply to any thumbnail.
@@ -887,7 +932,7 @@ function App(){
       if(results.length){
         searchContext = buildSearchContextBlock(results);
         searchSucceeded = true;
-        searchSources = results.map(r=>({title:r.title, url:r.url}));
+        searchSources = results.map(r=>({title:r.title, url:r.url, snippet:r.snippet}));
       } else {
         // Whether it errored or just returned zero hits, tell the model a
         // search WAS attempted so it never falsely claims "I can't search".
@@ -1256,6 +1301,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const [loading,setLoading]=useState(false);
   const [loadingHasImage,setLoadingHasImage]=useState(false);
   const [listening,setListening]=useState(false);
+  const [sourcesModalFor,setSourcesModalFor]=useState(null);
   const recogRef=useRef(null);
   const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
 
@@ -1416,15 +1462,14 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                     <${MarkdownText} text=${m.text} className="text-zinc-800 dark:text-zinc-100"/>
                   `}
                   ${m.sources && m.sources.length ? html`
-                    <div className="flex flex-wrap gap-[6px] mt-[10px]">
-                      ${m.sources.map((s,si)=> html`
-                        <a key=${si} href=${s.url} target="_blank" rel="noopener noreferrer"
-                           className="flex items-center gap-[5px] max-w-[220px] bg-zinc-100 dark:bg-[#20233a] hover:bg-zinc-200 dark:hover:bg-[#282c47] border border-zinc-200 dark:border-zinc-700 rounded-full px-[10px] py-[5px] text-[11px] text-zinc-600 dark:text-zinc-300 transition no-underline">
-                          <${I} name="Globe" size=${11} className="shrink-0 text-[#7c5cff]"/>
-                          <span className="truncate">${(()=>{ try{ return new URL(s.url).hostname.replace('www.',''); }catch{ return s.title||s.url; } })()}</span>
-                        </a>
-                      `)}
-                    </div>
+                    <button onClick=${()=>setSourcesModalFor(m.id)} className="flex items-center gap-[8px] mt-[10px] bg-zinc-100 dark:bg-[#20233a] hover:bg-zinc-200 dark:hover:bg-[#282c47] border border-zinc-200 dark:border-zinc-700 rounded-full pl-[6px] pr-[12px] py-[4px] text-[11.5px] text-zinc-600 dark:text-zinc-300 transition">
+                      <span className="flex items-center -space-x-[6px]">
+                        ${m.sources.slice(0,3).map((s,si)=> html`
+                          <img key=${si} src=${(()=>{ try{ return `https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=32`; }catch{ return ''; } })()} className="w-[18px] h-[18px] rounded-full border border-white dark:border-[#181b2b] bg-white object-contain" onError=${e=>e.target.style.visibility='hidden'}/>
+                        `)}
+                      </span>
+                      <span className="font-[600]">Sources</span>
+                    </button>
                   `:null}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
@@ -1504,6 +1549,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
         <span>🔒 Secure</span>
       </div>
     </div>
+    ${sourcesModalFor ? html`<${SourcesSheet} sources=${(messages.find(m=>m.id===sourcesModalFor)?.sources)||[]} onClose=${()=>setSourcesModalFor(null)}/>` : null}
   </div>`;
 }
 
