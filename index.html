@@ -305,7 +305,23 @@ NEVER assume, invent, or carry over the user's niche, channel topic, or content 
 - Every piece of advice must be grounded ONLY in what the user has said in this conversation. Do not import context from outside this conversation.
 ${webSearch?'Browsing enabled. Use latest 2026 data.':''}
 ${smart?'Think step-by-step, deep reasoning. Verify your answer against the original constraints before finalizing it.':''}
-Response style: ${responseStyle}.`;
+Response style: ${responseStyle}.
+
+--- CHANNEL DATA ACCURACY (NEVER BREAK) ---
+When real channel data is provided below, always use it exactly as given — never invent or guess a number, and never substitute one metric for another.
+- Subscribers, Total Views, Watch Time, Likes, Comments, and Net Subscriber Change are DIFFERENT metrics. Never answer a question about one metric using the number for a different metric.
+- Before answering, re-read exactly which metric the user asked about (subscribers vs views vs watch time vs likes, etc.) and quote ONLY that metric's real value.
+- Example — User: "How many subscribers do I have?" → Good: "You currently have 6 subscribers." Example — User: "How many views do I have?" → Good: "You currently have 404 total channel views." Never answer a views question with the subscriber number or vice versa.
+- If the requested metric isn't in the data provided, say plainly: "I don't currently have access to that metric." Never make one up.
+- When asked generally about channel performance, don't return just one number — summarize: Subscribers, Total Views, Watch Time, Net 28-day growth, and the biggest opportunity area, using only real values you actually have.
+
+--- THUMBNAIL/IMAGE SCORING FORMAT ---
+When rating a thumbnail, always structure the reply with these sections: Overall Score, CTR Potential, Would I Click?, Strengths, Weaknesses, Actionable Improvements, Expected Performance. Ground every point in what's actually visible (text size/readability, color contrast, emotional impact, focal point, curiosity, mobile visibility, visual hierarchy) — never a generic line like "the colors are eye-catching" without explaining why it works (e.g. "the blue title contrasts well against the sky, making it readable even on mobile"). Every improvement must say exactly what to change (e.g. "increase the '500 Coins' text ~20% so it stays readable on smaller screens"), not just "improve the thumbnail."
+
+--- NO DEBUG OUTPUT (NEVER BREAK) ---
+Never expose model names, backend IDs, retry counts, API errors, stack traces, or HTTP status codes (e.g. "HTTP 504", model/provider names, "retry", "backend") unless the user explicitly asks for technical debug info. If a tool or data fetch fails, just say: "I couldn't retrieve that information right now. Please try again in a few moments." — never show the raw technical error.
+
+Tone: sound like an experienced YouTube strategist — confident, practical, concise. Avoid robotic wording and unnecessary long paragraphs. Accuracy matters more than sounding impressive: if data is unavailable, say so clearly instead of guessing.`;
 }
 
 function buildSearchContextBlock(results){
@@ -386,8 +402,14 @@ function buildChannelContextBlock(insights){
   if(!insights) return '\n\n--- Creator channel data ---\nNo YouTube channel is connected yet for this user. If they ask about their own stats, views, CTR, or performance, tell them plainly you don\'t have channel data yet and ask them to connect their YouTube channel in the Channel Analytics tab — do not guess or invent numbers.';
   const i = insights;
   const lines = [];
-  lines.push(`Channel: ${i.channelTitle||'Unknown'}${i.subscriberCount!=null?` (${i.subscriberCount.toLocaleString('en-US')} subscribers)`:''}`);
-  lines.push(`Last 28 days — Views: ${i.views.toLocaleString('en-US')}, Watch time: ${Math.round(i.watchMin/60)} hrs, Net subscriber change: ${i.netSubs>=0?'+':''}${i.netSubs}`);
+  lines.push(`Channel: ${i.channelTitle||'Unknown'}`);
+  lines.push(`SUBSCRIBERS (total, current): ${i.subscriberCount!=null ? i.subscriberCount.toLocaleString('en-US') : 'not available'}`);
+  lines.push(`TOTAL VIEWS (last 28 days): ${i.views.toLocaleString('en-US')}`);
+  lines.push(`WATCH TIME (last 28 days): ${Math.round(i.watchMin/60)} hrs`);
+  lines.push(`NET SUBSCRIBER CHANGE (last 28 days, gained minus lost): ${i.netSubs>=0?'+':''}${i.netSubs}`);
+  lines.push(`LIKES (last 28 days): ${i.likes}`);
+  lines.push(`COMMENTS (last 28 days): ${i.comments}`);
+  lines.push(`These are six separate metrics — never answer a question about one using the number from another.`);
   lines.push(`Average view duration: ~${i.avgViewDurationSec}s. Engagement rate (likes+comments+shares / views): ${i.engagementRate}%.`);
   lines.push(`Views trend vs first half of period: ${i.viewsTrendPct>=0?'+':''}${i.viewsTrendPct}%.`);
   if(i.uploadGapEstimate!=null) lines.push(`Estimated upload gap: roughly every ${i.uploadGapEstimate} day(s), based on ${i.activeDays} active days out of ${i.totalDays}.`);
@@ -3100,7 +3122,6 @@ function AdminDashboard({card, transactions}){
         setUsers({
           total:profiles.length,
           active:profiles.length,
-          online:Math.min(3, profiles.length),
           new_today:profiles.filter(p=>new Date(p.created_at)>=today).length,
           free:profiles.filter(p=>!p.plan||p.plan==='free').length,
           pro:profiles.filter(p=>p.plan==='pro').length,
@@ -3131,27 +3152,24 @@ function AdminDashboard({card, transactions}){
     <div className="flex items-center gap-2 bg-[#0f1911] border border-[#1c3324] rounded-[10px] px-3.5 py-2 mb-5 w-fit">
       <span className="w-[7px] h-[7px] rounded-full bg-[#3ecf8e] pulse-dot"></span>
       <span className="text-[11.5px] font-[600] text-[#6fdba8]">All systems operational</span>
-      <span className="text-[11px] text-zinc-500 mono">· ${users.online} online now</span>
     </div>
 
     ${loading ? html`<div className="text-[12px] text-zinc-500">Loading stats…</div>` : html`
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         ${card('Total Users', users.total, 'Users', '#e8b04b', 'All registered accounts')}
-        ${card('Active Users', users.active, 'Activity', '#3ecf8e', 'With profile')}
-        ${card('Online Now', users.online, 'Wifi', '#5b9dff', 'Estimated')}
         ${card('New Today', users.new_today, 'UserPlus', '#e8b04b', 'Signed up today')}
+        ${card('Free Plan', (users.free||0).toString(), 'Send', '#6b7280', 'Users')}
+        ${card('Pro Plan', (users.pro||0).toString(), 'Zap', '#e8b04b', 'Users')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        ${card('Elite Plan', (users.elite||0).toString(), 'Crown', '#f0c876', 'Users')}
         ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', '#c98bf0', `${todayTx.length} transactions`)}
         ${card('Total Credits Used', totalCreditsSpent.toLocaleString(), 'TrendingUp', '#ef5b5b', 'All time')}
         ${card('AI Requests', aiRequests.toString(), 'MessageSquare', '#5bc8e8', 'Text & code')}
-        ${card('Image Generations', imageGens.toString(), 'Image', '#e85ba3', 'All time')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        ${card('Image Generations', imageGens.toString(), 'Image', '#e85ba3', 'All time')}
         ${card('Voice Generations', voiceGens.toString(), 'AudioLines', '#3ecf8e', 'All time')}
-        ${card('Free Plan', (users.free||0).toString(), 'Send', '#6b7280', 'Users')}
-        ${card('Pro Plan', (users.pro||0).toString(), 'Zap', '#e8b04b', 'Users')}
-        ${card('Elite Plan', (users.elite||0).toString(), 'Crown', '#f0c876', 'Users')}
       </div>
     `}
 
@@ -3520,71 +3538,35 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
 
 // --- Admin AI Models ---
 function AdminAIModels(){
-  const [models,setModels]=useState([
-    {id:'1', name:'GPT-4o', provider:'OpenAI', enabled:true, default:false, cost:40, experimental:false},
-    {id:'2', name:'DeepSeek R1', provider:'OpenRouter', enabled:true, default:true, cost:15, experimental:false},
-    {id:'3', name:'Claude Sonnet', provider:'Anthropic', enabled:true, default:false, cost:45, experimental:false},
-    {id:'4', name:'Gemini 1.5 Pro', provider:'Google', enabled:true, default:false, cost:30, experimental:false},
-    {id:'5', name:'Llama 3.3 70B', provider:'OpenRouter', enabled:true, default:false, cost:10, experimental:false},
-    {id:'6', name:'Qwen 2.5 72B', provider:'OpenRouter', enabled:true, default:false, cost:12, experimental:false},
-    {id:'7', name:'Groq Llama', provider:'Groq', enabled:false, default:false, cost:5, experimental:false},
-    {id:'8', name:'Together Mistral', provider:'Together AI', enabled:false, default:false, cost:8, experimental:true},
-  ]);
-  const provColors={'OpenAI':'#10a37f','OpenRouter':'#e8b04b','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'#8b5cf6','DeepSeek':'#06b6d4'};
-
-  const toggleModel=(id,field,val)=>setModels(ms=>ms.map(m=>m.id===id?{...m,[field]:val, ...(field==='default'&&val?{}:{})}:field==='default'&&val?{...m,default:false}:m));
-  const setDefault=(id)=>setModels(ms=>ms.map(m=>({...m,default:m.id===id})));
-
+  const pools = [
+    {label:'Normal (fast) text models', models:NORMAL_TEXT_MODELS, color:'#3ecf8e'},
+    {label:'Smart (reasoning) text models', models:SMART_TEXT_MODELS, color:'#e8b04b'},
+    {label:'Vision models', models:FREE_VISION_MODELS, color:'#5b9dff'},
+  ];
   return html`
   <div>
     <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Cpu" size=${20}/> AI Models</div>
-    <div className="text-[12px] text-zinc-500 mb-5">Configure model availability, costs, and defaults. API keys are backend-only.</div>
+    <div className="text-[12px] text-zinc-500 mb-5">The actual model pools Zedith rotates through, read directly from the app's model-routing config. API keys are backend-only.</div>
 
     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5 text-[12px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
-      <${I} name="Lock" size=${14}/> API keys are stored securely on the server and never exposed to the frontend.
+      <${I} name="Lock" size=${14}/> API keys are stored securely on the server and never exposed to the frontend. This view is read-only — editing per-model routing requires a code change, not a config toggle, so no fake "enable/cost" controls are shown here.
     </div>
 
-    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141727]">
-            <tr>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Model</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Enabled</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Default</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Credit Cost</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Experimental</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${models.map(m=>html`
-              <tr key=${m.id} className="border-b border-zinc-50 dark:border-zinc-900">
-                <td className="px-4 py-3 font-[600]">${m.name}</td>
-                <td className="px-4 py-3">
-                  <span className="text-[10px] px-2 py-[3px] rounded-full font-[600]" style=${{background:(provColors[m.provider]||'#e8b04b')+'20',color:provColors[m.provider]||'#e8b04b'}}>${m.provider}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <button onClick=${()=>toggleModel(m.id,'enabled',!m.enabled)} className=${`w-10 h-5 rounded-full relative transition ${m.enabled?'bg-[#e8b04b]':'bg-zinc-300 dark:bg-zinc-700'}`}>
-                    <span className=${`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow transition-all ${m.enabled?'left-[22px]':'left-[2px]'}`}></span>
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <button onClick=${()=>setDefault(m.id)} className=${`w-4 h-4 rounded-full border-2 transition ${m.default?'border-[#e8b04b] bg-[#e8b04b]':'border-zinc-400'}`}></button>
-                </td>
-                <td className="px-4 py-3">
-                  <input type="number" value=${m.cost} onChange=${e=>toggleModel(m.id,'cost',parseInt(e.target.value)||0)} className="w-16 px-2 py-[4px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#14182a] outline-none"/>
-                </td>
-                <td className="px-4 py-3">
-                  <button onClick=${()=>toggleModel(m.id,'experimental',!m.experimental)} className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${m.experimental?'bg-orange-100 text-orange-600 dark:bg-orange-900/30':'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'}`}>${m.experimental?'Yes':'No'}</button>
-                </td>
-              </tr>
+    <div className="space-y-4">
+      ${pools.map(pool=>html`
+        <div key=${pool.label} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
+          <div className="font-[650] text-[13px] mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style=${{background:pool.color}}></span> ${pool.label}
+            <span className="text-[10.5px] text-zinc-400 font-[500]">(${pool.models.length} model${pool.models.length===1?'':'s'})</span>
+          </div>
+          <div className="space-y-1.5">
+            ${pool.models.map(m=>html`
+              <div key=${m} className="text-[12px] font-[500] text-zinc-600 dark:text-zinc-300 px-3 py-[7px] rounded-lg bg-zinc-50 dark:bg-[#141727] mono">${m}</div>
             `)}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
+      `)}
     </div>
-    <button onClick=${()=>toast('Model config saved')} className="mt-4 px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600]">Save Model Config</button>
   </div>`;
 }
 
@@ -3619,7 +3601,7 @@ function AdminSecurity(){
     <div className="text-[12px] text-zinc-500 mb-5">Activity logs, audit trail, and security events.</div>
 
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      ${[['Active Sessions','—','Wifi','#10b981'],['Failed Logins','0','AlertTriangle','#ef4444'],['Audit Events',logs.length.toString(),'Activity','#e8b04b'],['API Calls',logs.length.toString(),'Plug','#f59e0b']].map(([l,v,ic,col])=>html`
+      ${[['Audit Events',logs.length.toString(),'Activity','#e8b04b']].map(([l,v,ic,col])=>html`
         <div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[11px] text-zinc-500">${l}</div>
@@ -3628,6 +3610,9 @@ function AdminSecurity(){
           <div className="text-[20px] font-[800] display">${v}</div>
         </div>
       `)}
+      <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-4 col-span-2 md:col-span-3 flex items-center gap-2 text-[11.5px] text-zinc-500">
+        <${I} name="Info" size=${13} className="text-zinc-400"/> Active sessions and failed-login tracking aren't connected to a backend endpoint yet — only real audit events below are shown.
+      </div>
     </div>
 
     <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
@@ -3651,53 +3636,17 @@ function AdminSecurity(){
 
 // --- Admin API ---
 function AdminAPI(){
-  const providers=[
-    {name:'OpenRouter',status:'active',requests:0,latency:'—',cost:'—'},
-    {name:'Google Gemini',status:'unknown',requests:0,latency:'—',cost:'—'},
-    {name:'OpenAI',status:'unknown',requests:0,latency:'—',cost:'—'},
-    {name:'Anthropic',status:'unknown',requests:0,latency:'—',cost:'—'},
-    {name:'Groq',status:'inactive',requests:0,latency:'—',cost:'—'},
-    {name:'DeepSeek',status:'active',requests:0,latency:'—',cost:'—'},
-  ];
-  const statusColor={active:'text-emerald-500',inactive:'text-zinc-400',unknown:'text-amber-500'};
-  const statusDot={active:'bg-emerald-500',inactive:'bg-zinc-400',unknown:'bg-amber-500'};
   return html`
   <div>
     <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="Plug" size=${20}/> API Management</div>
-    <div className="text-[12px] text-zinc-500 mb-5">Monitor provider health and usage. Secret API keys are never displayed here.</div>
+    <div className="text-[12px] text-zinc-500 mb-5">Provider health and usage monitoring. Secret API keys are never displayed here.</div>
     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5 text-[12px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
       <${I} name="Lock" size=${14}/> API keys are stored in environment variables on your server. They are never exposed to this frontend.
     </div>
-    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141727]">
-            <tr>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Status</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Requests</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Avg Latency</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Est. Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${providers.map(p=>html`
-              <tr key=${p.name} className="border-b border-zinc-50 dark:border-zinc-900">
-                <td className="px-4 py-3 font-[600]">${p.name}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className=${`w-2 h-2 rounded-full ${statusDot[p.status]}`}></div>
-                    <span className=${statusColor[p.status]}>${p.status}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.requests}</td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.latency}</td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">${p.cost}</td>
-              </tr>
-            `)}
-          </tbody>
-        </table>
-      </div>
+    <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-8 text-center">
+      <${I} name="Plug" size=${28} className="mx-auto text-zinc-400 mb-3"/>
+      <div className="font-[700] text-[14px] mb-1">Provider health monitoring isn't connected yet</div>
+      <div className="text-[12px] text-zinc-500 max-w-[420px] mx-auto">Real-time status, request counts, and latency per provider (OpenRouter, Google, etc.) require a backend endpoint that isn't wired up yet — nothing is shown here rather than fabricated numbers.</div>
     </div>
   </div>`;
 }
@@ -3820,19 +3769,20 @@ function AdminSettings(){
       </div>
 
       <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-        <div className="font-[650] text-[13px] mb-4">Database & Storage</div>
+        <div className="font-[650] text-[13px] mb-1">Infrastructure</div>
+        <div className="text-[11px] text-zinc-500 mb-3">Configured backend services (not a live health check).</div>
         <div className="space-y-2 text-[12px]">
           <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
             <span className="text-zinc-600 dark:text-zinc-400">Database</span>
-            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Online</span>
+            <span className="text-zinc-500 font-[600]">Supabase</span>
           </div>
           <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
             <span className="text-zinc-600 dark:text-zinc-400">Storage</span>
-            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Storage</span>
+            <span className="text-zinc-500 font-[600]">Supabase Storage</span>
           </div>
           <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
             <span className="text-zinc-600 dark:text-zinc-400">Auth</span>
-            <span className="text-emerald-600 font-[600] flex items-center gap-1"><${I} name="CheckCircle" size=${12}/>Supabase Auth</span>
+            <span className="text-zinc-500 font-[600]">Supabase Auth</span>
           </div>
         </div>
       </div>
