@@ -2096,75 +2096,167 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
 function AnalyticsView(){
   const [tab,setTab]=useState('Overview');
   const [connected,setConnected]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [connecting,setConnecting]=useState(false);
+  const [data,setData]=useState(null);
+  const [err,setErr]=useState('');
   const tabs=['Overview','Content','Audience','Engagement','Revenue','Trends'];
-  const mockStats=[['Total Views','128.4K','+12.3%'],['Watch Time','4.2K hrs','+8.1%'],['Subscribers','8.2K','+4.5%'],['Avg CTR','6.8%','+1.2%']];
-  const mockVideos=[
-    {title:'10 AI Tools You Need in 2026', views:'42K', ctr:'8.2%', avgView:'4:12'},
-    {title:'How I Edit YouTube Shorts with AI', views:'31K', ctr:'7.5%', avgView:'3:48'},
-    {title:'Faceless YouTube Channel Setup', views:'24K', ctr:'6.1%', avgView:'5:20'},
-  ];
+
+  const fmt=(n)=>{
+    n=Number(n)||0;
+    if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+    if(n>=1000) return (n/1000).toFixed(1)+'K';
+    return String(n);
+  };
+  const fmtMinutes=(m)=>{
+    m=Number(m)||0;
+    const hrs=m/60;
+    if(hrs>=1000) return (hrs/1000).toFixed(1)+'K hrs';
+    return hrs.toFixed(0)+' hrs';
+  };
+
+  const loadAnalytics=async()=>{
+    setLoading(true); setErr('');
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token){ setConnected(false); setLoading(false); return; }
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-analytics-fetch`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if(json.connected){
+        setConnected(true);
+        setData(json);
+      } else {
+        setConnected(false);
+      }
+    }catch(e){
+      setErr('Could not load analytics. Please try again.');
+      setConnected(false);
+    }
+    setLoading(false);
+  };
+
+  useEffect(()=>{
+    const hash = window.location.hash;
+    if(hash.includes('yt_connected=1')){
+      toast('YouTube channel connected!');
+      history.replaceState(null,'',window.location.pathname+window.location.search+'#analytics');
+    } else if(hash.includes('yt_error=1')){
+      toast('Could not connect YouTube channel', 'err');
+      history.replaceState(null,'',window.location.pathname+window.location.search+'#analytics');
+    }
+    loadAnalytics();
+  },[]);
+
+  const handleConnect=async()=>{
+    setConnecting(true);
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token){ toast('Please sign in first', 'err'); setConnecting(false); return; }
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-oauth-start`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if(json.url){
+        window.location.href = json.url;
+      } else {
+        toast('Could not start connection', 'err');
+        setConnecting(false);
+      }
+    }catch(e){
+      toast('Could not start connection', 'err');
+      setConnecting(false);
+    }
+  };
+
+  const stats = data ? [
+    ['Total Views', fmt(data.overview.views), ''],
+    ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), ''],
+    ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), ''],
+    ['Net Sub Change', (data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '') + (data.overview.subscribersGained - data.overview.subscribersLost), ''],
+  ] : [];
+
+  const topVideos = data?.topVideos ?? [];
 
   return html`
   <div className="flex-1 h-full bg-[#fbfbfe] dark:bg-[#141620] p-6 overflow-y-auto">
-    <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
-    <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
+        <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
+      </div>
+      ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#7c5cff] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button>` : null}
+    </div>
 
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
       ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#7c5cff] border-b-2 border-[#7c5cff] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
     </div>
 
-    ${!connected ? html`
+    ${loading ? html`
+      <div className="flex items-center justify-center py-20 text-zinc-400 text-[12.5px] gap-2">
+        <${I} name="Loader2" size=${16} className="animate-spin"/> Loading analytics…
+      </div>
+    ` : !connected ? html`
       <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-10 text-center max-w-[760px]">
         <${I} name="Lock" size=${32} className="mx-auto text-[#7c5cff] mb-3"/>
         <div className="font-[700]">No Social Accounts Connected</div>
-        <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube / Instagram / TikTok to unlock analytics.</div>
-        <button onClick=${()=>{ setConnected(true); toast('Demo: channel connected'); }} className="mt-4 bg-[#7c5cff] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600]">Connect Your Account</button>
+        <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
+        ${err ? html`<div className="text-[11.5px] text-red-500 mt-2">${err}</div>` : null}
+        <button onClick=${handleConnect} disabled=${connecting} className="mt-4 bg-[#7c5cff] hover:bg-[#6b48f5] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600] disabled:opacity-60 transition-colors">${connecting?'Redirecting…':'Connect Your Account'}</button>
         <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
       </div>
     ` : html`
       <div className="space-y-5 max-w-[1000px]">
+        ${data?.channel ? html`
+          <div className="flex items-center gap-3 mb-1">
+            ${data.channel.thumbnail ? html`<img src=${data.channel.thumbnail} className="w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700"/>` : null}
+            <div>
+              <div className="font-[700] text-[13.5px]">${data.channel.title}</div>
+              <div className="text-[11px] text-zinc-500">Last 28 days</div>
+            </div>
+          </div>
+        ` : null}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          ${mockStats.map(([l,v,c])=>html`<div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-4"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div><div className="text-[11px] text-emerald-600">${c}</div></div>`)}
+          ${stats.map(([l,v,c])=>html`<div key=${l} className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[13px] p-4"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div>${c?html`<div className="text-[11px] text-emerald-600">${c}</div>`:null}</div>`)}
         </div>
         ${tab==='Overview' ? html`
           <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
-            <div className="font-[650] text-[13px] mb-3">Performance Overview</div>
-            <div className="h-[220px] flex items-end gap-2 px-2">
-              ${[35,52,48,68,75,62,88,95,82,70,90,105].map((h,i)=>html`<div key=${i} className="flex-1 flex flex-col items-center gap-1"><div className="w-full bg-[#7c5cff]/20 rounded-t-md relative" style=${{height:h+'px'}}><div className="absolute bottom-0 left-0 right-0 bg-[#7c5cff] rounded-t-md" style=${{height:(h*0.6)+'px'}}></div></div><div className="text-[9px] text-zinc-500">${['J','F','M','A','M','J','J','A','S','O','N','D'][i]}</div></div>`)}
-            </div>
-          </div>
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5">
             <div className="font-[650] text-[13px] mb-3">Top Performing Content</div>
             <div className="space-y-2">
-              ${mockVideos.map((v,i)=>html`<div key=${i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">${i+1}</div><div className="font-[600]">${v.title}</div></div><div className="flex gap-4 text-zinc-500"><span>${v.views} views</span><span>${v.ctr} CTR</span><span>${v.avgView} avg</span></div></div>`)}
+              ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="flex items-center gap-3">${v.thumbnail?html`<img src=${v.thumbnail} className="w-12 h-8 rounded-md object-cover"/>`:html`<div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">${i+1}</div>`}<div className="font-[600] max-w-[280px] truncate">${v.title}</div></div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${v.likes} likes</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet for this period.</div>`}
             </div>
           </div>
         ` : tab==='Content' ? html`
           <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Content Performance</div>
-            ${mockVideos.map((v,i)=>html`<div key=${i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="font-[600]">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${v.views} views</span><span>${v.ctr} CTR</span></div></div>`)}
+            ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px]"><div className="font-[600] max-w-[320px] truncate">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${fmtMinutes(v.watchTimeMinutes)}</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet.</div>`}
           </div>
         ` : tab==='Audience' ? html`
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Age Groups</div>
-              ${[['18-24','32%'],['25-34','45%'],['35-44','15%'],['45+','8%']].map(([a,p])=>html`<div key=${a} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-16">${a}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#7c5cff] rounded-full" style=${{width:p}}></div></div><div className="w-10 text-right">${p}</div></div>`)}
+            <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Age &amp; Gender</div>
+              ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`<div key=${i} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-20 truncate">${row[0]} · ${row[1]}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#7c5cff] rounded-full" style=${{width:(Number(row[2])||0)+'%'}}></div></div><div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
             </div>
             <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Top Countries</div>
-              ${[['India','42%'],['USA','23%'],['UK','12%'],['Canada','8%'],['Other','15%']].map(([c,p])=>html`<div key=${c} className="flex items-center justify-between mb-2 text-[12px]"><span>${c}</span><span className="font-[600]">${p}</span></div>`)}
+              ${(data?.topCountries ?? []).length ? data.topCountries.map((row,i)=>html`<div key=${i} className="flex items-center justify-between mb-2 text-[12px]"><span>${row[0]}</span><span className="font-[600]">${fmt(row[1])} views</span></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
             </div>
           </div>
         ` : tab==='Engagement' ? html`
           <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Engagement Metrics</div>
             <div className="grid grid-cols-3 gap-3 text-center">
-              ${[['Likes','8.4K','+5.2%'],['Comments','1.2K','+3.1%'],['Shares','642','+12.8%']].map(([l,v,c])=>html`<div key=${l} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-xl"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[20px] font-[800] display mt-1">${v}</div><div className="text-[11px] text-emerald-600">${c}</div></div>`)}
+              ${[['Likes',data?.overview.likes ?? 0],['Comments',data?.overview.comments ?? 0],['Shares',data?.overview.shares ?? 0]].map(([l,v])=>html`<div key=${l} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-xl"><div className="text-[11px] text-zinc-500">${l}</div><div className="text-[20px] font-[800] display mt-1">${fmt(v)}</div></div>`)}
             </div>
           </div>
         ` : tab==='Revenue' ? html`
-          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Estimated Revenue</div><div className="text-[28px] font-[800] display">₹24,850</div><div className="text-[12px] text-zinc-500">Last 28 days</div><div className="mt-4 text-[12px] text-zinc-500">RPM: ₹4.20 • CPM: ₹12.50</div></div>
+          <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5 text-center">
+            <${I} name="Info" size=${20} className="mx-auto text-zinc-400 mb-2"/>
+            <div className="font-[650] text-[13px] mb-1">Revenue data not connected</div>
+            <div className="text-[12px] text-zinc-500">Revenue reporting requires an additional permission. Reconnect your account with monetary access to see this.</div>
+          </div>
         ` : html`
           <div className="bg-white dark:bg-[#1a1d2e] border border-zinc-200 dark:border-[#2a2f4a] rounded-[14px] p-5"><div className="font-[650] text-[13px] mb-3">Trending Topics</div>
-            <div className="flex flex-wrap gap-2">
-              ${['AI tools','Faceless YouTube','YouTube Shorts','ChatGPT alternatives','Thumbnail design','Monetization','Video SEO'].map(t=>html`<span key=${t} className="px-3 py-1 rounded-full bg-[#f3f0ff] dark:bg-[#221d3a] text-[#7c5cff] text-[12px]">${t}</span>`)}
-            </div>
+            <div className="text-[12px] text-zinc-400 text-center py-6">Trend insights are generated from your content history and will appear here soon.</div>
           </div>
         `}
       </div>
