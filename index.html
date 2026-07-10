@@ -249,13 +249,53 @@ function formatDate(d){
 function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 function isAdmin(user){ return user?.email === ADMIN_EMAIL; }
 
-// ---------- Credit System ----------
+// ---------- Credit System v3 ----------
+// Credits Used = (BaseCost + userChars/50*5 + aiChars/50*5) × FeatureMultiplier, min 20, rounded.
+const CREDIT_BASE_COST = 20;
+const CREDIT_PER_50_CHARS = 5;
+const FEATURE_MULTIPLIERS = {
+  normal: 1,            // 💬 normal chat
+  web_search: 2,         // 🌐 live web search
+  youtube_analytics: 2.5, // 📊 shorts/video analytics
+  channel_analytics: 2.5, // 📈 channel-level analytics
+  image_analysis: 3,      // 🖼 vision / thumbnail analysis
+  image_gen: 8,           // 🎨 AI image generation
+  video_analysis: 10,     // 🎥 video analysis
+  agent: 12,              // 🤖 future AI agent
+};
 const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
   image_gen: 200, image_edit: 200, voice: 100, smart_multiplier: 1.5
 };
 const PLAN_CREDITS = { free: 20000, pro: 500000, elite: 1000000 };
+const LOW_CREDIT_WARNING_RATIO = 0.10; // warn under 10% of the plan's monthly allowance remaining
 
+// Heuristically detect which feature multiplier applies to a message, since the
+// user doesn't explicitly tag "this is an analytics question" — we infer it from
+// content so YouTube/channel analytics questions get charged at the right tier.
+function detectCreditFeature({text='', attachment=null, webSearch=false}={}){
+  const t = text.toLowerCase();
+  if(attachment?.type==='image') return 'image_analysis';
+  const analyticsRe = /\b(ctr|click[- ]?through|impressions|retention|average view duration|avd|watch time|subscribers?( gained)?|channel analytics|video analytics|youtube analytics|analytics)\b/;
+  if(analyticsRe.test(t)) return /\bchannel\b/.test(t) ? 'channel_analytics' : 'youtube_analytics';
+  if(webSearch) return 'web_search';
+  return 'normal';
+}
+
+// Core v3 formula. Pass aiText='' before sending for a live preview estimate;
+// pass the real AI reply after completion for the actual charge.
+function estimateCreditCostV3({userText='', aiText='', feature='normal', smart=false}={}){
+  const userChars = (userText||'').length;
+  const aiChars = (aiText||'').length;
+  const raw = CREDIT_BASE_COST + (userChars/50*CREDIT_PER_50_CHARS) + (aiChars/50*CREDIT_PER_50_CHARS);
+  const multiplier = FEATURE_MULTIPLIERS[feature] ?? FEATURE_MULTIPLIERS.normal;
+  let cost = raw * multiplier;
+  if(smart) cost *= 1.15; // smart/deep-reasoning mode carries a modest extra premium on top of the feature multiplier
+  return Math.max(CREDIT_BASE_COST, Math.round(cost));
+}
+
+// Legacy flat-cost estimator — still used by Voice Studio and other pathways
+// that aren't part of the v3 character-based formula above.
 function estimateCreditCost({text='', feature='text', smart=false, attachment=null, creditCosts=DEFAULT_CREDIT_COSTS}){
   let cost = 0;
   const len = text.length;
@@ -375,6 +415,7 @@ Match the confidence of every claim to the strength of the evidence behind it. U
 
 --- IMAGE FLOW ---
 Once you have successfully analyzed an uploaded image in this conversation, do not ask the user to upload it again in the same reply or immediately after — you already have it. Only ask for a re-upload if the image genuinely failed to come through.
+If an image was supposed to be attached but you did not actually receive usable image content this turn, say so plainly and briefly (e.g. "I couldn't see the image that time") rather than guessing at its contents or silently answering as if you'd seen it. Never fabricate a thumbnail description, score, or CTR opinion when no image content actually reached you — an honest "I couldn't see it, try again" is always better than a confident guess. Don't over-apologize or repeat the failure explanation more than once; state it once, plainly, and invite a retry.
 
 --- FINAL SELF-CHECK (apply silently before every response) ---
 Before finalizing any analytical response (analytics, thumbnails, strategy), quickly check: Did I state anything as fact without evidence? Is every conclusion actually supported by what was given? Did I flag missing data before concluding, in the right priority order? Did I explain the "why" behind every recommendation? Did I avoid generic filler advice? Did I connect related metrics instead of treating them in isolation? Did I filter out low-quality or irrelevant sources? If any check fails, revise before sending.
@@ -420,7 +461,9 @@ const SMART_TEXT_MODELS = [
   'deepseek/deepseek-chat-v3-0324:free'
 ];
 const FREE_VISION_MODELS = [
-  'google/gemma-4-31b-it:free','google/gemma-4-26b-a4b-it:free','nvidia/nemotron-nano-12b-v2-vl:free'
+  'mistralai/mistral-small-3.1-24b-instruct:free','google/gemma-3-27b-it:free',
+  'qwen/qwen2.5-vl-32b-instruct:free','meta-llama/llama-3.2-11b-vision-instruct:free',
+  'internlm/internvl3-14b:free'
 ];
 // This AI is scoped to content creation only now. Deep-reasoning models are the
 // default for any substantive question; the fast pool is only for trivial chat
@@ -432,7 +475,7 @@ function looksLikeHardReasoning(text){
   return !isTrivialChat;
 }
 
-async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText=''}={}){
+async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText='',_isRetry=false}={}){
   const wantsSmart = smart || looksLikeHardReasoning(userText);
   const poolBase = vision
     ? [...FREE_VISION_MODELS, ...NORMAL_TEXT_MODELS]
@@ -452,6 +495,13 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
     else debugInfo = `all ${d?.tried||pool.length} models returned empty (likely OpenRouter daily free-tier limit — 50/day without $10 credit purchased, 1000/day with it)`;
     console.error('Zedith AI failed:', debugInfo, d);
   } catch(e){ debugInfo = 'network error: '+e.message; console.error('Zedith AI network error:', e); }
+
+  // Vision requests are more prone to a transient single-shot failure (a flaky
+  // multimodal model in the pool) — give it exactly one automatic silent retry
+  // before showing the user a "couldn't see your image" message.
+  if(vision && !_isRetry){
+    return callOR(messages, {vision, smart, modelPref, hasImage, userText, _isRetry:true});
+  }
 
   // Honest fallback: never pretend to have analyzed an image or fabricate unrelated
   // "creator draft" content as if it answered the question. Say plainly what failed,
@@ -876,13 +926,19 @@ function App(){
   }
 
   async function deductCredits(cost, feature, metadata={}){
-    if(!user || isAdmin(user)) return true;
+    if(!user || isAdmin(user)) return {ok:true, remaining:Infinity};
     const current = profile?.credits || 0;
-    if(current < cost) return false;
+    if(current < cost) return {ok:false, remaining:current};
     const remaining = current - cost;
     await updateProfileCredits(remaining);
     await logTransaction(feature, cost, remaining, metadata);
-    return true;
+    const planTotal = PLAN_CREDITS[profile?.plan||'free'] || PLAN_CREDITS.free;
+    const wasAbove = (current/planTotal) >= LOW_CREDIT_WARNING_RATIO;
+    const nowBelow = (remaining/planTotal) < LOW_CREDIT_WARNING_RATIO;
+    if(wasAbove && nowBelow){
+      toast(`You're under 10% of your monthly Credits — upgrade to Zedith Pro or wait for your renewal.`, 'err');
+    }
+    return {ok:true, remaining};
   }
 
   async function addNotification(title, body){
@@ -932,9 +988,8 @@ function App(){
       || /^(what|why|how|is|does|can|should|explain|analyze|analyse|rate|review|tell me|list|rank|does this|can you (tell|explain|analyze|rate|review))\b/i.test((text||'').trim());
 
     if(wantsImage && !attachment && !looksLikeQuestion){
-      const cost = estimateCreditCost({text, feature:'image_gen', smart, creditCosts});
-      const ok = await deductCredits(cost, 'image_gen', {prompt:text});
-      if(!ok){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+      const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:'image_gen', smart});
+      if(!(await hasEnoughCredits(preEstimate))){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
 
       const placeholderId=uid('m');
       const chatWithPlaceholder={...updatedChat, messages:[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image_generating', prompt:text, ts:Date.now()}]};
@@ -953,12 +1008,17 @@ function App(){
           url=imageGenUrl(imgPrompt+', high quality, vibrant, high detail');
           await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
         }
-        const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:`Here’s your generated image for: "${imgPrompt}"`, ts:Date.now()}];
+        // Success — charge now, using the real prompt/caption length (v3: only successful requests are billed).
+        const replyText = `Here’s your generated image for: "${imgPrompt}"`;
+        const finalCost = estimateCreditCostV3({userText:text, aiText:replyText, feature:'image_gen', smart});
+        const {remaining} = await deductCredits(finalCost, 'image_gen', {prompt:text});
+        const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:replyText, creditsUsed:finalCost, creditsRemaining:remaining, ts:Date.now()}];
         setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
         const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
         addNotification('Image generated', imgPrompt.slice(0,60));
         return;
       }catch(e){
+        // Failed request — 0 credits charged, per v3 rules.
         const errMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'text', text:'Image generation failed: '+e.message, error:true, ts:Date.now()}];
         setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:errMessages, updated_at:new Date().toISOString()}:c));
         const {error:e2}=await supabase.from('chats').update({messages:errMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e2) console.error('chat save error:', e2);
@@ -966,10 +1026,9 @@ function App(){
       }
     }
 
-    const feature = attachment?.type==='image' ? 'vision' : text.length > 200 ? 'text_long' : text.length > 20 ? 'text_medium' : 'text_short';
-    const cost = estimateCreditCost({text, feature, smart, attachment, creditCosts});
-    const ok = await deductCredits(cost, feature, {length:text.length});
-    if(!ok){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+    const creditFeature = detectCreditFeature({text, attachment, webSearch});
+    const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
+    if(!(await hasEnoughCredits(preEstimate))){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
 
     const history=(chat?.messages||[]).slice(-8).map(mm=>{
       if(mm.attachment?.type==='image'){
@@ -1012,13 +1071,23 @@ function App(){
       const {text:answer, model, tried, error, debugInfo} = await callOR(payload,{vision:!!attachment, smart, modelPref: modelPref==='auto'? (settings.defaultModel==='auto'?null:settings.defaultModel) : modelPref, hasImage: !!attachment, userText: text});
       const combinedDebug = [error?debugInfo:null, searchDebug||null].filter(Boolean).join(' | ') || null;
       const cleanAnswer = stripInlineSourcesList(answer);
-      const assistantMsg={id:uid('m'), role:'assistant', text:cleanAnswer, ts:Date.now(), model, tried, liked:0, error:!!error, debugInfo: combinedDebug, sources: searchSources.length ? searchSources : null};
+      // v3 rule: credits are only charged on a genuinely successful response, using
+      // the REAL user+AI character counts (not the pre-send estimate) — failed
+      // requests are 0 credits.
+      let creditsUsed = 0, creditsRemaining = profile?.credits ?? 0;
+      if(!error){
+        creditsUsed = estimateCreditCostV3({userText:text, aiText:cleanAnswer, feature:creditFeature, smart});
+        const ded = await deductCredits(creditsUsed, creditFeature, {userChars:text.length, aiChars:cleanAnswer.length});
+        creditsRemaining = ded.remaining;
+      }
+      const assistantMsg={id:uid('m'), role:'assistant', text:cleanAnswer, ts:Date.now(), model, tried, liked:0, error:!!error, debugInfo: combinedDebug, sources: searchSources.length ? searchSources : null, creditsUsed, creditsRemaining};
       const finalMessages=[...updatedChat.messages, assistantMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
       const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
       if(!error) addNotification('Zedith replied', cleanAnswer.slice(0,70));
     }catch(e){
-      const errMsg={id:uid('m'), role:'assistant', text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, ts:Date.now()};
+      // Network/unexpected failure — 0 credits charged, per v3 rules.
+      const errMsg={id:uid('m'), role:'assistant', text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, ts:Date.now(), creditsUsed:0};
       const finalMessages=[...updatedChat.messages, errMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
       const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
@@ -1568,6 +1637,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                       <button onClick=${()=>{ const lastUser = [...messages].reverse().find(mm=>mm.role==='user'); if(lastUser){ doSend(lastUser.text); toast('Regenerating…'); } }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="RefreshCw" size=${13}/> Regenerate</button>
                       <button onClick=${()=>{ updateChat(chat.id, {saved:!chat.saved}); toast(chat.saved?'Removed from saved':'Saved chat ✓'); }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name=${chat.saved?'BookmarkCheck':'Bookmark'} size=${13}/> ${chat.saved?'Saved':''}</button>
                       ${m.model ? html`<span className="text-[10px] text-zinc-400">• ${String(m.model).split('/').pop()} ${m.tried?`· ${m.tried} tried`:''}</span>`:null}
+                      ${(!isAdminUser && typeof m.creditsUsed==='number') ? html`<span className="text-[10px] text-zinc-400">• ${m.creditsUsed>0?`${m.creditsUsed.toLocaleString('en-IN')} Credits used`:'0 Credits (failed request)'}</span>`:null}
                     </div>
                     ${m.debugInfo && isAdminUser ? html`
                       <div className="mt-[6px] text-[10.5px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-[8px] px-[8px] py-[5px] max-w-[560px] break-words">
@@ -1630,7 +1700,10 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
       </div>
       <div className="max-w-[760px] mx-auto flex items-center justify-between text-[10.5px] text-zinc-400 mt-[8px] px-1">
         <span>${isAdminUser?'Admin mode: unlimited credits':`Credits: ${credits.toLocaleString('en-IN')} remaining`}</span>
-        <span>🔒 Secure</span>
+        <span className="flex items-center gap-[8px]">
+          ${!isAdminUser && (input.trim()||attached) ? html`<span>≈ ${estimateCreditCostV3({userText:input, aiText:'', feature:detectCreditFeature({text:input, attachment:attached, webSearch}), smart}).toLocaleString('en-IN')} Credits</span>` : null}
+          <span>🔒 Secure</span>
+        </span>
       </div>
     </div>
     ${sourcesModalFor ? html`<${SourcesSheet} sources=${(messages.find(m=>m.id===sourcesModalFor)?.sources)||[]} onClose=${()=>setSourcesModalFor(null)}/>` : null}
@@ -2139,7 +2212,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   const gen = async ()=>{
     if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
     const cost = estimateCreditCost({text, feature:'voice', creditCosts:DEFAULT_CREDIT_COSTS});
-    const ok = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
+    const {ok} = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
     if(!ok && !isAdminUser){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
 
     setBusy(true); setAudioUrl(null);
