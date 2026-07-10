@@ -267,7 +267,7 @@ const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
   image_gen: 200, image_edit: 200, voice: 100, smart_multiplier: 1.5
 };
-const PLAN_CREDITS = { free: 20000, pro: 500000, elite: 1000000 };
+const PLAN_CREDITS = { free: 50000, pro: 500000, elite: 1000000 };
 const LOW_CREDIT_WARNING_RATIO = 0.10; // warn under 10% of the plan's monthly allowance remaining
 
 // Heuristically detect which feature multiplier applies to a message, since the
@@ -422,6 +422,9 @@ Before finalizing any analytical response (analytics, thumbnails, strategy), qui
 
 Script writing: start with a strong hook, keep pacing fast, use curiosity, avoid filler, end with a CTA.
 Thumbnail mode: analyze CTR, readability, contrast, emotion, curiosity, composition, colors, mobile visibility based ONLY on what's actually visible in the image — never invent or exaggerate a visual flaw you can't clearly see, and never state a precise numeric CTR range from the thumbnail alone (CTR depends on audience, title, impressions, and competition, none of which a thumbnail image can tell you — you may say a thumbnail is likely to help or hurt CTR, but never quote exact percentages from image alone). Explicitly name the strongest positive design elements too (e.g. reward/progression cues, contrast, readability, emotional expression) — not just problems. When explaining visual hierarchy, explain WHY the eye is drawn where it is (contrast against background, size, face/eye placement, color saturation, position within the frame) rather than just stating what stands out. Give a score out of 10 and suggestions that are specific to this exact image (reference the actual colors/elements/text you saw), not generic image-improvement tips that could apply to any thumbnail.
+--- IMAGE GENERATION REQUESTS (no image model currently connected) ---
+You cannot generate, create, or output actual images right now. When the user asks you to make/generate/create/draw an image, picture, thumbnail, illustration, or similar (e.g. "make an image of my dog"), do NOT say you can't help — instead write a detailed, ready-to-use image generation PROMPT they can paste into another AI image tool (Midjourney, DALL·E, Stable Diffusion, etc). Cover: subject, pose/expression, composition, lighting, color palette, style/aesthetic, background, mood, and any other detail implied by their request. Present it clearly (e.g. in a labeled block) so they can copy-paste it directly, and briefly note it's a prompt for them to use in an image generator.
+If the user then clarifies they don't want a prompt and specifically want you to actually produce/output the image yourself, do not give a prompt again — instead reply in plain conversational language that you're not able to generate images yourself right now, in a natural, human, apologetic tone (not a system/error message, not a toast). Keep it brief and warm, and you may suggest pasting the earlier prompt into an image-generation tool instead.
 Image generation (thumbnails/assets): high quality, good lighting, professional aesthetics, correct proportions, sharp details.
 Writing style rules: use clean formatting, headings when useful, bullet points where appropriate, avoid giant paragraphs, keep responses premium and easy to read.
 If unclear or missing key context: ask one concise clarifying question rather than guessing.
@@ -805,12 +808,12 @@ function App(){
   async function loadProfile(){
     let {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
     const adminUser = isAdmin(user);
-    const planCreditsFor = (plan)=> PLAN_CREDITS[plan||'free'] ?? PLAN_CREDITS['elite'] ?? 20000;
+    const planCreditsFor = (plan)=> PLAN_CREDITS[plan||'free'] ?? PLAN_CREDITS['elite'] ?? 50000;
     if(!data && !error){
       const nowIso=new Date().toISOString();
       const fresh = {
         id:user.id, email:user.email||'', display_name:'', username:'', bio:'',
-        plan:'free', credits: adminUser ? 999999999 : 20000, monthly_credits: adminUser ? 999999999 : 20000,
+        plan:'free', credits: adminUser ? 999999999 : 50000, monthly_credits: adminUser ? 999999999 : 50000,
         credits_reset_at: nowIso, created_at:nowIso
       };
       const created = await supabase.from('profiles').insert(fresh).select().single();
@@ -971,60 +974,12 @@ function App(){
     const {error:saveErr} = await supabase.from('chats').update({messages:updatedMessages, updated_at:now, title:updatedChat.title}).eq('id',chatId);
     if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
 
-    const lower=(text||'').toLowerCase();
-    // Only trigger image GENERATION on explicit generation commands.
-    // Previously the word "thumbnail" alone triggered this, so analysis
-    // questions like "rate this thumbnail" or "explain my thumbnail CTR"
-    // were hijacked into generating a picture instead of answering.
-    const wantsImage = /^\s*\/image\b/.test(lower)
-      || /\b(generate|create|make|draw)\s+(me\s+)?(an?\s+)?(new\s+)?(image|picture|thumbnail|art|illustration|photo)\b/.test(lower)
-      || /\b(image|picture|thumbnail)\s+of\b/.test(lower)
-      || /\bimagine\s+(a|an|the)\b/.test(lower);
-
-    // A question is never a generation request, even if it contains
-    // "image" or "thumbnail" — and an attached image is clearly meant
-    // for analysis, not generation.
-    const looksLikeQuestion = /\?/.test(text||'')
-      || /^(what|why|how|is|does|can|should|explain|analyze|analyse|rate|review|tell me|list|rank|does this|can you (tell|explain|analyze|rate|review))\b/i.test((text||'').trim());
-
-    if(wantsImage && !attachment && !looksLikeQuestion){
-      const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:'image_gen', smart});
-      if(!(await hasEnoughCredits(preEstimate))){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
-
-      const placeholderId=uid('m');
-      const chatWithPlaceholder={...updatedChat, messages:[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image_generating', prompt:text, ts:Date.now()}]};
-      setChats(cs=>cs.map(c=>c.id===chatId?chatWithPlaceholder:c));
-      try{
-        let imgPrompt=text.replace(/^(generate|create|make)\s+(an?\s+)?image\s+(of\s+)?/i,'').trim()||text;
-        const isThumbnail = /thumbnail/i.test(text);
-        let url;
-        if(isThumbnail){
-          // Pull a likely title out of the request (text after "about"/"title"/"topic is", or quoted text, else the whole prompt).
-          const titleMatch = text.match(/(?:titled?|title(?:d)?\s*[:\-]?|topic\s+is|about)\s*["“]?([^"”\n]{3,80})["”]?$/i) || text.match(/["“]([^"”]{3,80})["”]/);
-          const titleText = (titleMatch ? titleMatch[1] : imgPrompt).trim();
-          const bgPrompt = `${imgPrompt}, cinematic youtube thumbnail background, bold composition, vibrant colors, dramatic lighting, no text, no words, no letters`;
-          url = await composeThumbnail(bgPrompt, titleText);
-        } else {
-          url=imageGenUrl(imgPrompt+', high quality, vibrant, high detail');
-          await new Promise(res=>{ const im=new Image(); im.onload=res; im.onerror=res; im.src=url; setTimeout(res, 1800); });
-        }
-        // Success — charge now, using the real prompt/caption length (v3: only successful requests are billed).
-        const replyText = `Here’s your generated image for: "${imgPrompt}"`;
-        const finalCost = estimateCreditCostV3({userText:text, aiText:replyText, feature:'image_gen', smart});
-        const {remaining} = await deductCredits(finalCost, 'image_gen', {prompt:text});
-        const finalMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'image', imageUrl:url, prompt:imgPrompt, text:replyText, creditsUsed:finalCost, creditsRemaining:remaining, ts:Date.now()}];
-        setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
-        const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
-        addNotification('Image generated', imgPrompt.slice(0,60));
-        return;
-      }catch(e){
-        // Failed request — 0 credits charged, per v3 rules.
-        const errMessages=[...updatedChat.messages,{id:placeholderId, role:'assistant', type:'text', text:'Image generation failed: '+e.message, error:true, ts:Date.now()}];
-        setChats(cs=>cs.map(c=> c.id===chatId ? {...c, messages:errMessages, updated_at:new Date().toISOString()}:c));
-        const {error:e2}=await supabase.from('chats').update({messages:errMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e2) console.error('chat save error:', e2);
-        return;
-      }
-    }
+    // NOTE: Direct image generation is temporarily disabled. Requests that ask
+    // for an image now fall through to the normal AI chat path below — the
+    // system prompt instructs the model to hand back a detailed prompt the
+    // user can paste into another AI image tool, and to politely decline
+    // (as a normal chat reply, not an error) if the user insists on an
+    // actual generated image.
 
     const creditFeature = detectCreditFeature({text, attachment, webSearch});
     const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
@@ -1234,7 +1189,7 @@ function App(){
       profile=${profile}
       isAdminUser=${isAdmin(user)}
       credits=${profile?.credits||0}
-      monthlyCredits=${profile?.monthly_credits||20000}
+      monthlyCredits=${profile?.monthly_credits||50000}
       signOut=${signOut}
       openTool=${t=>setToolModal(t)}
       openNotifications=${openNotifications}
@@ -2809,7 +2764,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
           <div className="font-[650] mb-2">Account</div>
           <div className="text-zinc-500 text-[11px] space-y-1">
             <div>Plan: <b>${(profile?.plan||'free').toUpperCase()}</b></div>
-            <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||20000).toLocaleString('en-IN')}</b></div>
+            <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||50000).toLocaleString('en-IN')}</b></div>
             <div>Storage: <b>Supabase Cloud</b></div>
           </div>
           <button onClick=${openUpgrade} className="w-full mt-3 bg-[#7c5cff] text-white py-[8px] rounded-xl text-[12px] font-[600]">Upgrade to Pro</button>
@@ -2841,8 +2796,8 @@ function UpgradeView({plan, planConfig, onPlan}) {
   };
 
   const plans = [
-    {k:'free', name:'Free', credits:planConfig.free||20000,
-      features:[['20K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
+    {k:'free', name:'Free', credits:planConfig.free||50000,
+      features:[['50K Credits / month',1],['Basic AI Models',1],['Web Search',1],['Chat History',1],['Save Chats',1],['Voice Studio',0],['Channel Analytics',0],['AI Image Generation',1],['Priority Support',0]],
       btn:'Current Plan', popular:false},
     {k:'pro', name:'Pro', credits:planConfig.pro||500000, badge:'★ Most Popular',
       features:[['500K Credits / month',1],['Advanced AI Models',1],['Web Search',1],['Voice Studio',1],['Channel Analytics',1],['AI Image Generation',1],['Faster Responses',1],['AI Memory',1],['Priority Support',1]],
@@ -3213,13 +3168,13 @@ function AdminUsers(){
   };
 
   const resetCredits=async(uid,plan)=>{
-    const cr = PLAN_CREDITS[plan||'free']||20000;
+    const cr = PLAN_CREDITS[plan||'free']||50000;
     await adjustCredits(uid,cr,'set');
     toast('Credits reset to plan default');
   };
 
   const changePlan=async(uid,plan)=>{
-    const cr = PLAN_CREDITS[plan]||20000;
+    const cr = PLAN_CREDITS[plan]||50000;
     const {error}=await supabase.from('profiles').update({plan,credits:cr,monthly_credits:cr}).eq('id',uid);
     if(!error){ setUsers(us=>us.map(x=>x.id===uid?{...x,plan,credits:cr}:x)); toast('Plan updated'); }
     else toast('Failed: '+error.message,'err');
