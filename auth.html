@@ -124,7 +124,7 @@ tailwind.config = {
             email, password,
             options: {
               data: { display_name: name || email.split('@')[0] },
-              emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html'
+              emailRedirectTo: 'https://zedithai.vercel.app/index.html'
             }
           });
           if(error) throw error;
