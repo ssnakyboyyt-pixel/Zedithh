@@ -73,8 +73,8 @@ tailwind.config = {
 
   <script type="module">
     import { createClient } from '@supabase/supabase-js';
-    const SUPABASE_URL = 'https://ghcgqrhhrxpyysjsxexv.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoY2dxcmhocnhweXlzanN4ZXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODExMTEsImV4cCI6MjA5ODc1NzExMX0.7gD3O0Oa-hhp1LfA8Mv0JM2J22U5SmC7YOWqC7u9LDM';
+    const SUPABASE_URL = 'https://fyypciidgbvdbalwrstb.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5eXBjaWlkZ2J2ZGJhbHdyc3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzYwMjgsImV4cCI6MjA5OTM1MjAyOH0.JRDljDTWYuBH9d-MsQxaioyPtkfsMX60GAwGmno5J0s';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const params = new URLSearchParams(location.search);
@@ -124,7 +124,7 @@ tailwind.config = {
             email, password,
             options: {
               data: { display_name: name || email.split('@')[0] },
-              emailRedirectTo: 'https://zedithai.vercel.app/index.html'
+              emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html'
             }
           });
           if(error) throw error;
