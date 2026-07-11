@@ -73,13 +73,8 @@ tailwind.config = {
 
   <script type="module">
     import { createClient } from '@supabase/supabase-js';
-
-    const configRes = await fetch('/api/config');
-    if(!configRes.ok){
-      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#71717a;font-size:13px;text-align:center;padding:20px;">Zedith couldn\'t start — please refresh the page. If this keeps happening, contact zedithsupport@gmail.com</div>';
-      throw new Error('Failed to load app config from /api/config');
-    }
-    const {url: SUPABASE_URL, anonKey: SUPABASE_ANON} = await configRes.json();
+    const SUPABASE_URL = 'https://ghcgqrhhrxpyysjsxexv.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoY2dxcmhocnhweXlzanN4ZXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODExMTEsImV4cCI6MjA5ODc1NzExMX0.7gD3O0Oa-hhp1LfA8Mv0JM2J22U5SmC7YOWqC7u9LDM';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const params = new URLSearchParams(location.search);
@@ -129,7 +124,7 @@ tailwind.config = {
             email, password,
             options: {
               data: { display_name: name || email.split('@')[0] },
-              emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html'
+              emailRedirectTo: 'https://zedithai.vercel.app/index.html'
             }
           });
           if(error) throw error;
