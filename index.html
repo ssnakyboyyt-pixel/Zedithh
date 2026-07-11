@@ -8,6 +8,15 @@
 <meta name="description" content="Zedith AI is an AI-powered content creation and analytics workspace for YouTube creators — get script writing, thumbnail feedback, content ideas, and channel analytics powered by Zedith AI."/>
 <meta name="keywords" content="Zedith AI, Zedith, AI creator tools, YouTube AI assistant, content creation AI, thumbnail analyzer, script writer AI"/>
 <link rel="canonical" href="https://zedithai.vercel.app/"/>
+
+<!-- Favicons -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico"/>
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png"/>
+<meta name="theme-color" content="#0b0b12"/>
 <meta property="og:title" content="Zedith AI — AI Creator Workspace"/>
 <meta property="og:description" content="AI-powered content creation and analytics workspace for YouTube creators, built by Zedith AI."/>
 <meta property="og:type" content="website"/>
@@ -96,9 +105,18 @@ const I = ({name, size=16, className="", ...p}) => {
 };
 
 // ---------- Supabase ----------
-const SUPABASE_URL = 'https://fyypciidgbvdbalwrstb.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5eXBjaWlkZ2J2ZGJhbHdyc3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzYwMjgsImV4cCI6MjA5OTM1MjAyOH0.JRDljDTWYuBH9d-MsQxaioyPtkfsMX60GAwGmno5J0s';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+// Credentials are never hardcoded here — they're fetched from /api/config,
+// which reads SUPABASE_URL and SUPABASE_ANON_KEY from server env vars.
+// This lets the live and dev deployments point at different Supabase
+// projects purely via Vercel env vars, with zero code differences.
+let supabase = null;
+async function initSupabase(){
+  const res = await fetch('/api/config');
+  if(!res.ok) throw new Error('Failed to load app config from /api/config');
+  const {url, anonKey} = await res.json();
+  supabase = createClient(url, anonKey);
+  supabase.projectUrl = url; // reused by direct edge-function fetch() calls below
+}
 
 // ---------- helpers ----------
 const ADMIN_EMAIL = 'zedithsupport@gmail.com';
@@ -129,6 +147,36 @@ function toast(msg,type='ok'){
   el.appendChild(dot); el.appendChild(label);
   root.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(5px)'; setTimeout(()=>el.remove(),200)},2400);
+}
+
+// Same visual style as toast(), but stays up for 5s with a clickable "Undo"
+// button. onUndo is called if the person taps Undo before it expires;
+// onExpire (the real delete) runs automatically once the 5s window passes.
+function toastUndo(msg,onUndo,onExpire){
+  const root=document.getElementById('toast-root');
+  const el=document.createElement('div');
+  el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[#1a1d2e]/95 border-[#7c5cff]/25 text-white`;
+  el.style.transition='opacity .2s ease, transform .2s ease';
+  const dot=document.createElement('span');
+  dot.className='w-[6px] h-[6px] rounded-full shrink-0 bg-[#a487ff]';
+  const label=document.createElement('span');
+  label.textContent=msg;
+  label.className='flex-1';
+  const undoBtn=document.createElement('button');
+  undoBtn.textContent='Undo';
+  undoBtn.className='text-[#a487ff] font-[700] hover:text-white transition-colors shrink-0';
+  let done=false;
+  const dismiss=(ranUndo)=>{
+    if(done) return; done=true;
+    clearTimeout(timer);
+    el.style.opacity='0'; el.style.transform='translateY(5px)';
+    setTimeout(()=>el.remove(),200);
+    if(ranUndo) onUndo(); else onExpire();
+  };
+  undoBtn.onclick=()=>dismiss(true);
+  el.appendChild(dot); el.appendChild(label); el.appendChild(undoBtn);
+  root.appendChild(el);
+  const timer=setTimeout(()=>dismiss(false),5000);
 }
 
 function ConfirmDialog({title, message, confirmLabel='Confirm', danger=false, onConfirm, onClose}){
@@ -241,6 +289,25 @@ function fallbackCopy(t){
   document.body.appendChild(ta); ta.select();
   try{document.execCommand('copy'); toast('Copied')}catch{toast('Copy failed','err')}
   ta.remove();
+}
+// True only when the browser actually supports the native share sheet
+// (mobile Chrome/Safari, most desktop browsers do not) — used to decide
+// whether to show the Share button at all, instead of showing it and
+// failing silently on unsupported browsers.
+const canNativeShare = typeof navigator!=='undefined' && !!navigator.share;
+function shareText(text, title='Zedith'){
+  if(!navigator.share){ copyText(text); return; }
+  navigator.share({ title, text }).catch(err=>{
+    // AbortError just means the person closed the share sheet — not a real failure.
+    if(err && err.name!=='AbortError'){ console.error('share failed:', err); toast('Share failed — copied instead'); copyText(text); }
+  });
+}
+// Very light plain-text -> Markdown pass: wraps the raw AI response so pasting
+// it into a notes app/README preserves basic structure. Zedith's responses
+// are already close to Markdown (headings/lists), so this mainly just leaves
+// the text as-is; kept as its own function in case formatting rules grow later.
+function toMarkdown(text){
+  return (text||'').trim();
 }
 function formatDate(d){
   const date = new Date(d);
@@ -1080,10 +1147,20 @@ function App(){
   }
 
   async function deleteChat(chatId){
-    const {error}=await supabase.from('chats').delete().eq('id',chatId);
-    if(error){ console.error('deleteChat error:', error); toast('Failed to delete chat: '+error.message,'err'); return; }
+    const chatToDelete = chats.find(c=>c.id===chatId);
+    if(!chatToDelete) return;
+    // Remove from view immediately for a snappy feel, but don't hit the DB yet.
     setChats(cs=>cs.filter(c=>c.id!==chatId));
-    toast('Chat deleted');
+    toastUndo(
+      'Chat deleted',
+      // onUndo: restore it in the UI, nothing was ever sent to the DB.
+      ()=>{ setChats(cs=>[chatToDelete, ...cs]); },
+      // onExpire: the 5s window passed with no undo — now actually delete it.
+      async ()=>{
+        const {error}=await supabase.from('chats').delete().eq('id',chatId);
+        if(error){ console.error('deleteChat error:', error); toast('Failed to delete chat: '+error.message,'err'); setChats(cs=>[chatToDelete, ...cs]); }
+      }
+    );
   }
 
   async function updateMessage(chatId, msgId, patch){
@@ -1110,12 +1187,22 @@ function App(){
   async function updateProject(id, patch){
     const updated={...projects.find(p=>p.id===id), ...patch, updated_at:new Date().toISOString()};
     setProjects(ps=>ps.map(p=>p.id===id?updated:p));
-    await supabase.from('projects').update(updated).eq('id',id);
+    const {error}=await supabase.from('projects').update(updated).eq('id',id);
+    if(error){ console.error('updateProject error:', error); toast('Failed to save project changes: '+error.message,'err'); }
   }
 
   async function deleteProject(id){
-    await supabase.from('projects').delete().eq('id',id);
+    const projectToDelete = projects.find(p=>p.id===id);
+    if(!projectToDelete) return;
     setProjects(ps=>ps.filter(p=>p.id!==id));
+    toastUndo(
+      'Project deleted',
+      ()=>{ setProjects(ps=>[projectToDelete, ...ps]); },
+      async ()=>{
+        const {error}=await supabase.from('projects').delete().eq('id',id);
+        if(error){ console.error('deleteProject error:', error); toast('Failed to delete project: '+error.message,'err'); setProjects(ps=>[projectToDelete, ...ps]); }
+      }
+    );
   }
 
   async function uploadProjectFile(projectId, file){
@@ -1586,6 +1673,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                       <div className="flex gap-3 text-[11px] text-zinc-500">
                         <a href=${m.imageUrl} download="zedith-image.png" target="_blank" className="hover:underline flex items-center gap-1"><${I} name="Download" size=${12}/> Download PNG</a>
                         <button onClick=${()=>copyText(m.imageUrl)} className="hover:underline flex items-center gap-1"><${I} name="Copy" size=${12}/> Copy URL</button>
+                        ${canNativeShare ? html`<button onClick=${()=>shareText(m.imageUrl, 'Zedith image')} className="hover:underline flex items-center gap-1"><${I} name="Share2" size=${12}/> Share</button>`:null}
                       </div>
                     </div>
                   ` : html`
@@ -1603,7 +1691,14 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                   `:null}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
+                      ${m.error ? html`
+                        <button onClick=${()=>{ const lastUser = [...messages].reverse().find(mm=>mm.role==='user'); if(lastUser){ doSend(lastUser.text); toast('Retrying…'); } }} className="flex items-center gap-[5px] text-[#7c5cff] font-[600] hover:text-[#6b48f5]"><${I} name="RefreshCw" size=${13}/> Retry</button>
+                      `:null}
                       <button onClick=${()=>copyText(m.text||m.prompt||'')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Copy" size=${13}/> Copy</button>
+                      <button onClick=${()=>copyText(toMarkdown(m.text||m.prompt||''))} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="FileText" size=${13}/> Copy as Markdown</button>
+                      ${canNativeShare ? html`
+                        <button onClick=${()=>shareText(m.text||m.prompt||'', 'Zedith')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Share2" size=${13}/> Share</button>
+                      `:null}
                       <button onClick=${()=>{ const liked = m.liked===1?0:1; updateMessage(chat.id, m.id, {liked}); toast(liked?'Liked ✓':'Like removed'); }} className=${`flex items-center gap-[4px] ${m.liked===1?'text-emerald-600 font-[600]':''}`}>
                         <${I} name="ThumbsUp" size=${13}/> ${m.liked===1?'Liked':''}
                       </button>
@@ -2249,6 +2344,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
             <div className="flex gap-3 text-[11px] mt-2">
               <a href=${audioUrl} download="zedith-voice.mp3" className="text-[#7c5cff] hover:underline">Download MP3</a>
               <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline">Copy link</button>
+              ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline">Share</button>`:null}
             </div>
           </div>
         `:null}
@@ -2436,7 +2532,7 @@ function AnalyticsView(){
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if(!token){ setConnected(false); setLoading(false); return; }
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-analytics-fetch`, {
+      const res = await fetch(`${supabase.projectUrl}/functions/v1/youtube-analytics-fetch`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -2471,7 +2567,7 @@ function AnalyticsView(){
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if(!token){ toast('Please sign in first', 'err'); setConnecting(false); return; }
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/youtube-oauth-start`, {
+      const res = await fetch(`${supabase.projectUrl}/functions/v1/youtube-oauth-start`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -4034,7 +4130,7 @@ function ZedithPicksView(){
   });
 
   const logEvent = async (productId, eventType) => {
-    try{ await supabase.from('picks_events').insert({product_id:productId, event_type:eventType}); }catch(e){}
+    try{ const {error}=await supabase.from('picks_events').insert({product_id:productId, event_type:eventType}); if(error) console.warn('picks_events insert failed:', error.message); }catch(e){ console.warn('picks_events insert failed:', e.message); }
   };
 
   const openProduct = (p) => { setSelected(p); logEvent(p.id,'view'); supabase.rpc('increment_picks_counter',{p_table:'picks_products',p_id:p.id,p_column:'views'}); };
@@ -4533,7 +4629,13 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
 }
 // ---------- mount ----------
 const root = createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+initSupabase()
+  .then(() => root.render(React.createElement(App)))
+  .catch(err => {
+    console.error('App failed to start:', err);
+    document.getElementById('root').innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#71717a;font-size:13px;text-align:center;padding:20px;">Zedith couldn\'t start — please refresh the page. If this keeps happening, contact zedithsupport@gmail.com</div>';
+  });
 </script>
 </body>
 </html>

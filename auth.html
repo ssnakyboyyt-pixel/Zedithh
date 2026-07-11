@@ -73,8 +73,13 @@ tailwind.config = {
 
   <script type="module">
     import { createClient } from '@supabase/supabase-js';
-    const SUPABASE_URL = 'https://fyypciidgbvdbalwrstb.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5eXBjaWlkZ2J2ZGJhbHdyc3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzYwMjgsImV4cCI6MjA5OTM1MjAyOH0.JRDljDTWYuBH9d-MsQxaioyPtkfsMX60GAwGmno5J0s';
+
+    const configRes = await fetch('/api/config');
+    if(!configRes.ok){
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#71717a;font-size:13px;text-align:center;padding:20px;">Zedith couldn\'t start — please refresh the page. If this keeps happening, contact zedithsupport@gmail.com</div>';
+      throw new Error('Failed to load app config from /api/config');
+    }
+    const {url: SUPABASE_URL, anonKey: SUPABASE_ANON} = await configRes.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
     const params = new URLSearchParams(location.search);
