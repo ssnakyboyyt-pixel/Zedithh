@@ -133,7 +133,16 @@ tailwind.config = {
             }
           });
           if(error) throw error;
-          showMessage('Check your email and click the verification link.', 'ok');
+          if(data.session){
+            // Supabase gave us a session immediately — email confirmation is
+            // OFF in project settings, so the account is already usable.
+            // Don't show the "check your email" message, just go straight in.
+            location.href = 'index.html';
+          } else {
+            // No session yet — email confirmation is ON, so this account
+            // really does need the verification link before it can log in.
+            showMessage('Check your email and click the verification link.', 'ok');
+          }
         } else {
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if(error) throw error;
