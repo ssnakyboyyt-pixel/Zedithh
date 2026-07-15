@@ -428,6 +428,10 @@ User experience: make every interaction feel premium, fast, clear, and intellige
 
 Formatting: the chat UI renders Markdown, so use it to make answers scannable. Use **bold** for key terms and important points, ## or ### headings to break up longer answers into sections, "-" bullet lists or "1." numbered lists for steps and options, and \`inline code\` or \`\`\`code blocks\`\`\` for code/commands. Don't over-format short conversational replies — save headings and lists for answers that are genuinely long or structured (scripts, plans, comparisons, tutorials).
 
+Section dividers: when an answer covers several distinct topics or sections, separate them the way ChatGPT does — with a "###" or "##" heading for each new section, not with a plain horizontal rule made of dashes or underscores. Never output a standalone line of "---" or "___" as a visual divider between topics. Headings alone create the visual break.
+
+Summary: for long or multi-section answers, end with a short "**Summary**" section — one or two sentences that recap the key takeaway. Skip this for short or simple answers where it would feel redundant.
+
 Zedith exists for one reason — to help creators build, grow, and run their content channels well. Your goal is not simply to answer questions — it is to help creators build, create, and grow, truthfully.
 
 --- Creator-specific operational rules ---
@@ -1167,15 +1171,17 @@ function App(){
 
     // Mark this message as "retrying" so the UI can show a loading state
     // right where the old failed/old answer was, instead of a new bubble.
-    const retryingMessages = chat.messages.map(m=>m.id===assistantMsgId ? {...m, retrying:true} : m);
-    setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:retryingMessages}:c));
+    // Always derive the next state from the latest `cs` inside the functional
+    // updater — never from the `chat`/`chat.messages` captured at the top of
+    // this function — so a concurrent update elsewhere (a notification, a
+    // realtime sync, another send) can never clobber this flag or vice versa.
+    setChats(cs=>cs.map(c=>c.id===chatId ? {...c, messages:c.messages.map(m=>m.id===assistantMsgId?{...m, retrying:true}:m)} : c));
 
     const creditFeature = detectCreditFeature({text, attachment, webSearch});
     const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
     if(!(await hasEnoughCredits(preEstimate))){
       toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err');
-      const revert = chat.messages.map(m=>m.id===assistantMsgId ? {...m, retrying:false} : m);
-      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:revert}:c));
+      setChats(cs=>cs.map(c=>c.id===chatId ? {...c, messages:c.messages.map(m=>m.id===assistantMsgId?{...m, retrying:false}:m)} : c));
       return;
     }
 
@@ -1215,19 +1221,27 @@ function App(){
         creditsUsed = estimateCreditCostV3({userText:text, aiText:cleanAnswer, feature:creditFeature, smart});
         await deductCredits(creditsUsed, creditFeature, {userChars:text.length, aiChars:cleanAnswer.length});
       }
-      const updatedMessages = chat.messages.map(m=>m.id===assistantMsgId ? {
-        ...m, text:cleanAnswer, model, tried, error:!!error, debugInfo:combinedDebug,
-        sources: searchSources.length ? searchSources : null, creditsUsed, retrying:false, liked:0, ts:Date.now()
-      } : m);
-      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:updatedMessages, updated_at:new Date().toISOString()}:c));
-      const {error:e1}=await supabase.from('chats').update({messages:updatedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      let savedMessages = null;
+      setChats(cs=>cs.map(c=>{
+        if(c.id!==chatId) return c;
+        savedMessages = c.messages.map(m=>m.id===assistantMsgId ? {
+          ...m, text:cleanAnswer, model, tried, error:!!error, debugInfo:combinedDebug,
+          sources: searchSources.length ? searchSources : null, creditsUsed, retrying:false, liked:0, ts:Date.now()
+        } : m);
+        return {...c, messages:savedMessages, updated_at:new Date().toISOString()};
+      }));
+      const {error:e1}=await supabase.from('chats').update({messages:savedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
       if(e1) console.error('chat save error:', e1);
     }catch(e){
-      const updatedMessages = chat.messages.map(m=>m.id===assistantMsgId ? {
-        ...m, text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, retrying:false, creditsUsed:0, ts:Date.now()
-      } : m);
-      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:updatedMessages, updated_at:new Date().toISOString()}:c));
-      const {error:e1}=await supabase.from('chats').update({messages:updatedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      let savedMessages = null;
+      setChats(cs=>cs.map(c=>{
+        if(c.id!==chatId) return c;
+        savedMessages = c.messages.map(m=>m.id===assistantMsgId ? {
+          ...m, text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, retrying:false, creditsUsed:0, ts:Date.now()
+        } : m);
+        return {...c, messages:savedMessages, updated_at:new Date().toISOString()};
+      }));
+      const {error:e1}=await supabase.from('chats').update({messages:savedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
       if(e1) console.error('chat save error:', e1);
     }
   }
