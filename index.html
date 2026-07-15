@@ -2620,6 +2620,110 @@ function TrendPill({value}){
   </span>`;
 }
 
+// ---------- Ask Studio (AI widget grounded in real channel analytics) ----------
+function AskStudioWidget({data, connected}){
+  const [open,setOpen]=useState(false);
+  const [msgs,setMsgs]=useState([]); // {role,text}
+  const [input,setInput]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [mobileSheet,setMobileSheet]=useState(false);
+  const endRef=useRef(null);
+
+  useEffect(()=>{ endRef.current?.scrollIntoView({behavior:'smooth'}); },[msgs,busy]);
+
+  const suggestions=['How can Ask Studio help me?','Summarise my channel performance','What should I improve first?','Suggest new video ideas'];
+
+  const buildContext=()=>{
+    if(!connected || !data) return 'The creator has not connected a YouTube channel yet, so no real analytics data is available. Encourage them to connect their channel for a grounded answer.';
+    const ov=data.overview||{};
+    const top=(data.topVideos||[]).slice(0,5).map((v,i)=>`${i+1}. "${v.title}" — ${v.views||0} views, ${v.likes||0} likes`).join('\n');
+    return `Real channel analytics (last 28 days):
+Channel: ${data.channel?.title||'Unknown'}
+Subscribers: ${data.channel?.subscriberCount ?? 0}
+Views: ${ov.views ?? 0}
+Watch time (minutes): ${ov.watchTimeMinutes ?? 0}
+Subscribers gained: ${ov.subscribersGained ?? 0}, lost: ${ov.subscribersLost ?? 0}
+Likes: ${ov.likes ?? 0}, Comments: ${ov.comments ?? 0}, Shares: ${ov.shares ?? 0}
+Top content:
+${top||'No video data yet.'}`;
+  };
+
+  const ask=async(text)=>{
+    if(!text.trim() || busy) return;
+    const userMsg={role:'user', text};
+    setMsgs(m=>[...m, userMsg]);
+    setInput('');
+    setBusy(true);
+    try{
+      const sys=`You are Ask Studio, an AI assistant embedded in Zedith's Channel Analytics page. Answer questions about the creator's own YouTube channel using ONLY the real data provided below — never invent numbers. If the data doesn't cover what's asked, say so plainly. Be concise, concrete, and actionable.\n\n${buildContext()}`;
+      const payload=[{role:'system',content:sys}, ...msgs.slice(-6).map(m=>({role:m.role,content:m.text})), {role:'user',content:text}];
+      const {text:answer, error} = await callOR(payload,{smart:false, userText:text});
+      setMsgs(m=>[...m, {role:'assistant', text: error ? "Couldn't get a response right now — please try again." : answer}]);
+    }catch(e){
+      setMsgs(m=>[...m, {role:'assistant', text:"Couldn't get a response right now — please try again."}]);
+    }
+    setBusy(false);
+  };
+
+  const PanelBody = ()=> html`
+    <div className="flex flex-col h-full">
+      <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#23283f] shrink-0">
+        <div className="flex items-center gap-2">
+          <${I} name="Sparkles" size=${16} className="text-[#7c5cff]"/>
+          <span className="font-[700] text-[13px] display">Ask Studio</span>
+        </div>
+        <button onClick=${()=>{setOpen(false); setMobileSheet(false);}} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        ${msgs.length===0 ? html`
+          <div className="mb-2">
+            <div className="text-[17px] font-[800] display">Hello, Zedith AI</div>
+            <div className="text-[15px] font-[700] text-[#7c5cff]">How can I help you?</div>
+          </div>
+        ` : msgs.map((m,i)=>html`
+          <div key=${i} className=${`text-[12.5px] rounded-xl px-3 py-2 max-w-[88%] ${m.role==='user'?'bg-[#7c5cff] text-white ml-auto':'bg-zinc-100 dark:bg-[#1c2033] mr-auto'}`}>${m.text}</div>
+        `)}
+        ${busy ? html`<div className="text-[12px] text-zinc-400 flex items-center gap-2"><${I} name="Loader2" size=${13} className="animate-spin"/> Thinking…</div>` : null}
+        <div ref=${endRef}></div>
+      </div>
+      ${msgs.length===0 ? html`
+        <div className="px-4 pb-2 flex flex-col gap-2 items-start">
+          ${suggestions.map(s=>html`<button key=${s} onClick=${()=>ask(s)} className="px-3 py-[7px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] hover:border-[#7c5cff] transition">${s}</button>`)}
+        </div>
+      `:null}
+      <div className="p-3 border-t border-zinc-200 dark:border-[#23283f] shrink-0">
+        <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#1c2033] rounded-xl px-3 py-2">
+          <input value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
+          <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[#7c5cff] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
+        </div>
+        <div className="text-[9.5px] text-zinc-400 mt-[6px] text-center">AI can make mistakes. You are responsible for the content that you publish.</div>
+      </div>
+    </div>`;
+
+  return html`
+    <!-- Trigger button -->
+    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Studio" className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+      <${I} name="Sparkles" size=${18} className="text-[#7c5cff]"/>
+    </button>
+
+    <!-- Desktop: resizable side panel -->
+    ${open ? html`
+      <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#141620] border-l border-zinc-200 dark:border-[#23283f] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px'}}>
+        <${PanelBody}/>
+      </div>
+    `:null}
+
+    <!-- Mobile: bottom sheet -->
+    ${mobileSheet ? html`
+      <div className="md:hidden fixed inset-0 z-[600] bg-black/50" onClick=${()=>{setOpen(false); setMobileSheet(false);}}>
+        <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#141620] rounded-t-[20px] overflow-hidden flex flex-col" onClick=${e=>e.stopPropagation()}>
+          <${PanelBody}/>
+        </div>
+      </div>
+    `:null}
+  `;
+}
+
 // ---------- Channel Analytics ----------
 function AnalyticsView(){
   const [tab,setTab]=useState('Overview');
@@ -2764,7 +2868,10 @@ function AnalyticsView(){
         <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
         <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
       </div>
-      ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#7c5cff] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button>` : null}
+      <div className="flex items-center gap-2">
+        ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#7c5cff] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button> ` : null}
+        <${AskStudioWidget} data=${data} connected=${connected}/>
+      </div>
     </div>
 
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
@@ -3593,6 +3700,8 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
   const [openChat,setOpenChat]=useState(null);
   const [banHours,setBanHours]=useState('24');
   const [banReason,setBanReason]=useState('');
+  const [creditTx,setCreditTx]=useState([]);
+  const [loadingTx,setLoadingTx]=useState(true);
 
   useEffect(()=>{
     let cancelled=false;
@@ -3604,6 +3713,40 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
     load();
     return ()=>{ cancelled=true; };
   },[user.id]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    const loadTx=async()=>{
+      setLoadingTx(true);
+      const {data,error}=await supabase.from('credit_transactions').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(500);
+      if(!cancelled){ if(!error) setCreditTx(data||[]); setLoadingTx(false); }
+    };
+    loadTx();
+    return ()=>{ cancelled=true; };
+  },[user.id]);
+
+  // Real usage grouping from credit_transactions — no fabricated numbers
+  const FEATURE_META = {
+    text_short:{label:'Chat (short)', icon:'MessageSquare', color:'#5b9dff'},
+    text_medium:{label:'Chat (medium)', icon:'MessageSquare', color:'#5b9dff'},
+    text_long:{label:'Chat (long)', icon:'MessageSquare', color:'#5b9dff'},
+    code:{label:'Code', icon:'Code2', color:'#22c55e'},
+    vision:{label:'Vision / Image analysis', icon:'Eye', color:'#f59e0b'},
+    image_gen:{label:'Image Generation', icon:'Image', color:'#ec4899'},
+    voice:{label:'Voice Studio', icon:'Mic', color:'#8b5cf6'},
+  };
+  const usageByFeature = {};
+  let totalSpent = 0;
+  creditTx.forEach(t=>{
+    const key = t.feature || 'other';
+    if(!usageByFeature[key]) usageByFeature[key] = {count:0, spent:0};
+    usageByFeature[key].count += 1;
+    usageByFeature[key].spent += (t.credits_spent||0);
+    totalSpent += (t.credits_spent||0);
+  });
+  const usageRows = Object.entries(usageByFeature).sort((a,b)=>b[1].spent-a[1].spent);
+  const last30 = creditTx.filter(t=>new Date(t.created_at) > new Date(Date.now()-30*86400000));
+  const spent30 = last30.reduce((s,t)=>s+(t.credits_spent||0),0);
 
   const isBanned = !!user.suspended;
   const isTemp = isBanned && !!user.banned_until;
@@ -3661,6 +3804,68 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           ${user.ban_reason ? html`<div className="text-zinc-500">Reason: ${user.ban_reason}</div>` : null}
         </div>
       ` : null}
+
+      <!-- Credit Usage -->
+      <div className="mb-6">
+        <div className="font-[650] text-[13px] mb-2 flex items-center justify-between">
+          <span className="flex items-center gap-1.5"><${I} name="Coins" size=${14}/> Credit Usage</span>
+          <span className="text-zinc-400 font-[500] text-[11.5px]">${creditTx.length} logged transaction${creditTx.length===1?'':'s'}</span>
+        </div>
+
+        ${loadingTx ? html`<div className="text-zinc-500 text-[12px]">Loading usage…</div>` : creditTx.length===0 ? html`
+          <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No credit usage recorded yet</div>
+        ` : html`
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3 text-[12px]">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#141727]">
+              <div className="text-zinc-500 mb-1">Total spent (all time)</div>
+              <div className="font-[700]">${totalSpent.toLocaleString('en-IN')}</div>
+            </div>
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#141727]">
+              <div className="text-zinc-500 mb-1">Spent (last 30 days)</div>
+              <div className="font-[700]">${spent30.toLocaleString('en-IN')}</div>
+            </div>
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#141727]">
+              <div className="text-zinc-500 mb-1">Avg per request</div>
+              <div className="font-[700]">${creditTx.length ? Math.round(totalSpent/creditTx.length).toLocaleString('en-IN') : 0}</div>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            ${usageRows.map(([feature, stat])=>{
+              const meta = FEATURE_META[feature] || {label: feature.replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()), icon:'Zap', color:'#a3a3a3'};
+              const pct = totalSpent>0 ? Math.round((stat.spent/totalSpent)*100) : 0;
+              return html`
+                <div key=${feature} className="p-3 rounded-xl bg-zinc-50 dark:bg-[#141727]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 text-[12.5px] font-[650]">
+                      <span className="w-6 h-6 rounded-lg flex items-center justify-center" style=${{background: meta.color+'22', color: meta.color}}><${I} name=${meta.icon} size=${13}/></span>
+                      ${meta.label}
+                    </div>
+                    <div className="text-[12px] text-zinc-500">${stat.count} use${stat.count===1?'':'s'} · <span className="font-[700] text-zinc-700 dark:text-zinc-300">${stat.spent.toLocaleString('en-IN')} credits</span></div>
+                  </div>
+                  <div className="h-[6px] rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                    <div className="h-full rounded-full" style=${{width: pct+'%', background: meta.color}}></div>
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+
+          <div className="text-[11.5px] text-zinc-500 mb-1.5">Recent activity</div>
+          <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
+            ${creditTx.slice(0,20).map(t=>{
+              const meta = FEATURE_META[t.feature] || {label: (t.feature||'other').replace(/_/g,' '), color:'#a3a3a3'};
+              return html`
+                <div key=${t.id} className="flex items-center justify-between text-[11.5px] px-2.5 py-[6px] rounded-lg hover:bg-zinc-50 dark:hover:bg-[#1a1e30]">
+                  <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style=${{background:meta.color}}></span>${meta.label}</span>
+                  <span className="text-zinc-400">${formatDate(t.created_at)}</span>
+                  <span className="font-[650]">−${(t.credits_spent||0).toLocaleString('en-IN')}</span>
+                </div>
+              `;
+            })}
+          </div>
+        `}
+      </div>
 
       <!-- Moderation actions -->
       <div className="mb-6">
@@ -4233,6 +4438,17 @@ function ZedithPicksView(){
 
   const catName = (id) => categories.find(c=>c.id===id)?.name || 'Other';
 
+  // Deterministic per-category color so each category gets its own visual
+  // identity instead of everything rendering the same flat purple.
+  const CAT_PALETTE = ['#7c5cff','#22c1c3','#f5762e','#22a06b','#e0457b','#3b82f6','#eab308','#ec4899'];
+  const catColor = (nameOrId) => {
+    if(nameOrId==='All') return '#7c5cff';
+    const key = String(nameOrId||'');
+    let hash = 0;
+    for(let i=0;i<key.length;i++){ hash = (hash*31 + key.charCodeAt(i)) >>> 0; }
+    return CAT_PALETTE[hash % CAT_PALETTE.length];
+  };
+
   const filtered = products.filter(p=>{
     const q = search.toLowerCase();
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || (p.short_description||'').toLowerCase().includes(q) || (p.tags||[]).some(t=>t.toLowerCase().includes(q));
@@ -4271,7 +4487,10 @@ function ZedithPicksView(){
             ${p.is_new ? badge('New','#10b981') : null}
             ${p.is_sponsored ? badge('Sponsored','#7c5cff') : null}
           </div>
-          <div className="text-[11px] text-zinc-400">${catName(p.category_id)}</div>
+          <div className="text-[11px] font-[600] inline-flex items-center gap-[5px] mt-[2px]" style=${{color:catColor(catName(p.category_id))}}>
+            <span className="w-[6px] h-[6px] rounded-full" style=${{background:catColor(catName(p.category_id))}}></span>
+            ${catName(p.category_id)}
+          </div>
         </div>
       </div>
       <div className="text-[12.5px] text-zinc-600 dark:text-zinc-400 mb-3 line-clamp-2 flex-1">${p.short_description}</div>
@@ -4335,9 +4554,20 @@ function ZedithPicksView(){
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">
-          ${['All',...categories.map(c=>c.name)].map(cat=>html`
-            <button key=${cat} onClick=${()=>setActiveCategory(cat)} className=${`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-[600] transition border ${activeCategory===cat?'bg-[#7c5cff] border-[#7c5cff] text-white':'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-[#7c5cff]'}`}>${cat}</button>
-          `)}
+          ${['All',...categories.map(c=>c.name)].map(cat=>{
+            const color = catColor(cat);
+            const active = activeCategory===cat;
+            return html`
+            <button key=${cat} onClick=${()=>setActiveCategory(cat)}
+              className=${`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-[600] transition border flex items-center gap-[6px] ${active?'text-white':'text-zinc-600 dark:text-zinc-400'}`}
+              style=${active ? {background:color, borderColor:color} : {borderColor:color+'55'}}
+              onMouseEnter=${e=>{ if(!active) e.currentTarget.style.borderColor=color; }}
+              onMouseLeave=${e=>{ if(!active) e.currentTarget.style.borderColor=color+'55'; }}
+            >
+              ${!active ? html`<span className="w-[7px] h-[7px] rounded-full shrink-0" style=${{background:color}}></span>` : null}
+              ${cat}
+            </button>`;
+          })}
         </div>
 
         ${loading ? html`
@@ -4374,7 +4604,10 @@ function ZedithPicksView(){
               </div>
               <div>
                 <div className="font-[800] text-[17px] display">${selected.name}</div>
-                <div className="text-[11.5px] text-zinc-400">${catName(selected.category_id)}</div>
+                <div className="text-[11.5px] font-[600] inline-flex items-center gap-[5px]" style=${{color:catColor(catName(selected.category_id))}}>
+                  <span className="w-[6px] h-[6px] rounded-full" style=${{background:catColor(catName(selected.category_id))}}></span>
+                  ${catName(selected.category_id)}
+                </div>
               </div>
             </div>
             <button onClick=${()=>setSelected(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"><${I} name="X" size=${18}/></button>
