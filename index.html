@@ -820,6 +820,14 @@ function TypingMarkdown({text, sources, className='', onDone}){
 }
 
 // ---------- App ----------
+function ZedithMark({size=14, color='currentColor', strokeWidth=2.6}){
+  return html`<svg width=${size} height=${size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3 V21" stroke=${color} stroke-width=${strokeWidth} stroke-linecap="round"/>
+    <path d="M4.5 7.5 L19.5 16.5" stroke=${color} stroke-width=${strokeWidth} stroke-linecap="round"/>
+    <path d="M19.5 7.5 L4.5 16.5" stroke=${color} stroke-width=${strokeWidth} stroke-linecap="round"/>
+  </svg>`;
+}
+
 function App(){
   const [user,setUser]=useState(null);
   const [loadingUser,setLoadingUser]=useState(true);
@@ -1438,7 +1446,7 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
       </button>
       ${!collapsed ? html`
         <div className="flex items-center gap-2">
-          <div className="w-[28px] h-[28px] rounded-[8px] bg-gradient-to-br from-[#359aa6] to-[#1a6b76] flex items-center justify-center text-white"><${I} name="Sparkles" size=${14}/></div>
+          <div className="w-[28px] h-[28px] rounded-[8px] bg-gradient-to-br from-[#359aa6] to-[#1a6b76] flex items-center justify-center text-white"><${ZedithMark} size=${14} color="white"/></div>
           <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
         </div>
       ` : null}
@@ -2669,7 +2677,7 @@ ${top||'No video data yet.'}`;
     <div className="flex flex-col h-full">
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2">
-          <${I} name="Sparkles" size=${16} className="text-[#20808d]"/>
+          <${ZedithMark} size=${16} color="#20808d"/>
           <span className="font-[700] text-[13px] display">Ask Studio</span>
         </div>
         <button onClick=${()=>{setOpen(false); setMobileSheet(false);}} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
@@ -2703,7 +2711,7 @@ ${top||'No video data yet.'}`;
   return html`
     <!-- Trigger button -->
     <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Studio" className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
-      <${I} name="Sparkles" size=${18} className="text-[#20808d]"/>
+      <${ZedithMark} size=${18} color="#20808d"/>
     </button>
 
     <!-- Desktop: resizable side panel -->
@@ -4630,7 +4638,7 @@ function ZedithPicksView(){
 
           ${selected.why_recommended ? html`
             <div className="bg-[#e4f1f2] dark:bg-[#122a2d] border border-[#bedde0] dark:border-[#3a3436] rounded-[12px] p-3 mb-4">
-              <div className="font-[700] text-[12px] text-[#20808d] mb-1 flex items-center gap-1.5"><${I} name="Sparkles" size=${13}/> Why Zedith Recommends This</div>
+              <div className="font-[700] text-[12px] text-[#20808d] mb-1 flex items-center gap-1.5"><${ZedithMark} size=${13} color="#20808d"/> Why Zedith Recommends This</div>
               <div className="text-[12.5px] text-zinc-600 dark:text-zinc-300">${selected.why_recommended}</div>
             </div>
           `:null}
