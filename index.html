@@ -302,12 +302,16 @@ function shareText(text, title='Zedith'){
     if(err && err.name!=='AbortError'){ console.error('share failed:', err); toast('Share failed — copied instead'); copyText(text); }
   });
 }
-// Very light plain-text -> Markdown pass: wraps the raw AI response so pasting
-// it into a notes app/README preserves basic structure. Zedith's responses
-// are already close to Markdown (headings/lists), so this mainly just leaves
-// the text as-is; kept as its own function in case formatting rules grow later.
-function toMarkdown(text){
-  return (text||'').trim();
+// Genuinely different from Copy: appends any web-search sources as a
+// Markdown-formatted link list at the bottom. Plain Copy only grabs the
+// response body — this is for pasting into notes/docs where you also want
+// the citations preserved as clickable links, not just the response text.
+function toMarkdown(text, sources){
+  let out = (text||'').trim();
+  if(sources && sources.length){
+    out += '\n\n---\n**Sources:**\n' + sources.map(s=>`- [${s.title||s.url}](${s.url})`).join('\n');
+  }
+  return out;
 }
 function formatDate(d){
   const date = new Date(d);
@@ -671,11 +675,17 @@ async function composeThumbnail(bgPrompt, titleText){
   return canvas.toDataURL('image/png');
 }
 async function ttsFetch(text, voiceName='Brian'){
-  const map={Brian:'Brian',Amy:'Amy',Emma:'Emma',Joey:'Joey'};
+  // StreamElements' TTS endpoint proxies Amazon Polly voices. These four are
+  // confirmed distinct Polly voices (2 male, 2 female) — using the exact
+  // Polly voice IDs here (not close-sounding aliases) so each preset card
+  // actually sounds different, not just named differently.
+  const map={Brian:'Brian', Joey:'Joey', Amy:'Amy', Emma:'Emma'};
   const v=map[voiceName]||'Brian';
   const url=`https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(v)}&text=${encodeURIComponent(text.slice(0,900))}`;
   const res=await fetch(url); if(!res.ok) throw new Error('tts '+res.status);
-  const blob=await res.blob(); return URL.createObjectURL(blob);
+  const blob=await res.blob();
+  if(blob.size < 200) throw new Error('tts returned empty audio'); // StreamElements sometimes 200s with a near-empty file on bad voice names
+  return URL.createObjectURL(blob);
 }
 
 
@@ -1135,6 +1145,90 @@ function App(){
       const finalMessages=[...updatedChat.messages, errMsg];
       setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:new Date().toISOString()}:c));
       const {error:e1}=await supabase.from('chats').update({messages:finalMessages, updated_at:new Date().toISOString()}).eq('id',chatId); if(e1) console.error('chat save error:', e1);
+    }
+  }
+
+  // Retries a specific assistant message IN PLACE — used by both the Retry
+  // (failed messages) and Regenerate (any message) buttons. Unlike
+  // sendMessage(), this never creates a new user/assistant message pair; it
+  // finds the target message by id and overwrites just that one, so the
+  // chat doesn't fill up with duplicate attempts every time someone retries.
+  async function retryMessage(chatId, assistantMsgId, {smart=false, webSearch=false}={}){
+    const chat = chats.find(c=>c.id===chatId);
+    if(!chat) return;
+    const msgIndex = chat.messages.findIndex(m=>m.id===assistantMsgId);
+    if(msgIndex===-1) return;
+    // The user message being answered is always the one right before this
+    // assistant message in the array.
+    const userMsg = chat.messages[msgIndex-1];
+    if(!userMsg || userMsg.role!=='user') return;
+    const text = userMsg.text || '';
+    const attachment = userMsg.attachment || null;
+
+    // Mark this message as "retrying" so the UI can show a loading state
+    // right where the old failed/old answer was, instead of a new bubble.
+    const retryingMessages = chat.messages.map(m=>m.id===assistantMsgId ? {...m, retrying:true} : m);
+    setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:retryingMessages}:c));
+
+    const creditFeature = detectCreditFeature({text, attachment, webSearch});
+    const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
+    if(!(await hasEnoughCredits(preEstimate))){
+      toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err');
+      const revert = chat.messages.map(m=>m.id===assistantMsgId ? {...m, retrying:false} : m);
+      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:revert}:c));
+      return;
+    }
+
+    const history=(chat.messages||[]).slice(0, msgIndex-1).slice(-8).map(mm=>{
+      if(mm.attachment?.type==='image'){
+        return {role:mm.role, content:(mm.text||'')+' [User previously shared an image here.]'};
+      }
+      return {role:mm.role, content:mm.text||''};
+    });
+    let userContent=text;
+    if(attachment?.type==='image'){
+      userContent=[{type:'text', text:text||'Analyze this image for YouTube – thumbnail score, CTR tips, hook ideas.'},{type:'image_url', image_url:{url:attachment.dataUrl}}];
+    }
+    let searchContext = '', searchSucceeded = false, searchFailedNote = '', searchDebug = '', searchSources = [];
+    if(webSearch && text && text.trim()){
+      const searchQuery = text.trim().length > 300 ? text.trim().slice(0, 300) : text.trim();
+      const {results, error:searchErr} = await realWebSearch(searchQuery);
+      if(results.length){
+        searchContext = buildSearchContextBlock(results);
+        searchSucceeded = true;
+        searchSources = results.map(r=>({title:r.title, url:r.url, snippet:r.snippet}));
+      } else {
+        searchDebug = 'search: ' + (searchErr || 'no results returned');
+        searchFailedNote = '\n\nNote: a live web search WAS attempted for this message but it failed or returned no usable results. Do not claim search is unavailable or off — it was on. Tell the user the search didn\'t turn up current results and answer from general knowledge with that caveat.';
+      }
+    }
+    const effectiveSmart = smart || looksLikeHardReasoning(text);
+    const sys = buildSystemPrompt({webSearch: searchSucceeded, smart: effectiveSmart, responseStyle: settings.responseStyle, hasImage: !!attachment}) + searchContext + searchFailedNote + (settings.systemPrompt ? '\n\nAdditional user instructions:\n'+settings.systemPrompt : '');
+    const payload=[{role:'system', content:sys}, ...history, {role:'user', content:userContent}];
+
+    try{
+      const {text:answer, model, tried, error, debugInfo} = await callOR(payload,{vision:!!attachment, smart, hasImage: !!attachment, userText: text});
+      const combinedDebug = [error?debugInfo:null, searchDebug||null].filter(Boolean).join(' | ') || null;
+      const cleanAnswer = stripInlineSourcesList(answer);
+      let creditsUsed = 0;
+      if(!error){
+        creditsUsed = estimateCreditCostV3({userText:text, aiText:cleanAnswer, feature:creditFeature, smart});
+        await deductCredits(creditsUsed, creditFeature, {userChars:text.length, aiChars:cleanAnswer.length});
+      }
+      const updatedMessages = chat.messages.map(m=>m.id===assistantMsgId ? {
+        ...m, text:cleanAnswer, model, tried, error:!!error, debugInfo:combinedDebug,
+        sources: searchSources.length ? searchSources : null, creditsUsed, retrying:false, liked:0, ts:Date.now()
+      } : m);
+      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:updatedMessages, updated_at:new Date().toISOString()}:c));
+      const {error:e1}=await supabase.from('chats').update({messages:updatedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      if(e1) console.error('chat save error:', e1);
+    }catch(e){
+      const updatedMessages = chat.messages.map(m=>m.id===assistantMsgId ? {
+        ...m, text:`We're currently experiencing huge traffic — please try again in a few minutes.\n\n${e.message}`, error:true, retrying:false, creditsUsed:0, ts:Date.now()
+      } : m);
+      setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:updatedMessages, updated_at:new Date().toISOString()}:c));
+      const {error:e1}=await supabase.from('chats').update({messages:updatedMessages, updated_at:new Date().toISOString()}).eq('id',chatId);
+      if(e1) console.error('chat save error:', e1);
     }
   }
 
@@ -1677,7 +1771,16 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                       </div>
                     </div>
                   ` : html`
-                    ${m.id===typingId ? html`<${TypingMarkdown} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100" onDone=${()=>setTypingId(id=>id===m.id?null:id)}/>` : html`<${MarkdownText} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100"/>`}
+                    ${m.retrying ? html`
+                      <div className="flex items-center gap-2 text-zinc-400 text-[13px] py-[2px]">
+                        <span className="flex gap-[3px]">
+                          <span className="w-[5px] h-[5px] rounded-full bg-current animate-bounce" style="animation-delay:0ms"></span>
+                          <span className="w-[5px] h-[5px] rounded-full bg-current animate-bounce" style="animation-delay:120ms"></span>
+                          <span className="w-[5px] h-[5px] rounded-full bg-current animate-bounce" style="animation-delay:240ms"></span>
+                        </span>
+                        Retrying…
+                      </div>
+                    ` : (m.id===typingId ? html`<${TypingMarkdown} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100" onDone=${()=>setTypingId(id=>id===m.id?null:id)}/>` : html`<${MarkdownText} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100"/>`)}
                   `}
                   ${m.sources && m.sources.length ? html`
                     <button onClick=${()=>setSourcesModalFor(m.id)} className="flex items-center gap-[8px] mt-[10px] bg-zinc-100 dark:bg-[#20233a] hover:bg-zinc-200 dark:hover:bg-[#282c47] border border-zinc-200 dark:border-zinc-700 rounded-full pl-[6px] pr-[12px] py-[4px] text-[11.5px] text-zinc-600 dark:text-zinc-300 transition">
@@ -1690,25 +1793,25 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                     </button>
                   `:null}
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
-                    <div className="flex items-center gap-[14px] mt-[10px] text-zinc-500 text-[11.5px] flex-wrap">
+                    <div className="flex items-center gap-[3px] mt-[10px] text-zinc-500 flex-wrap">
                       ${m.error ? html`
-                        <button onClick=${()=>{ const lastUser = [...messages].reverse().find(mm=>mm.role==='user'); if(lastUser){ doSend(lastUser.text); toast('Retrying…'); } }} className="flex items-center gap-[5px] text-[#7c5cff] font-[600] hover:text-[#6b48f5]"><${I} name="RefreshCw" size=${13}/> Retry</button>
+                        <button disabled=${m.retrying} onClick=${()=>retryMessage(chat.id, m.id, {smart, webSearch})} title="Retry" className="p-[6px] rounded-lg text-[#7c5cff] hover:bg-[#7c5cff]/10 disabled:opacity-40"><${I} name="RefreshCw" size=${14} className=${m.retrying?'animate-spin':''}/></button>
                       `:null}
-                      <button onClick=${()=>copyText(m.text||m.prompt||'')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Copy" size=${13}/> Copy</button>
-                      <button onClick=${()=>copyText(toMarkdown(m.text||m.prompt||''))} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="FileText" size=${13}/> Copy as Markdown</button>
+                      <button disabled=${m.retrying} onClick=${()=>copyText(m.text||m.prompt||'')} title="Copy" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="Copy" size=${14}/></button>
+                      <button disabled=${m.retrying} onClick=${()=>copyText(toMarkdown(m.text||m.prompt||'', m.sources))} title="Copy as Markdown" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="FileText" size=${14}/></button>
                       ${canNativeShare ? html`
-                        <button onClick=${()=>shareText(m.text||m.prompt||'', 'Zedith')} className="flex items-center gap-[5px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Share2" size=${13}/> Share</button>
+                        <button disabled=${m.retrying} onClick=${()=>shareText(m.text||m.prompt||'', 'Zedith')} title="Share" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="Share2" size=${14}/></button>
                       `:null}
-                      <button onClick=${()=>{ const liked = m.liked===1?0:1; updateMessage(chat.id, m.id, {liked}); toast(liked?'Liked ✓':'Like removed'); }} className=${`flex items-center gap-[4px] ${m.liked===1?'text-emerald-600 font-[600]':''}`}>
-                        <${I} name="ThumbsUp" size=${13}/> ${m.liked===1?'Liked':''}
+                      <button disabled=${m.retrying} onClick=${()=>{ const liked = m.liked===1?0:1; updateMessage(chat.id, m.id, {liked}); toast(liked?'Liked ✓':'Like removed'); }} title="Good response" className=${`p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 ${m.liked===1?'text-emerald-600':''}`}>
+                        <${I} name="ThumbsUp" size=${14}/>
                       </button>
-                      <button onClick=${()=>{ const dis = m.liked===-1?0:-1; updateMessage(chat.id, m.id, {liked:dis}); toast(dis?'Thanks for feedback':''); }} className=${m.liked===-1?'text-red-500':''}>
-                        <${I} name="ThumbsDown" size=${13}/>
+                      <button disabled=${m.retrying} onClick=${()=>{ const dis = m.liked===-1?0:-1; updateMessage(chat.id, m.id, {liked:dis}); toast(dis?'Thanks for feedback':''); }} title="Bad response" className=${`p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 ${m.liked===-1?'text-red-500':''}`}>
+                        <${I} name="ThumbsDown" size=${14}/>
                       </button>
-                      <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance((m.text||'').slice(0,900)); u.lang='en-IN'; speechSynthesis.cancel(); speechSynthesis.speak(u); toast('Speaking…'); }catch{ toast('TTS failed','err'); } }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="Volume2" size=${13}/> Speak</button>
-                      <button onClick=${()=>{ const lastUser = [...messages].reverse().find(mm=>mm.role==='user'); if(lastUser){ doSend(lastUser.text); toast('Regenerating…'); } }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name="RefreshCw" size=${13}/> Regenerate</button>
-                      <button onClick=${()=>{ updateChat(chat.id, {saved:!chat.saved}); toast(chat.saved?'Removed from saved':'Saved chat ✓'); }} className="flex items-center gap-[4px] hover:text-zinc-900 dark:hover:text-zinc-100"><${I} name=${chat.saved?'BookmarkCheck':'Bookmark'} size=${13}/> ${chat.saved?'Saved':''}</button>
-                      ${m.model ? html`<span className="text-[10px] text-zinc-400">• ${String(m.model).split('/').pop()} ${m.tried?`· ${m.tried} tried`:''}</span>`:null}
+                      <button disabled=${m.retrying} onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance((m.text||'').slice(0,900)); u.lang='en-IN'; speechSynthesis.cancel(); speechSynthesis.speak(u); toast('Speaking…'); }catch{ toast('TTS failed','err'); } }} title="Speak" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="Volume2" size=${14}/></button>
+                      <button disabled=${m.retrying} onClick=${()=>retryMessage(chat.id, m.id, {smart, webSearch})} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="RefreshCw" size=${14} className=${m.retrying?'animate-spin':''}/></button>
+                      <button disabled=${m.retrying} onClick=${()=>{ updateChat(chat.id, {saved:!chat.saved}); toast(chat.saved?'Removed from saved':'Saved chat ✓'); }} title=${chat.saved?'Saved':'Save chat'} className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name=${chat.saved?'BookmarkCheck':'Bookmark'} size=${14}/></button>
+                      ${m.model ? html`<span className="text-[10px] text-zinc-400 ml-[4px]">• ${String(m.model).split('/').pop()} ${m.tried?`· ${m.tried} tried`:''}</span>`:null}
                       ${(!isAdminUser && typeof m.creditsUsed==='number') ? html`<span className="text-[10px] text-zinc-400">• ${m.creditsUsed>0?`${m.creditsUsed.toLocaleString('en-IN')} Credits used`:'0 Credits (failed request)'}</span>`:null}
                     </div>
                     ${m.debugInfo && isAdminUser ? html`
@@ -2340,6 +2443,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
         </div>
         ${audioUrl ? html`
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#14182a]">
+            <div className="text-[11px] text-zinc-500 mb-2">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
             <audio controls src=${audioUrl} className="w-full"></audio>
             <div className="flex gap-3 text-[11px] mt-2">
               <a href=${audioUrl} download="zedith-voice.mp3" className="text-[#7c5cff] hover:underline">Download MP3</a>
