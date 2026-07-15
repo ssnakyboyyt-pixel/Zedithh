@@ -34,8 +34,8 @@ function zedithApplyTailwindConfig(){
     theme: {
       extend: {
         fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
-        colors: { zed:{DEFAULT:'#20808d',600:'#1a6b76'} },
-        boxShadow: { soft:'0 2px 10px rgba(15,17,26,0.05)', zed:'0 4px 14px rgba(32,128,141,.16)', 'zed-soft':'0 2px 8px rgba(32,128,141,.12)' }
+        colors: { zed:{DEFAULT:'#18181b',600:'#000000'} },
+        boxShadow: { soft:'0 2px 10px rgba(15,17,26,0.05)', zed:'0 4px 14px rgba(0,0,0,.16)', 'zed-soft':'0 2px 8px rgba(0,0,0,.12)' }
       }
     }
   };
@@ -49,6 +49,14 @@ function zedithLoadCDNTailwind(){
 </script>
 <script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
+:root{
+  --zed:#18181b; --zed-600:#000000; --zed-light:#52525b; --zed-lighter:#71717a;
+  --zed-tint-bg:#f4f4f5; --zed-tint-bg2:#e4e4e7;
+}
+.dark{
+  --zed:#f4f4f5; --zed-600:#ffffff; --zed-light:#d4d4d8; --zed-lighter:#a1a1aa;
+  --zed-tint-bg:#27272a; --zed-tint-bg2:#3f3f46;
+}
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
 .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
@@ -58,7 +66,7 @@ function zedithLoadCDNTailwind(){
 .no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
 .lucide{stroke-width:1.85}
 button:disabled{opacity:.55;cursor:not-allowed}
-.shimmer{background:linear-gradient(90deg,#d8ecee 25%,#e4f1f2 50%,#d8ecee 75%);background-size:200% 100%;animation:sh 1.4s infinite}
+.shimmer{background:linear-gradient(90deg,var(--zed-tint-bg) 25%,var(--zed-tint-bg) 50%,var(--zed-tint-bg) 75%);background-size:200% 100%;animation:sh 1.4s infinite}
 .dark .shimmer{background:linear-gradient(90deg,#2e2e2e 25%,#3a3a3a 50%,#2e2e2e 75%);background-size:200% 100%}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
@@ -138,7 +146,7 @@ function stripInlineSourcesList(t){
 function toast(msg,type='ok'){
   const root=document.getElementById('toast-root');
   const el=document.createElement('div');
-  el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[#20808d]/25 text-white'}`;
+  el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[var(--zed)]/25 text-white'}`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
   dot.className=`w-[6px] h-[6px] rounded-full shrink-0 ${type==='err'?'bg-white':'bg-[#5dc3cf]'}`;
@@ -155,7 +163,7 @@ function toast(msg,type='ok'){
 function toastUndo(msg,onUndo,onExpire){
   const root=document.getElementById('toast-root');
   const el=document.createElement('div');
-  el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[#20808d]/25 text-white`;
+  el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[var(--zed)]/25 text-white`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
   dot.className='w-[6px] h-[6px] rounded-full shrink-0 bg-[#5dc3cf]';
@@ -183,14 +191,14 @@ function ConfirmDialog({title, message, confirmLabel='Confirm', danger=false, on
   return html`
     <div className="fixed inset-0 z-[500] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
       <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full max-w-[360px] rounded-[20px] p-5">
-        <div className=${`w-9 h-9 rounded-[10px] flex items-center justify-center mb-3 ${danger?'bg-red-500/12 border border-red-500/25':'bg-[#20808d]/12 border border-[#20808d]/25'}`}>
-          <${I} name=${danger?'AlertTriangle':'HelpCircle'} size=${16} className=${danger?'text-red-500':'text-[#20808d]'}/>
+        <div className=${`w-9 h-9 rounded-[10px] flex items-center justify-center mb-3 ${danger?'bg-red-500/12 border border-red-500/25':'bg-[var(--zed)]/12 border border-[var(--zed)]/25'}`}>
+          <${I} name=${danger?'AlertTriangle':'HelpCircle'} size=${16} className=${danger?'text-red-500':'text-[var(--zed)]'}/>
         </div>
         <div className="font-[700] text-[15px] mb-1.5">${title}</div>
         <div className="text-[13px] text-zinc-500 mb-5 leading-relaxed">${message}</div>
         <div className="flex justify-end gap-2">
           <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12.5px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
-          <button onClick=${()=>{ onConfirm(); onClose(); }} className=${`px-[14px] py-[8px] rounded-xl text-white text-[12.5px] font-[600] shadow-sm transition-colors ${danger?'bg-red-600 hover:bg-red-700':'bg-[#20808d] hover:bg-[#1a6b76]'}`}>${confirmLabel}</button>
+          <button onClick=${()=>{ onConfirm(); onClose(); }} className=${`px-[14px] py-[8px] rounded-xl text-white text-[12.5px] font-[600] shadow-sm transition-colors ${danger?'bg-red-600 hover:bg-red-700':'bg-[var(--zed)] hover:bg-[var(--zed-600)]'}`}>${confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -203,10 +211,10 @@ function PromptDialog({title, placeholder='', onSubmit, onClose}){
     <div className="fixed inset-0 z-[500] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
       <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full max-w-[360px] rounded-[20px] p-5">
         <div className="font-[700] text-[15px] mb-3">${title}</div>
-        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none text-[13px] mb-4 focus:border-[#20808d] focus:ring-1 focus:ring-[#20808d]/30 transition-colors"/>
+        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none text-[13px] mb-4 focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"/>
         <div className="flex justify-end gap-2">
           <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12.5px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
-          <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[#20808d] hover:bg-[#1a6b76] text-white text-[12.5px] font-[600] shadow-sm transition-colors">Send</button>
+          <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white text-[12.5px] font-[600] shadow-sm transition-colors">Send</button>
         </div>
       </div>
     </div>
@@ -262,16 +270,16 @@ function CustomSelect({value, onChange, options, className='', panelClassName=''
   const current = opts.find(o=>o.value===value);
   return html`
     <div ref=${ref} className="relative inline-block">
-      <button type="button" onClick=${()=>setOpen(o=>!o)} className=${`flex items-center justify-between gap-2 transition-colors ${open?'border-[#20808d]! ring-1 ring-[#20808d]/30':''} ${className}`}>
+      <button type="button" onClick=${()=>setOpen(o=>!o)} className=${`flex items-center justify-between gap-2 transition-colors ${open?'border-[var(--zed)]! ring-1 ring-[var(--zed)]/30':''} ${className}`}>
         <span className="truncate">${current?.label ?? value}</span>
-        <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform duration-200 ${open?'rotate-180 text-[#20808d] opacity-100':''}`}/>
+        <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform duration-200 ${open?'rotate-180 text-[var(--zed)] opacity-100':''}`}/>
       </button>
       ${open ? html`
         <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[#404040] bg-white/95 dark:bg-[#2a2a2a]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
           ${opts.map(o=>html`
-            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[#20808d] font-[650] bg-[#20808d]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#343434]'}`}>
+            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[var(--zed)] font-[650] bg-[var(--zed)]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#343434]'}`}>
               <span className="truncate">${o.label}</span>
-              ${o.value===value ? html`<${I} name="Check" size=${13} className="shrink-0 text-[#20808d]"/>` : null}
+              ${o.value===value ? html`<${I} name="Check" size=${13} className="shrink-0 text-[var(--zed)]"/>` : null}
             </button>
           `)}
         </div>
@@ -673,7 +681,7 @@ async function composeThumbnail(bgPrompt, titleText){
   }
 
   // Small accent bar + brand tag so it reads as a designed thumbnail.
-  ctx.fillStyle='#20808d';
+  ctx.fillStyle='#18181b';
   ctx.fillRect(50, H-24, 90, 8);
 
   return canvas.toDataURL('image/png');
@@ -721,7 +729,7 @@ function renderInlineMarkdown(text, sources){
       const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
       const label = linkMatch ? linkMatch[1] : token;
       const url = linkMatch ? linkMatch[2] : '#';
-      parts.push(html`<a key=${key++} href=${url} target="_blank" rel="noopener noreferrer" className="text-[#20808d] underline hover:text-[#1a6b76] break-all">${label}</a>`);
+      parts.push(html`<a key=${key++} href=${url} target="_blank" rel="noopener noreferrer" className="text-[var(--zed)] underline hover:text-[var(--zed-600)] break-all">${label}</a>`);
     }
     else if(token.startsWith('**')) parts.push(html`<strong key=${key++} className="font-[700]">${token.slice(2,-2)}</strong>`);
     else if(token.startsWith('`')) parts.push(html`<code key=${key++} className="px-[5px] py-[1px] rounded-[5px] bg-zinc-200 dark:bg-zinc-700 text-[12px] font-mono">${token.slice(1,-1)}</code>`);
@@ -1289,7 +1297,7 @@ function App(){
   async function createProject(np){
     const proj={
       id:uid('p'), user_id:user.id, title:np.title||'Untitled', cat:np.cat||'YouTube',
-      color:np.color||'#20808d', icon:np.icon||'FolderKanban', desc:np.desc||'',
+      color:np.color||'var(--zed)', icon:np.icon||'FolderKanban', desc:np.desc||'',
       tasks:[], files:[], notes:'', members:[{id:'m1',name:'You',role:'Owner'}], pinned:false,
       created_at:new Date().toISOString(), updated_at:new Date().toISOString()
     };
@@ -1436,7 +1444,7 @@ function App(){
 
 // ---------- LeftSidebar ----------
 function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
-  const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[#d8ecee] dark:bg-[#122a2d] text-[#1a6b76] dark:text-[#8ad4db] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
+  const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
   const unread = 0;
   return html`
   <aside className=${`${collapsed?'w-0 md:w-[72px] border-r-0 md:border-r overflow-hidden':'w-[248px] border-r'} shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col transition-all duration-200`}>
@@ -1446,14 +1454,14 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
       </button>
       ${!collapsed ? html`
         <div className="flex items-center gap-2">
-          <div className="w-[28px] h-[28px] rounded-[8px] bg-gradient-to-br from-[#359aa6] to-[#1a6b76] flex items-center justify-center text-white"><${ZedithMark} size=${14} color="white"/></div>
+          <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
           <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
         </div>
       ` : null}
     </div>
 
     <div className="px-[10px] pt-[12px]">
-      <button onClick=${onNewChat} className=${`w-full flex items-center ${collapsed?'justify-center':'gap-[8px]'} px-3 py-[10px] rounded-[12px] bg-[#20808d] text-white text-[13px] font-[600] shadow-zed-soft hover:bg-[#1a6b76] transition`}>
+      <button onClick=${onNewChat} className=${`w-full flex items-center ${collapsed?'justify-center':'gap-[8px]'} px-3 py-[10px] rounded-[12px] bg-[var(--zed)] text-white text-[13px] font-[600] shadow-zed-soft hover:bg-[var(--zed-600)] transition`}>
         <${I} name="Plus" size=${16}/>
         ${!collapsed ? html`<span>New Chat</span><span className="ml-auto text-[10px] bg-white/15 px-[6px] py-[1px] rounded">⌘K</span>`:null}
       </button>
@@ -1496,10 +1504,10 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
         <div className="rounded-[16px] border border-zinc-200 dark:border-[#373737] bg-gradient-to-b from-[#f7f5ef] to-white dark:from-[#161a2b] dark:to-[#131727] p-[14px] text-center">
           <div className="flex justify-center text-amber-500"><${I} name="Crown" size=${20}/></div>
           <div className="display font-[700] text-[13.5px] mt-1">Zedith ${((profile?.plan||'free')==='infinity'?'ELITE':(profile?.plan||'free').toUpperCase())}</div>
-          <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[#e4f1f2] dark:bg-[#142e32] text-[#20808d] text-[11px] font-[650] flex items-center justify-center gap-1">
+          <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[11px] font-[650] flex items-center justify-center gap-1">
             ✨ ${isAdminUser ? 'Unlimited Credits' : `${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits`}
           </button>
-          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-gradient-to-r from-[#1a6b76] to-[#2c8f9c] text-white text-[12px] font-[650]">Upgrade Now →</button>
+          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-gradient-to-r from-[var(--zed-600)] to-[#2c8f9c] text-white text-[12px] font-[650]">Upgrade Now →</button>
         </div>
       ` : html`
         <button onClick=${()=>setModule('upgrade')} className="w-full py-[9px] rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" title="Upgrade">
@@ -1544,7 +1552,7 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       <div className="bg-white dark:bg-[#2a2a2a] rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] p-[14px]">
       <div className="flex justify-between items-center mb-2">
         <div className="font-[650] text-[12.5px]">Top Performing Content</div>
-        <button onClick=${()=>setModule('analytics')} className="text-[11px] text-[#20808d]">View all ›</button>
+        <button onClick=${()=>setModule('analytics')} className="text-[11px] text-[var(--zed)]">View all ›</button>
       </div>
       <div className="text-[11.5px] text-zinc-500">No content yet. Connect your YouTube channel in Analytics.</div>
     </div>
@@ -1556,11 +1564,11 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       </div>
       <div className="grid grid-cols-5 gap-[4px] text-center">
         ${[
-          ['FileText','Script','#20808d','Script Writer'],
+          ['FileText','Script','var(--zed)','Script Writer'],
           ['Lightbulb','Idea','#eab308','Idea Generator'],
           ['Wand2','Hook','#ef4444','Hook Generator'],
           ['Image','Thumb','#3b82f6','Thumbnail Analyzer'],
-          ['AudioLines','Voice','#4aabb5','AI Voice Generator'],
+          ['AudioLines','Voice','var(--zed-lighter)','AI Voice Generator'],
         ].map(([ic,lbl,col,full])=> html`
           <button key=${lbl} onClick=${()=>openTool(full)} className="relative">
             <div className="w-[42px] h-[42px] mx-auto rounded-[12px] flex items-center justify-center" style=${{background:col+'18'}}>
@@ -1580,7 +1588,7 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       ${chats.length===0 ? html`<div className="text-[11.5px] text-zinc-500">No chats yet. Start a new conversation.</div>` : html`
         <div className="space-y-[9px] text-[12px]">
           ${chats.map(c=> html`
-            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="w-full flex justify-between gap-2 text-left hover:text-[#20808d] transition">
+            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="w-full flex justify-between gap-2 text-left hover:text-[var(--zed)] transition">
               <span className="truncate text-zinc-700 dark:text-zinc-300">${c.t}</span>
               <span className="text-zinc-400 text-[11px] shrink-0">${c.ago}</span>
             </button>
@@ -1596,12 +1604,12 @@ function ComingSoonModal({plan,onClose}){
   return html`
   <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
     <div className="modal-panel modal-in w-[420px] max-w-[96vw] rounded-[22px] p-6 text-center" onClick=${e=>e.stopPropagation()}>
-      <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-[#20808d]/18 to-[#4aabb5]/10 border border-[#20808d]/25 flex items-center justify-center mx-auto mb-4">
-        <${I} name="Rocket" size=${24} className="text-[#20808d]"/>
+      <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-[var(--zed)]/18 to-[var(--zed-lighter)]/10 border border-[var(--zed)]/25 flex items-center justify-center mx-auto mb-4">
+        <${I} name="Rocket" size=${24} className="text-[var(--zed)]"/>
       </div>
       <div className="font-[750] text-[18px] display">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
       <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
-      <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[#20808d] hover:bg-[#1a6b76] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
+      <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
     </div>
   </div>`;
 }
@@ -1723,7 +1731,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
         <button onClick=${openNotifications} className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" title="Notifications">
           <${I} name="Bell" size=${18}/>
         </button>
-        <div className="text-[11px] px-3 py-[6px] rounded-full bg-[#e4f1f2] dark:bg-[#142e32] text-[#20808d] font-[600]">
+        <div className="text-[11px] px-3 py-[6px] rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] font-[600]">
           ✨ ${isAdminUser ? 'Unlimited' : `${credits.toLocaleString('en-IN')} Credits`}
         </div>
       </div>
@@ -1734,7 +1742,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
         <div className="max-w-[740px] mx-auto pt-14 text-center">
           <div className="text-[28px] font-[800] display">Hey ${profile?.display_name||'creator'}! 👋</div>
           <div className="text-[15px] mt-2 text-zinc-600 dark:text-zinc-300">
-            What would you like to <span className="text-[#20808d] font-[700]">create</span> or <span className="text-[#4aabb5] font-[700]">learn</span> today?
+            What would you like to <span className="text-[var(--zed)] font-[700]">create</span> or <span className="text-[var(--zed-lighter)] font-[700]">learn</span> today?
           </div>
           <div className="hidden md:grid md:grid-cols-4 gap-3 mt-7 text-left">
             ${[
@@ -1743,8 +1751,8 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
               ['Generate a hook for my video','Wand2'],
               ['Analyze my latest video','BarChart3'],
             ].map(([l,ic])=> html`
-              <button key=${l} onClick=${()=>doSend(l)} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-[14px] hover:border-[#20808d] transition text-left">
-                <${I} name=${ic} size=${17} className="text-[#20808d] mb-[8px]"/>
+              <button key=${l} onClick=${()=>doSend(l)} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-[14px] hover:border-[var(--zed)] transition text-left">
+                <${I} name=${ic} size=${17} className="text-[var(--zed)] mb-[8px]"/>
                 <div className="text-[12.5px] font-[550]">${l}</div>
               </button>
             `)}
@@ -1757,7 +1765,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
             <div key=${m.id||idx} className="fade-in">
               ${m.role==='user' ? html`
                 <div className="flex justify-end">
-                  <div className="relative bg-gradient-to-br from-[#359aa6] via-[#20808d] to-[#1a6b76] dark:from-[#1c545c] dark:via-[#173c41] dark:to-[#122a2d] text-white px-[17px] py-[13px] rounded-[20px] rounded-br-[6px] max-w-[72%] text-[13.5px] leading-[1.55] whitespace-pre-wrap shadow-[0_6px_20px_rgba(32,128,141,0.28),0_1px_2px_rgba(32,128,141,0.15)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-white/10 dark:ring-white/[0.06]">
+                  <div className="relative bg-gradient-to-br from-[var(--zed-light)] via-[var(--zed)] to-[var(--zed-600)] dark:from-[#3f3f46] dark:via-[#27272a] dark:to-[#18181b] text-white px-[17px] py-[13px] rounded-[20px] rounded-br-[6px] max-w-[72%] text-[13.5px] leading-[1.55] whitespace-pre-wrap shadow-[0_6px_20px_rgba(0,0,0,0.28),0_1px_2px_rgba(0,0,0,0.15)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-white/10 dark:ring-white/[0.06]">
                     ${m.attachment?.type==='image' ? html`
                       <div className="relative mb-[8px] -mx-[3px] -mt-[1px]">
                         <img src=${m.attachment.dataUrl} className="max-h-[210px] w-full object-cover rounded-[14px] border border-white/20 shadow-md"/>
@@ -1774,7 +1782,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                   ${m.type==='image_generating' ? html`
                     <div className="border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 bg-white dark:bg-[#2a2a2a] max-w-[520px]">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-8 h-8 rounded-full border-2 border-[#20808d] border-t-transparent animate-spin"></div>
+                        <div className="w-8 h-8 rounded-full border-2 border-[var(--zed)] border-t-transparent animate-spin"></div>
                         <div>
                           <div className="font-[600] text-[13px]">Creating your image…</div>
                           <div className="text-[11px] text-zinc-500 truncate">${m.prompt}</div>
@@ -1817,7 +1825,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                   ${m.role==='assistant' && m.type!=='image_generating' ? html`
                     <div className="flex items-center gap-[3px] mt-[10px] text-zinc-500 flex-wrap">
                       ${m.error ? html`
-                        <button disabled=${m.retrying} onClick=${()=>retryMessage(chat.id, m.id, {smart, webSearch})} title="Retry" className="p-[6px] rounded-lg text-[#20808d] hover:bg-[#20808d]/10 disabled:opacity-40"><${I} name="RefreshCw" size=${14} className=${m.retrying?'animate-spin':''}/></button>
+                        <button disabled=${m.retrying} onClick=${()=>retryMessage(chat.id, m.id, {smart, webSearch})} title="Retry" className="p-[6px] rounded-lg text-[var(--zed)] hover:bg-[var(--zed)]/10 disabled:opacity-40"><${I} name="RefreshCw" size=${14} className=${m.retrying?'animate-spin':''}/></button>
                       `:null}
                       <button disabled=${m.retrying} onClick=${()=>copyText(m.text||m.prompt||'')} title="Copy" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="Copy" size=${14}/></button>
                       <button disabled=${m.retrying} onClick=${()=>copyText(toMarkdown(m.text||m.prompt||'', m.sources))} title="Copy as Markdown" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-40"><${I} name="FileText" size=${14}/></button>
@@ -1854,10 +1862,10 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     <div className="px-3 sm:px-5 pb-4">
       <div className="max-w-[760px] mx-auto bg-white dark:bg-[#2d2d2d] border border-zinc-200 dark:border-[#414141] rounded-[18px] shadow-soft px-[13px] pt-[10px] pb-[10px]">
         ${attached ? html`
-          <div className="mb-[8px] flex items-center gap-[10px] text-[11px] bg-gradient-to-r from-[#e4f1f2] to-white dark:from-[#22263a] dark:to-[#2d2d2d] border border-[#bedde0] dark:border-zinc-700 rounded-[12px] px-3 py-[8px] shadow-sm">
+          <div className="mb-[8px] flex items-center gap-[10px] text-[11px] bg-gradient-to-r from-[var(--zed-tint-bg)] to-white dark:from-[#22263a] dark:to-[#2d2d2d] border border-[#bedde0] dark:border-zinc-700 rounded-[12px] px-3 py-[8px] shadow-sm">
             <div className="relative shrink-0">
               <img src=${attached.dataUrl} className="w-[42px] h-[34px] object-cover rounded-[8px] border border-white dark:border-zinc-600 shadow-sm"/>
-              <span className="absolute -top-[4px] -right-[4px] bg-[#20808d] text-white rounded-full w-[14px] h-[14px] flex items-center justify-center"><${I} name="Image" size=${8}/></span>
+              <span className="absolute -top-[4px] -right-[4px] bg-[var(--zed)] text-white rounded-full w-[14px] h-[14px] flex items-center justify-center"><${I} name="Image" size=${8}/></span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="truncate font-[600] text-zinc-700 dark:text-zinc-200">${attached.name}</div>
@@ -1877,7 +1885,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           <button onClick=${()=>imgRef.current?.click()} className="w-[33px] h-[33px] rounded-[10px] border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 shrink-0" title="Upload image">
             <${I} name="Plus" size=${15}/>
           </button>
-          <button onClick=${()=>setSmart(s=>!s)} className=${`px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] font-[550] border flex items-center gap-[5px] shrink-0 ${smart ? 'border-[#20808d] bg-[#e4f1f2] dark:bg-[#142e32] text-[#1a6b76]':'border-zinc-200 dark:border-zinc-700'}`}>
+          <button onClick=${()=>setSmart(s=>!s)} className=${`px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] font-[550] border flex items-center gap-[5px] shrink-0 ${smart ? 'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)]':'border-zinc-200 dark:border-zinc-700'}`}>
             <${I} name="Sparkles" size=${13}/><span className="hidden sm:inline">Smart</span>
           </button>
           <button onClick=${()=>fileRef.current?.click()} className="px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] border border-zinc-200 dark:border-zinc-700 flex items-center gap-[5px] shrink-0">
@@ -1888,7 +1896,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           </button>
           <div className="flex-1"></div>
           <button onClick=${toggleVoiceInput} title=${listening?'Stop listening':'Voice input'} className=${`w-[33px] h-[33px] rounded-full border flex items-center justify-center shrink-0 ${listening?'border-red-400 bg-red-50 dark:bg-red-950/30 text-red-500 animate-pulse':'border-zinc-200 dark:border-zinc-700'}`}><${I} name="Mic" size=${14}/></button>
-          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[#20808d] hover:bg-[#1a6b76] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0">
+          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0">
             <${I} name="ArrowUp" size=${17}/>
           </button>
         </div>
@@ -1960,7 +1968,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
         <button onClick=${()=>{ copyText(window.location.href); toast('Project link copied'); }} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] flex items-center gap-2">
           <${I} name="Share2" size=${14}/> Share
         </button>
-        <button onClick=${onChat} className="px-3 py-[8px] rounded-xl bg-[#20808d] text-white text-[12px] font-[600] flex items-center gap-2">
+        <button onClick=${onChat} className="px-3 py-[8px] rounded-xl bg-[var(--zed)] text-white text-[12px] font-[600] flex items-center gap-2">
           <${I} name="MessageSquare" size=${14}/> Project Chat
         </button>
       </div>
@@ -1968,14 +1976,14 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
 
     <div className="px-6 py-5">
       <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
-        ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#20808d] border-b-2 border-[#20808d] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+        ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
       </div>
 
       ${tab==='Files' ? html`
         <div className="max-w-[900px]">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[13px] font-[650]">Project Files</div>
-            <button onClick=${()=>fileRef.current?.click()} className="px-3 py-[8px] rounded-xl bg-[#20808d] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Upload" size=${14}/> Upload File</button>
+            <button onClick=${()=>fileRef.current?.click()} className="px-3 py-[8px] rounded-xl bg-[var(--zed)] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Upload" size=${14}/> Upload File</button>
             <input type="file" ref=${fileRef} onChange=${uploadFile} className="hidden"/>
           </div>
           ${files.length===0 ? html`
@@ -1986,12 +1994,12 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               ${files.map(f=> html`
                 <div key=${f.id} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[13px] p-3 flex gap-3">
-                  <div className="w-10 h-10 rounded-[10px] bg-[#e4f1f2] dark:bg-[#142e32] flex items-center justify-center"><${I} name=${f.type?.startsWith('image/')?'Image':'FileText'} size=${16} className="text-[#20808d]"/></div>
+                  <div className="w-10 h-10 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center"><${I} name=${f.type?.startsWith('image/')?'Image':'FileText'} size=${16} className="text-[var(--zed)]"/></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-[600] truncate">${f.name}</div>
                     <div className="text-[10.5px] text-zinc-500">${(f.size/1024).toFixed(1)} KB • ${formatDate(f.uploadedAt)}</div>
                   </div>
-                  ${f.url ? html`<a href=${f.url} target="_blank" download=${f.name} className="text-[#20808d] text-[11px]">Open</a>`:null}
+                  ${f.url ? html`<a href=${f.url} target="_blank" download=${f.name} className="text-[var(--zed)] text-[11px]">Open</a>`:null}
                 </div>
               `)}
             </div>
@@ -2001,7 +2009,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
         <div className="max-w-[700px]">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[13px] font-[650]">Tasks</div>
-            <button onClick=${addTask} className="px-3 py-[8px] rounded-xl bg-[#20808d] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> Add Task</button>
+            <button onClick=${addTask} className="px-3 py-[8px] rounded-xl bg-[var(--zed)] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> Add Task</button>
           </div>
           <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 space-y-2">
             ${tasks.length===0 ? html`<div className="text-zinc-500 text-[12px] text-center py-4">No tasks yet. Add your first project task.</div>` : tasks.map(t=> html`
@@ -2064,30 +2072,30 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
   <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] overflow-y-auto">
     <div className="px-4 sm:px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#353535] flex items-center justify-between">
       <div><div className="text-[19px] font-[800] display">My Projects</div><div className="text-[11px] text-zinc-500">${projects.length} Projects</div></div>
-      <button onClick=${()=>setShowCreate(true)} className="bg-[#20808d] hover:bg-[#1a6b76] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
+      <button onClick=${()=>setShowCreate(true)} className="bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
     </div>
     ${projects.length===0 && !showCreate ? html`
       <div className="h-[680px] flex flex-col items-center justify-center text-center px-10">
-        <div className="w-20 h-20 rounded-[18px] bg-[#e4f1f2] dark:bg-[#122a2d] flex items-center justify-center mb-4"><${I} name="FolderKanban" size=${32} className="text-[#20808d]"/></div>
+        <div className="w-20 h-20 rounded-[18px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center mb-4"><${I} name="FolderKanban" size=${32} className="text-[var(--zed)]"/></div>
         <div className="text-[18px] font-[750]">You don't have any projects yet</div>
         <div className="text-[12.5px] text-zinc-500 mt-1 max-w-[380px]">Create your first project to organize your ideas, files, chats and content in one place.</div>
-        <button onClick=${()=>setShowCreate(true)} className="mt-4 bg-[#20808d] text-white px-4 py-[9px] rounded-xl text-[12.5px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${15}/> Create Project</button>
+        <button onClick=${()=>setShowCreate(true)} className="mt-4 bg-[var(--zed)] text-white px-4 py-[9px] rounded-xl text-[12.5px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${15}/> Create Project</button>
       </div>
     ` : html`
       <div className="px-4 sm:px-6 py-5">
         <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4 overflow-x-auto no-scrollbar">
           ${['All Projects','Active','Archived','Shared','Trash'].map(t=> html`
-            <button key=${t} onClick=${()=>setFilter(t)} className=${`shrink-0 pb-[10px] ${filter===t?'text-[#20808d] border-b-2 border-[#20808d] font-[600]':'text-zinc-500'}`}>${t}</button>
+            <button key=${t} onClick=${()=>setFilter(t)} className=${`shrink-0 pb-[10px] ${filter===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>
           `)}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
           ${sorted.map(p=> html`
-            <div key=${p.id} className=${`relative text-left bg-white dark:bg-[#2c2c2c] rounded-[15px] border p-[15px] hover:border-[#20808d] transition ${p.pinned?'border-[#20808d]/50':'border-zinc-200 dark:border-[#404040]'}`}>
+            <div key=${p.id} className=${`relative text-left bg-white dark:bg-[#2c2c2c] rounded-[15px] border p-[15px] hover:border-[var(--zed)] transition ${p.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[#404040]'}`}>
               <button onClick=${()=>onOpenProject(p.id)} className="text-left w-full">
                 <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-3" style=${{background:p.color+'22', color:p.color}}>
                   <${I} name=${p.icon||'FolderKanban'} size=${18}/>
                 </div>
-                <div className="font-[680] text-[13.5px] flex items-center gap-1">${p.pinned?html`<${I} name="Pin" size=${11} className="text-[#20808d]"/>`:null} ${p.title}</div>
+                <div className="font-[680] text-[13.5px] flex items-center gap-1">${p.pinned?html`<${I} name="Pin" size=${11} className="text-[var(--zed)]"/>`:null} ${p.title}</div>
                 <div className="text-[11px] text-zinc-500">${p.cat||'General'}</div>
                 <div className="text-[10px] text-zinc-400 mt-1">Updated ${formatDate(p.updated_at||p.created_at)}</div>
               </button>
@@ -2117,7 +2125,7 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
 }
 
 function CreateProjectModal({onClose,onCreate}){
-  const [name,setName]=useState(''); const [desc,setDesc]=useState(''); const [icon,setIcon]=useState('FolderKanban'); const [color,setColor]=useState('#20808d'); const [cat,setCat]=useState('YouTube');
+  const [name,setName]=useState(''); const [desc,setDesc]=useState(''); const [icon,setIcon]=useState('FolderKanban'); const [color,setColor]=useState('var(--zed)'); const [cat,setCat]=useState('YouTube');
   return html`
   <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-[3px] flex items-center justify-center overlay-in" onClick=${onClose}>
     <div className="modal-panel modal-in w-[740px] max-w-[96vw] rounded-[20px]" onClick=${e=>e.stopPropagation()}>
@@ -2127,29 +2135,29 @@ function CreateProjectModal({onClose,onCreate}){
       </div>
       <div className="p-5 grid grid-cols-3 gap-5 text-[12px]">
         <div className="col-span-2 space-y-3">
-          <div className="text-[#20808d] font-[600] text-[11.5px]">1. Project Details</div>
+          <div className="text-[var(--zed)] font-[600] text-[11.5px]">1. Project Details</div>
           <input value=${name} onChange=${e=>setName(e.target.value)} placeholder="Enter project name…" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none"/>
           <textarea value=${desc} onChange=${e=>setDesc(e.target.value)} placeholder="Add a short description…" className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none"></textarea>
-          <div className="text-[#20808d] font-[600] text-[11.5px]">2. Choose Icon & Color</div>
+          <div className="text-[var(--zed)] font-[600] text-[11.5px]">2. Choose Icon & Color</div>
           <div className="flex gap-[8px] flex-wrap">
             ${['FolderKanban','Play','Code2','GraduationCap','Briefcase','Megaphone','Palette','Lightbulb'].map(ic=> html`
-              <button key=${ic} onClick=${()=>setIcon(ic)} className=${`w-10 h-10 rounded-[10px] border flex items-center justify-center ${icon===ic?'border-[#20808d] bg-[#e4f1f2] dark:bg-[#142e32]':'border-zinc-200 dark:border-zinc-700'}`}><${I} name=${ic} size=${16}/></button>
+              <button key=${ic} onClick=${()=>setIcon(ic)} className=${`w-10 h-10 rounded-[10px] border flex items-center justify-center ${icon===ic?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700'}`}><${I} name=${ic} size=${16}/></button>
             `)}
           </div>
           <div className="flex gap-[8px]">
-            ${['#20808d','#ef4444','#f97316','#eab308','#10b981','#06b6d4','#3b82f6','#4aabb5','#ec4899','#6b7280'].map(c=> html`
-              <button key=${c} onClick=${()=>setColor(c)} className="w-[22px] h-[22px] rounded-full" style=${{background:c, outline: color===c ? '2px solid #20808d':'none', outlineOffset:'2px'}}></button>
+            ${['var(--zed)','#ef4444','#f97316','#eab308','#10b981','#06b6d4','#3b82f6','var(--zed-lighter)','#ec4899','#6b7280'].map(c=> html`
+              <button key=${c} onClick=${()=>setColor(c)} className="w-[22px] h-[22px] rounded-full" style=${{background:c, outline: color===c ? '2px solid var(--zed)':'none', outlineOffset:'2px'}}></button>
             `)}
           </div>
         </div>
         <div>
-          <div className="text-[#20808d] font-[600] text-[11.5px]">3. Project Type</div>
+          <div className="text-[var(--zed)] font-[600] text-[11.5px]">3. Project Type</div>
           <${CustomSelect} value=${cat} onChange=${setCat} options=${['YouTube','Instagram','TikTok','Podcast']} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] text-[12px]"/>
         </div>
       </div>
       <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
         <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
-        <button onClick=${()=>onCreate({title:name, cat, icon, color, desc})} className="px-[14px] py-[8px] rounded-xl bg-[#20808d] hover:bg-[#1a6b76] text-white text-[12px] font-[600] shadow-sm transition-colors">Create Project</button>
+        <button onClick=${()=>onCreate({title:name, cat, icon, color, desc})} className="px-[14px] py-[8px] rounded-xl bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white text-[12px] font-[600] shadow-sm transition-colors">Create Project</button>
       </div>
     </div>
   </div>`;
@@ -2184,7 +2192,7 @@ function PlannerView({items, createPlannerItem}){
           <div className="flex bg-zinc-100 dark:bg-[#303030] rounded-[10px] p-1 text-[12px]">
             ${['Month','Week','List'].map(v=> html`<button key=${v} onClick=${()=>setView(v)} className=${`px-3 py-[6px] rounded-[8px] ${view===v?'bg-white dark:bg-[#3e3e3e] shadow-sm font-[600]':'text-zinc-500'}`}>${v}</button>`)}
           </div>
-          <button onClick=${()=>setShowNew(true)} className="bg-[#20808d] text-white px-3 py-[8px] rounded-xl text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Content</button>
+          <button onClick=${()=>setShowNew(true)} className="bg-[var(--zed)] text-white px-3 py-[8px] rounded-xl text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Content</button>
         </div>
       </div>
 
@@ -2204,9 +2212,9 @@ function PlannerView({items, createPlannerItem}){
               const day=i+1;
               const dayItems=items.filter(it=>{ const d=new Date(it.date); return d.getDate()===day && d.getMonth()===month && d.getFullYear()===year; });
               return html`
-                <button key=${day} onClick=${()=>setShowNew(true)} className="h-[90px] rounded-[10px] border border-zinc-100 dark:border-zinc-800 p-1 text-left hover:border-[#20808d] transition">
-                  <div className="text-[11px] font-[600] mb-1 ${day===today.getDate() && month===today.getMonth() ? 'text-[#20808d]' : ''}">${day}</div>
-                  ${dayItems.slice(0,2).map(it=>html`<div key=${it.id} className="text-[9px] truncate px-1 py-[2px] rounded bg-[#e4f1f2] dark:bg-[#142e32] text-[#20808d] mb-[2px]">${it.title}</div>`)}
+                <button key=${day} onClick=${()=>setShowNew(true)} className="h-[90px] rounded-[10px] border border-zinc-100 dark:border-zinc-800 p-1 text-left hover:border-[var(--zed)] transition">
+                  <div className="text-[11px] font-[600] mb-1 ${day===today.getDate() && month===today.getMonth() ? 'text-[var(--zed)]' : ''}">${day}</div>
+                  ${dayItems.slice(0,2).map(it=>html`<div key=${it.id} className="text-[9px] truncate px-1 py-[2px] rounded bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] mb-[2px]">${it.title}</div>`)}
                   ${dayItems.length>2 ? html`<div className="text-[9px] text-zinc-400">+${dayItems.length-2} more</div>`:null}
                 </button>
               `;
@@ -2227,7 +2235,7 @@ function PlannerView({items, createPlannerItem}){
               ${items.map(it=>html`
                 <div key=${it.id} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#e4f1f2] dark:bg-[#142e32] flex items-center justify-center"><${I} name=${it.type==='video'?'Play':'FileText'} size=${14} className="text-[#20808d]"/></div>
+                    <div className="w-8 h-8 rounded-lg bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center"><${I} name=${it.type==='video'?'Play':'FileText'} size=${14} className="text-[var(--zed)]"/></div>
                     <div>
                       <div className="text-[12.5px] font-[600]">${it.title}</div>
                       <div className="text-[10.5px] text-zinc-500">${it.platform} • ${formatDate(it.date)}</div>
@@ -2298,7 +2306,7 @@ function NewContentModal({onClose,onCreate}){
       </div>
       <div className="flex justify-end gap-2 mt-5">
         <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
-        <button onClick=${()=>onCreate({title:title||'Untitled', platform, type, date, status})} className="px-[14px] py-[8px] rounded-xl bg-[#20808d] hover:bg-[#1a6b76] text-white text-[12px] font-[600] shadow-sm transition-colors">Schedule</button>
+        <button onClick=${()=>onCreate({title:title||'Untitled', platform, type, date, status})} className="px-[14px] py-[8px] rounded-xl bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white text-[12px] font-[600] shadow-sm transition-colors">Schedule</button>
       </div>
     </div>
   </div>`;
@@ -2355,7 +2363,7 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
 
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4 overflow-x-auto no-scrollbar">
       ${['All','Chats','Projects','Voice','Saved','Archived'].map(t=> html`
-        <button key=${t} onClick=${()=>setTab(t)} className=${`shrink-0 pb-[10px] ${tab===t?'text-[#20808d] border-b-2 border-[#20808d] font-[600]':'text-zinc-500'}`}>${t}</button>
+        <button key=${t} onClick=${()=>setTab(t)} className=${`shrink-0 pb-[10px] ${tab===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>
       `)}
     </div>
 
@@ -2367,21 +2375,21 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
     ` : html`
       <div className=${layout==='grid'?'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-[10px] max-w-[900px]'}>
         ${items.map(it=> html`
-          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#2c2c2c] border rounded-[13px] p-[14px] flex gap-3 ${it.pinned?'border-[#20808d]/50':'border-zinc-200 dark:border-[#404040]'} ${it.type==='chat'?'cursor-pointer hover:border-[#20808d] transition':''}`}>
-            <div className="w-[34px] h-[34px] rounded-[9px] bg-[#e4f1f2] dark:bg-[#142e32] flex items-center justify-center shrink-0">
-              <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[#20808d]"/>
+          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#2c2c2c] border rounded-[13px] p-[14px] flex gap-3 ${it.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[#404040]'} ${it.type==='chat'?'cursor-pointer hover:border-[var(--zed)] transition':''}`}>
+            <div className="w-[34px] h-[34px] rounded-[9px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center shrink-0">
+              <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[var(--zed)]"/>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-[600] text-[13px] truncate flex items-center gap-1">${it.pinned?html`<${I} name="Pin" size=${11} className="text-[#20808d] shrink-0"/>`:null} ${it.title || (it.type==='voice'? it.voice+' voice' : 'Untitled')}</div>
+              <div className="font-[600] text-[13px] truncate flex items-center gap-1">${it.pinned?html`<${I} name="Pin" size=${11} className="text-[var(--zed)] shrink-0"/>`:null} ${it.title || (it.type==='voice'? it.voice+' voice' : 'Untitled')}</div>
               <div className="text-[11.5px] text-zinc-500 truncate">${it.type==='voice' ? it.text?.slice(0,120)+'…' : it.messages?.[it.messages.length-1]?.text?.slice(0,120) || '—'}</div>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               <div className="text-[11px] text-zinc-400">${formatDate(it.created_at)}</div>
               ${it.type==='chat' ? html`
                 <div className="flex items-center gap-[6px]">
-                  <button onClick=${e=>{ e.stopPropagation(); togglePinned(it.id); }} title=${it.pinned?'Unpin':'Pin'} className="text-zinc-400 hover:text-[#20808d]"><${I} name="Pin" size=${13}/></button>
-                  <button onClick=${e=>{ e.stopPropagation(); setRenaming(it); }} title="Rename" className="text-zinc-400 hover:text-[#20808d]"><${I} name="Pencil" size=${13}/></button>
-                  <button onClick=${e=>{ e.stopPropagation(); toggleSaved(it.id); }} title=${it.saved?'Unsave':'Save'} className="text-zinc-400 hover:text-[#20808d]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); togglePinned(it.id); }} title=${it.pinned?'Unpin':'Pin'} className="text-zinc-400 hover:text-[var(--zed)]"><${I} name="Pin" size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); setRenaming(it); }} title="Rename" className="text-zinc-400 hover:text-[var(--zed)]"><${I} name="Pencil" size=${13}/></button>
+                  <button onClick=${e=>{ e.stopPropagation(); toggleSaved(it.id); }} title=${it.saved?'Unsave':'Save'} className="text-zinc-400 hover:text-[var(--zed)]"><${I} name=${it.saved?'BookmarkCheck':'Bookmark'} size=${13}/></button>
                   <button onClick=${e=>{ e.stopPropagation(); setDeleting(it); }} title="Delete" className="text-zinc-400 hover:text-red-500"><${I} name="Trash2" size=${13}/></button>
                 </div>
               `:null}
@@ -2440,7 +2448,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
     <div className="text-[12px] text-zinc-500 mb-4">Create, clone, and customize realistic AI voices for your content.</div>
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
       ${['Voice Generator','Voice Cloning','My Voices','History'].map(t=> html`
-        <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#20808d] border-b-2 border-[#20808d] font-[600]':'text-zinc-500'}`}>${t}</button>
+        <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>
       `)}
     </div>
 
@@ -2449,7 +2457,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
         <div className="font-[600] text-[13px]">1. Choose a Voice</div>
         <div className="flex gap-3 flex-wrap">
           ${[...new Set(myVoices.map(v=>v.name))].map(n=> html`
-            <button key=${n} onClick=${()=>setVoice(n)} className=${`px-4 py-[10px] rounded-[12px] border text-[12px] text-left ${voice===n?'border-[#20808d] bg-[#e4f1f2] dark:bg-[#142e32]':'border-zinc-200 dark:border-zinc-700'}`}>
+            <button key=${n} onClick=${()=>setVoice(n)} className=${`px-4 py-[10px] rounded-[12px] border text-[12px] text-left ${voice===n?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700'}`}>
               <div className="font-[600]">${n}</div><div className="text-[10.5px] text-zinc-500">${myVoices.find(v=>v.name===n)?.gender||'Voice'} • ${myVoices.find(v=>v.name===n)?.accent||'US'}</div>
             </button>
           `)}
@@ -2457,7 +2465,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
         <div className="font-[600] text-[13px]">2. Enter your text</div>
         <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#252525] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
         <div className="flex gap-3 items-center">
-          <button onClick=${gen} disabled=${busy} className="bg-[#20808d] hover:bg-[#1a6b76] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2">
+          <button onClick=${gen} disabled=${busy} className="bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2">
             <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
           </button>
           <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); }catch{} }} className="px-[14px] py-[10px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Preview (10s)</button>
@@ -2468,7 +2476,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
             <div className="text-[11px] text-zinc-500 mb-2">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
             <audio controls src=${audioUrl} className="w-full"></audio>
             <div className="flex gap-3 text-[11px] mt-2">
-              <a href=${audioUrl} download="zedith-voice.mp3" className="text-[#20808d] hover:underline">Download MP3</a>
+              <a href=${audioUrl} download="zedith-voice.mp3" className="text-[var(--zed)] hover:underline">Download MP3</a>
               <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline">Copy link</button>
               ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline">Share</button>`:null}
             </div>
@@ -2482,13 +2490,13 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
         <div><div className="text-[11px] text-zinc-500 mb-1">Voice Name</div><input value=${cloneName} onChange=${e=>setCloneName(e.target.value)} placeholder="e.g. My Studio Voice" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12px]"/></div>
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Voice Sample</div>
-          <label className="block w-full h-[120px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#20808d]">
+          <label className="block w-full h-[120px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[var(--zed)]">
             <${I} name="Upload" size=${24} className="text-zinc-400 mb-2"/>
             <div className="text-[12px] text-zinc-500">${cloneFile ? cloneFile.name : 'Click to upload MP3/WAV (max 10MB)'}</div>
             <input type="file" accept="audio/*" className="hidden" onChange=${e=>{ setCloneFile(e.target.files?.[0]||null); }}/>
           </label>
         </div>
-        <button onClick=${doClone} className="px-5 py-[10px] rounded-xl bg-[#20808d] text-white text-[13px] font-[600]">Start Voice Cloning</button>
+        <button onClick=${doClone} className="px-5 py-[10px] rounded-xl bg-[var(--zed)] text-white text-[13px] font-[600]">Start Voice Cloning</button>
       </div>
     ` : tab==='My Voices' ? html`
       <div className="max-w-[900px]">
@@ -2496,7 +2504,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
           ${myVoices.map(v=> html`
             <div key=${v.id} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-[#e4f1f2] dark:bg-[#142e32] flex items-center justify-center"><${I} name="Mic" size=${16} className="text-[#20808d]"/></div>
+                <div className="w-10 h-10 rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center"><${I} name="Mic" size=${16} className="text-[var(--zed)]"/></div>
                 <div><div className="font-[600] text-[13px]">${v.name}</div><div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div></div>
               </div>
               ${v.cloned ? html`<span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Cloned</span>`:html`<span className="text-[10px] px-2 py-1 rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800">Built-in</span>`}
@@ -2540,7 +2548,7 @@ function buildPath(vals, w, h, pad=6){
   return {line, area, points};
 }
 
-function AreaChart({data, w=640, h=180, color='#20808d', fmt=(v)=>v, labels=[]}){
+function AreaChart({data, w=640, h=180, color='var(--zed)', fmt=(v)=>v, labels=[]}){
   const [hover,setHover]=useState(null);
   const pad=10;
   const vals = data.length? data : [0];
@@ -2573,7 +2581,7 @@ function AreaChart({data, w=640, h=180, color='#20808d', fmt=(v)=>v, labels=[]})
   </div>`;
 }
 
-function BarSpark({data, w=640, h=140, color='#20808d', fmt=(v)=>v, labels=[]}){
+function BarSpark({data, w=640, h=140, color='var(--zed)', fmt=(v)=>v, labels=[]}){
   const [hover,setHover]=useState(null);
   if(!data.length){
     return html`<div style=${{height:h}} className="flex items-center justify-center text-[12px] text-zinc-400">No data for this period.</div>`;
@@ -2677,7 +2685,7 @@ ${top||'No video data yet.'}`;
     <div className="flex flex-col h-full">
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2">
-          <${ZedithMark} size=${16} color="#20808d"/>
+          <${ZedithMark} size=${16} color="var(--zed)"/>
           <span className="font-[700] text-[13px] display">Ask Studio</span>
         </div>
         <button onClick=${()=>{setOpen(false); setMobileSheet(false);}} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
@@ -2686,23 +2694,23 @@ ${top||'No video data yet.'}`;
         ${msgs.length===0 ? html`
           <div className="mb-2">
             <div className="text-[17px] font-[800] display">Hello, Zedith AI</div>
-            <div className="text-[15px] font-[700] text-[#20808d]">How can I help you?</div>
+            <div className="text-[15px] font-[700] text-[var(--zed)]">How can I help you?</div>
           </div>
         ` : msgs.map((m,i)=>html`
-          <div key=${i} className=${`text-[12.5px] rounded-xl px-3 py-2 max-w-[88%] ${m.role==='user'?'bg-[#20808d] text-white ml-auto':'bg-zinc-100 dark:bg-[#2e2e2e] mr-auto'}`}>${m.text}</div>
+          <div key=${i} className=${`text-[12.5px] rounded-xl px-3 py-2 max-w-[88%] ${m.role==='user'?'bg-[var(--zed)] text-white ml-auto':'bg-zinc-100 dark:bg-[#2e2e2e] mr-auto'}`}>${m.text}</div>
         `)}
         ${busy ? html`<div className="text-[12px] text-zinc-400 flex items-center gap-2"><${I} name="Loader2" size=${13} className="animate-spin"/> Thinking…</div>` : null}
         <div ref=${endRef}></div>
       </div>
       ${msgs.length===0 ? html`
         <div className="px-4 pb-2 flex flex-col gap-2 items-start">
-          ${suggestions.map(s=>html`<button key=${s} onClick=${()=>ask(s)} className="px-3 py-[7px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] hover:border-[#20808d] transition">${s}</button>`)}
+          ${suggestions.map(s=>html`<button key=${s} onClick=${()=>ask(s)} className="px-3 py-[7px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] hover:border-[var(--zed)] transition">${s}</button>`)}
         </div>
       `:null}
       <div className="p-3 border-t border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#2e2e2e] rounded-xl px-3 py-2">
           <input value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
-          <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[#20808d] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
+          <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[var(--zed)] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
         </div>
         <div className="text-[9.5px] text-zinc-400 mt-[6px] text-center">AI can make mistakes. You are responsible for the content that you publish.</div>
       </div>
@@ -2710,8 +2718,8 @@ ${top||'No video data yet.'}`;
 
   return html`
     <!-- Trigger button -->
-    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Studio" className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
-      <${ZedithMark} size=${18} color="#20808d"/>
+    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Studio" className="relative w-[30px] h-[30px] rounded-[9px] bg-zinc-900 flex items-center justify-center hover:opacity-85 transition">
+      <${ZedithMark} size=${16} color="white"/>
     </button>
 
     <!-- Desktop: resizable side panel -->
@@ -2854,7 +2862,7 @@ function AnalyticsView(){
   const netSubSeries = series.map(d=>(Number(d.subscribersGained)||0)-(Number(d.subscribersLost)||0));
 
   const stats = data ? [
-    ['Total Views', fmt(data.overview.views), pctChange(viewsSeries), 'Eye', '#20808d'],
+    ['Total Views', fmt(data.overview.views), pctChange(viewsSeries), 'Eye', 'var(--zed)'],
     ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), pctChange(watchSeries), 'Clock', '#22c1c3'],
     ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), pctChange(netSubSeries), 'Users', '#f5762e'],
     ['Net Sub Change', (data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '') + fmt(data.overview.subscribersGained - data.overview.subscribersLost), pctChange(netSubSeries), 'UserPlus', '#22a06b'],
@@ -2865,7 +2873,7 @@ function AnalyticsView(){
   const PeriodToggle = ()=> html`
     <div className="flex items-center bg-zinc-100 dark:bg-[#313131] rounded-xl p-[3px] text-[11.5px]">
       ${['Daily','Monthly'].map(p=>html`
-        <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[6px] rounded-[9px] font-[650] transition-all ${period===p?'bg-white dark:bg-[#404040] text-[#20808d] shadow-sm':'text-zinc-500'}`}>${p}</button>
+        <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[6px] rounded-[9px] font-[650] transition-all ${period===p?'bg-white dark:bg-[#404040] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${p}</button>
       `)}
     </div>`;
 
@@ -2877,13 +2885,13 @@ function AnalyticsView(){
         <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
       </div>
       <div className="flex items-center gap-2">
-        ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[#20808d] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button> ` : null}
+        ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[var(--zed)] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button> ` : null}
         <${AskStudioWidget} data=${data} connected=${connected}/>
       </div>
     </div>
 
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
-      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#20808d] border-b-2 border-[#20808d] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
+      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
     </div>
 
     ${loading ? html`
@@ -2892,11 +2900,11 @@ function AnalyticsView(){
       </div>
     ` : !connected ? html`
       <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-10 text-center max-w-[760px]">
-        <${I} name="Lock" size=${32} className="mx-auto text-[#20808d] mb-3"/>
+        <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
         <div className="font-[700]">No Social Accounts Connected</div>
         <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
         ${err ? html`<div className="text-[11.5px] text-red-500 mt-2">${err}</div>` : null}
-        <button onClick=${handleConnect} disabled=${connecting} className="mt-4 bg-[#20808d] hover:bg-[#1a6b76] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600] disabled:opacity-60 transition-colors">${connecting?'Redirecting…':'Connect Your Account'}</button>
+        <button onClick=${handleConnect} disabled=${connecting} className="mt-4 bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600] disabled:opacity-60 transition-colors">${connecting?'Redirecting…':'Connect Your Account'}</button>
         <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
       </div>
     ` : html`
@@ -2916,7 +2924,7 @@ function AnalyticsView(){
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           ${stats.map(([l,v,c,icon,color])=>html`
-            <div key=${l} className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-4 relative overflow-hidden group hover:border-[#20808d]/40 transition-colors">
+            <div key=${l} className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-4 relative overflow-hidden group hover:border-[var(--zed)]/40 transition-colors">
               <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-[0.08]" style=${{background:color}}></div>
               <div className="flex items-center justify-between">
                 <div className="text-[11px] text-zinc-500 font-[550]">${l}</div>
@@ -2938,10 +2946,10 @@ function AnalyticsView(){
                   <div className="font-[700] text-[13.5px]">Views Over Time</div>
                   <div className="text-[11px] text-zinc-500">${period==='Daily'?'Daily':'Monthly'} views for the last 28 days</div>
                 </div>
-                <div className="text-[11px] px-2 py-1 rounded-lg font-[700]" style=${{background:'#20808d1a',color:'#20808d'}}>${fmt(viewsSeries.reduce((s,v)=>s+v,0))} total</div>
+                <div className="text-[11px] px-2 py-1 rounded-lg font-[700]" style=${{background:'var(--zed)1a',color:'var(--zed)'}}>${fmt(viewsSeries.reduce((s,v)=>s+v,0))} total</div>
               </div>
               <div className="mt-3">
-                <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="#20808d" fmt=${v=>fmt(v)+' views'}/>
+                <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="var(--zed)" fmt=${v=>fmt(v)+' views'}/>
               </div>
               <div className="flex justify-between text-[10px] text-zinc-400 mt-1 px-1">
                 <span>${seriesLabels[0]||''}</span><span>${seriesLabels[seriesLabels.length-1]||''}</span>
@@ -2986,20 +2994,20 @@ function AnalyticsView(){
             <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
               <div className="font-[700] text-[13.5px] mb-1">Views Trend</div>
               <div className="text-[11px] text-zinc-500 mb-3">${period==='Daily'?'Daily':'Monthly'}</div>
-              <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="#20808d" fmt=${v=>fmt(v)+' views'} h=${160} w=${300}/>
+              <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="var(--zed)" fmt=${v=>fmt(v)+' views'} h=${160} w=${300}/>
             </div>
           </div>
         ` : tab==='Audience' ? html`
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Age &amp; Gender</div>
-              ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`<div key=${i} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-20 truncate">${row[0]} · ${row[1]}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#20808d] rounded-full" style=${{width:(Number(row[2])||0)+'%'}}></div></div><div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
+              ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`<div key=${i} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-20 truncate">${row[0]} · ${row[1]}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[var(--zed)] rounded-full" style=${{width:(Number(row[2])||0)+'%'}}></div></div><div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
             </div>
             <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Top Countries</div>
               ${(data?.topCountries ?? []).length ? html`
                 <div className="flex items-center gap-4">
-                  <${Donut} segments=${data.topCountries.slice(0,5).map((row,i)=>({value:Number(row[1])||0, color:['#20808d','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}))}/>
+                  <${Donut} segments=${data.topCountries.slice(0,5).map((row,i)=>({value:Number(row[1])||0, color:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}))}/>
                   <div className="flex-1 space-y-[6px]">
-                    ${data.topCountries.slice(0,5).map((row,i)=>html`<div key=${i} className="flex items-center justify-between text-[11.5px]"><span className="flex items-center gap-2"><span className="w-[8px] h-[8px] rounded-full" style=${{background:['#20808d','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}}></span>${row[0]}</span><span className="font-[600]">${fmt(row[1])}</span></div>`)}
+                    ${data.topCountries.slice(0,5).map((row,i)=>html`<div key=${i} className="flex items-center justify-between text-[11.5px]"><span className="flex items-center gap-2"><span className="w-[8px] h-[8px] rounded-full" style=${{background:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}}></span>${row[0]}</span><span className="font-[600]">${fmt(row[1])}</span></div>`)}
                   </div>
                 </div>
               ` : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
@@ -3015,7 +3023,7 @@ function AnalyticsView(){
             <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
               <div className="font-[700] text-[13.5px] mb-3">Breakdown</div>
               <div className="space-y-3">
-                ${[['Likes',data?.overview.likes ?? 0,'#20808d'],['Comments',data?.overview.comments ?? 0,'#22c1c3'],['Shares',data?.overview.shares ?? 0,'#f5762e']].map(([l,v,color])=>html`
+                ${[['Likes',data?.overview.likes ?? 0,'var(--zed)'],['Comments',data?.overview.comments ?? 0,'#22c1c3'],['Shares',data?.overview.shares ?? 0,'#f5762e']].map(([l,v,color])=>html`
                   <div key=${l} className="p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl">
                     <div className="flex items-center justify-between text-[11px] text-zinc-500"><span>${l}</span><span className="font-[700] text-[14px] text-zinc-900 dark:text-zinc-100">${fmt(v)}</span></div>
                     <div className="mt-2 h-[6px] rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full" style=${{width:'100%',background:color}}></div></div>
@@ -3045,7 +3053,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
   const upd=(k,v)=>{ const ns={...settings,[k]:v}; setSettings(ns); };
   const saveAll=()=>{ saveProfile({display_name:settings.displayName, username:settings.username, bio:settings.bio}); toast('Profile & settings saved'); };
   const Toggle=({on,setOn})=> html`
-    <button onClick=${()=>{ setOn(!on); }} className=${`w-11 h-[22px] rounded-full relative transition ${on?'bg-[#20808d]':'bg-zinc-300 dark:bg-zinc-700'}`}>
+    <button onClick=${()=>{ setOn(!on); }} className=${`w-11 h-[22px] rounded-full relative transition ${on?'bg-[var(--zed)]':'bg-zinc-300 dark:bg-zinc-700'}`}>
       <div className=${`absolute top-[2px] w-[18px] h-[18px] bg-white rounded-full shadow transition-all ${on?'right-[2px]':'left-[2px]'}`}></div>
     </button>`;
   return html`
@@ -3072,7 +3080,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
               <textarea value=${settings.bio} onChange=${e=>upd('bio',e.target.value)} className="w-full h-[72px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12px]"></textarea>
             </div>
           </div>
-          <button onClick=${saveAll} className="mt-4 px-4 py-[8px] rounded-xl bg-[#20808d] text-white text-[12px] font-[600]">Save Changes</button>
+          <button onClick=${saveAll} className="mt-4 px-4 py-[8px] rounded-xl bg-[var(--zed)] text-white text-[12px] font-[600]">Save Changes</button>
         </div>
 
         <div className="bg-white dark:bg-[#282828] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5 text-[12.5px] space-y-4">
@@ -3118,7 +3126,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
             <div>Credits: <b>${(profile?.credits||0).toLocaleString('en-IN')} / ${(profile?.monthly_credits||50000).toLocaleString('en-IN')}</b></div>
             <div>Storage: <b>Supabase Cloud</b></div>
           </div>
-          <button onClick=${openUpgrade} className="w-full mt-3 bg-[#20808d] text-white py-[8px] rounded-xl text-[12px] font-[600]">Upgrade to Pro</button>
+          <button onClick=${openUpgrade} className="w-full mt-3 bg-[var(--zed)] text-white py-[8px] rounded-xl text-[12px] font-[600]">Upgrade to Pro</button>
         </div>
         <div className="bg-[#fdf3f1] dark:bg-[#2a1515] border border-red-100 dark:border-red-900/40 rounded-[14px] p-4 text-[12px]">
           <div className="font-[700] text-red-600">Support</div>
@@ -3163,7 +3171,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
     <div className="px-10 pt-10 pb-10 max-w-[1180px]">
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[32px] font-[800] display">Upgrade Your <span className="text-[#20808d]">Experience</span></div>
+          <div className="text-[32px] font-[800] display">Upgrade Your <span className="text-[var(--zed)]">Experience</span></div>
           <div className="text-zinc-500 dark:text-zinc-400 mt-1 text-[13.5px]">Choose the plan that fits your creative journey.</div>
           <div className="mt-5 inline-flex bg-zinc-100 dark:bg-[#292929] rounded-full p-1 text-[12.5px] border border-zinc-200 dark:border-zinc-800">
             <button onClick=${()=>setYearly(false)} className=${`px-4 py-[6px] rounded-full transition ${!yearly?'bg-white dark:bg-[#373737] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>Monthly</button>
@@ -3179,20 +3187,20 @@ function UpgradeView({plan, planConfig, onPlan}) {
         ${plans.map(p=> {
           const {display, sub} = getPrice(p.k);
           return html`
-          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[#20808d]/60 bg-white dark:bg-[#242424] shadow-[0_8px_40px_rgba(32,128,141,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[#242424]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#212121]' : ''}`}>
+          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[#242424] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[#242424]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#212121]' : ''}`}>
             ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#5dc3cf] text-white'}`}>${p.badge}</div>`:null}
             <div className="text-zinc-400 mb-2 mt-2">
               ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#5dc3cf]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
             </div>
-            <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[#20808d]':''} ${p.k==='elite'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
+            <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[var(--zed)]':''} ${p.k==='elite'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
             <div className="text-[12px] text-zinc-500 dark:text-zinc-400 min-h-[34px]">${p.k==='free'?'Explore Zedith with essential features.':p.k==='pro'?'More power, more creativity.':'Unlimited creativity. Ultimate everything.'}</div>
-            <div className="mt-2 text-[14px] font-[600] text-[#20808d]">${p.credits.toLocaleString('en-IN')} Credits / month</div>
+            <div className="mt-2 text-[14px] font-[600] text-[var(--zed)]">${p.credits.toLocaleString('en-IN')} Credits / month</div>
             <div className="mt-2 text-[30px] font-[800] tracking-tight">${display} <span className="text-[12px] text-zinc-500 font-[500]">${sub}</span></div>
             ${yearly && p.k!=='free' ? html`<div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-[600] mt-1">You save ₹${Math.round(MONTHLY_PRICES[p.k]*12*0.2).toLocaleString('en-IN')} / year</div>` : null}
             <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-3 space-y-[9px] text-[12.5px] flex-1">
               ${p.features.map(([f,ok])=> html`<div className="flex items-start gap-2"><span className=${ok ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>${ok ? '✓' : '✕'}</span><span className=${ok ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400'}>${f}</span></div>`)}
             </div>
-            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#313131] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[#20808d] hover:bg-[#1a6b76] text-white shadow-zed-soft' : ''} ${p.k==='elite' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
+            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#313131] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white shadow-zed-soft' : ''} ${p.k==='elite' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
               ${p.btn}
             </button>
           </div>`;
@@ -3215,16 +3223,16 @@ function NotificationsView({notifications,markRead}){
     </div>
     <div className="max-w-[820px] mt-5 space-y-[10px]">
       ${notifications.length===0 ? html`<div className="text-zinc-500 text-[13px]">No notifications yet.</div>` : notifications.map(n=> html`
-        <div key=${n.id} className=${`bg-white dark:bg-[#2c2c2c] border ${n.read?'border-zinc-200 dark:border-[#404040]':'border-[#20808d]/40'} rounded-[13px] p-[14px] flex gap-3`}>
-          <div className=${`w-8 h-8 rounded-full flex items-center justify-center ${n.read?'bg-zinc-100 dark:bg-zinc-800':'bg-[#d8ecee] dark:bg-[#142e32]'}`}>
-            <${I} name="Bell" size=${14} className=${n.read?'text-zinc-400':'text-[#20808d]'} />
+        <div key=${n.id} className=${`bg-white dark:bg-[#2c2c2c] border ${n.read?'border-zinc-200 dark:border-[#404040]':'border-[var(--zed)]/40'} rounded-[13px] p-[14px] flex gap-3`}>
+          <div className=${`w-8 h-8 rounded-full flex items-center justify-center ${n.read?'bg-zinc-100 dark:bg-zinc-800':'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]'}`}>
+            <${I} name="Bell" size=${14} className=${n.read?'text-zinc-400':'text-[var(--zed)]'} />
           </div>
           <div className="flex-1">
             <div className="font-[600] text-[13px]">${n.title}</div>
             <div className="text-[12px] text-zinc-500">${n.body}</div>
             <div className="text-[10.5px] text-zinc-400 mt-1">${new Date(n.created_at).toLocaleString()}</div>
           </div>
-          ${!n.read ? html`<div className="w-2 h-2 rounded-full bg-[#20808d] mt-1"></div>`:null}
+          ${!n.read ? html`<div className="w-2 h-2 rounded-full bg-[var(--zed)] mt-1"></div>`:null}
         </div>
       `)}
     </div>
@@ -3254,10 +3262,10 @@ function ToolModal({tool,onClose,onSend}){
         <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="text-[12px] text-zinc-500 mb-3">${prompts[tool]}</div>
-      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none text-[12.5px] focus:border-[#20808d] focus:ring-1 focus:ring-[#20808d]/30 transition-colors"></textarea>
+      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#202020] outline-none text-[12.5px] focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"></textarea>
       <div className="flex justify-end gap-2 mt-4">
         <button onClick=${onClose} className="px-4 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
-        <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[#20808d] hover:bg-[#1a6b76] text-white text-[12px] font-[600] shadow-sm disabled:opacity-50 transition-colors">Run in Chat</button>
+        <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[var(--zed)] hover:bg-[var(--zed-600)] text-white text-[12px] font-[600] shadow-sm disabled:opacity-50 transition-colors">Run in Chat</button>
       </div>
     </div>
   </div>`;
@@ -3403,7 +3411,7 @@ function AdminDashboard({card, transactions}){
         ${card('New Today', users.new_today, 'UserPlus', '#e8b04b', 'Signed up today')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', '#8ad4db', `${todayTx.length} transactions`)}
+        ${card('Credits Used Today', todayCredits.toLocaleString(), 'Coins', 'var(--zed-lighter)', `${todayTx.length} transactions`)}
         ${card('Total Credits Used', totalCreditsSpent.toLocaleString(), 'TrendingUp', '#ef5b5b', 'All time')}
         ${card('AI Requests', aiRequests.toString(), 'MessageSquare', '#5bc8e8', 'Text & code')}
         ${card('Image Generations', imageGens.toString(), 'Image', '#e85ba3', 'All time')}
@@ -3652,7 +3660,7 @@ function AdminUsers(){
             <button onClick=${()=>setSelectedUser(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${18}/></button>
           </div>
           <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#242424] rounded-xl mb-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#359aa6] to-[#1a6b76] flex items-center justify-center text-white font-[700]">${(selectedUser.display_name||selectedUser.email||'?')[0].toUpperCase()}</div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--zed-light)] to-[var(--zed-600)] flex items-center justify-center text-white font-[700]">${(selectedUser.display_name||selectedUser.email||'?')[0].toUpperCase()}</div>
             <div>
               <div className="font-[700] text-[14px]">${selectedUser.display_name||'—'}</div>
               <div className="text-[12px] text-zinc-500">${selectedUser.email||selectedUser.id}</div>
@@ -3741,7 +3749,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
     code:{label:'Code', icon:'Code2', color:'#22c55e'},
     vision:{label:'Vision / Image analysis', icon:'Eye', color:'#f59e0b'},
     image_gen:{label:'Image Generation', icon:'Image', color:'#ec4899'},
-    voice:{label:'Voice Studio', icon:'Mic', color:'#4aabb5'},
+    voice:{label:'Voice Studio', icon:'Mic', color:'var(--zed-lighter)'},
   };
   const usageByFeature = {};
   let totalSpent = 0;
@@ -3773,7 +3781,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
 
       <!-- Identity -->
       <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#242424] rounded-xl mb-4">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#359aa6] to-[#1a6b76] flex items-center justify-center text-white font-[700] text-[16px]">${(user.display_name||user.email||'?')[0].toUpperCase()}</div>
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--zed-light)] to-[var(--zed-600)] flex items-center justify-center text-white font-[700] text-[16px]">${(user.display_name||user.email||'?')[0].toUpperCase()}</div>
         <div className="flex-1 min-w-0">
           <div className="font-[700] text-[15px] truncate">${user.display_name||user.username||'—'}</div>
           <div className="text-[12px] text-zinc-500 truncate">${user.email||user.id}</div>
@@ -3950,7 +3958,7 @@ function AdminChatViewer({chat, onClose}){
       <div className="overflow-y-auto space-y-3 pr-1 flex-1">
         ${(chat.messages||[]).length===0 ? html`<div className="text-zinc-400 text-[12px] text-center py-6">No messages in this chat</div>` : (chat.messages||[]).map(m=>html`
           <div key=${m.id} className=${`flex ${m.role==='user'?'justify-end':'justify-start'}`}>
-            <div className=${`max-w-[80%] px-3 py-2 rounded-2xl text-[12.5px] whitespace-pre-wrap break-words ${m.role==='user' ? 'bg-[#20808d] text-white rounded-br-sm' : 'bg-zinc-100 dark:bg-[#142e32] text-zinc-800 dark:text-zinc-200 rounded-bl-sm'}`}>
+            <div className=${`max-w-[80%] px-3 py-2 rounded-2xl text-[12.5px] whitespace-pre-wrap break-words ${m.role==='user' ? 'bg-[var(--zed)] text-white rounded-br-sm' : 'bg-zinc-100 dark:bg-[var(--zed-tint-bg2)] text-zinc-800 dark:text-zinc-200 rounded-bl-sm'}`}>
               <div className="text-[9.5px] uppercase tracking-wide opacity-60 mb-1 font-[700]">${m.role==='user'?'User':'Assistant'}</div>
               ${m.text||''}
               ${m.attachment ? html`<div className="mt-1 text-[10.5px] opacity-70 flex items-center gap-1"><${I} name="Paperclip" size=${11}/> ${m.attachment.name||'Attachment'}</div>` : null}
@@ -4100,7 +4108,7 @@ function AdminAIModels(){
     {id:'7', name:'Groq Llama', provider:'Groq', enabled:false, default:false, cost:5, experimental:false},
     {id:'8', name:'Together Mistral', provider:'Together AI', enabled:false, default:false, cost:8, experimental:true},
   ]);
-  const provColors={'OpenAI':'#10a37f','OpenRouter':'#e8b04b','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'#4aabb5','DeepSeek':'#06b6d4'};
+  const provColors={'OpenAI':'#10a37f','OpenRouter':'#e8b04b','Anthropic':'#d97706','Google':'#4285f4','Groq':'#f97316','Together AI':'var(--zed-lighter)','DeepSeek':'#06b6d4'};
 
   const toggleModel=(id,field,val)=>setModels(ms=>ms.map(m=>m.id===id?{...m,[field]:val, ...(field==='default'&&val?{}:{})}:field==='default'&&val?{...m,default:false}:m));
   const setDefault=(id)=>setModels(ms=>ms.map(m=>({...m,default:m.id===id})));
@@ -4448,9 +4456,9 @@ function ZedithPicksView(){
 
   // Deterministic per-category color so each category gets its own visual
   // identity instead of everything rendering the same flat purple.
-  const CAT_PALETTE = ['#20808d','#22c1c3','#f5762e','#22a06b','#e0457b','#3b82f6','#eab308','#ec4899'];
+  const CAT_PALETTE = ['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b','#3b82f6','#eab308','#ec4899'];
   const catColor = (nameOrId) => {
-    if(nameOrId==='All') return '#20808d';
+    if(nameOrId==='All') return 'var(--zed)';
     const key = String(nameOrId||'');
     let hash = 0;
     for(let i=0;i<key.length;i++){ hash = (hash*31 + key.charCodeAt(i)) >>> 0; }
@@ -4483,17 +4491,17 @@ function ZedithPicksView(){
   const badge = (text,color) => html`<span className="text-[9.5px] px-[7px] py-[2px] rounded-full font-[700] uppercase tracking-wide" style=${{background:color+'20',color}}>${text}</span>`;
 
   const ProductCard = ({p}) => html`
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 hover:border-[#20808d] transition flex flex-col fade-in">
+    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 hover:border-[var(--zed)] transition flex flex-col fade-in">
       <div className="flex items-start gap-3 mb-3">
         <div className="w-11 h-11 rounded-[11px] bg-zinc-100 dark:bg-[#242424] flex items-center justify-center overflow-hidden shrink-0">
-          ${p.logo_url ? html`<img src=${p.logo_url} alt=${p.name} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${18} className="text-[#20808d]"/>`}
+          ${p.logo_url ? html`<img src=${p.logo_url} alt=${p.name} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/>`}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <div className="font-[700] text-[14px] truncate">${p.name}</div>
             ${p.is_featured ? badge('Featured','#f59e0b') : null}
             ${p.is_new ? badge('New','#10b981') : null}
-            ${p.is_sponsored ? badge('Sponsored','#20808d') : null}
+            ${p.is_sponsored ? badge('Sponsored','var(--zed)') : null}
           </div>
           <div className="text-[11px] font-[600] inline-flex items-center gap-[5px] mt-[2px]" style=${{color:catColor(catName(p.category_id))}}>
             <span className="w-[6px] h-[6px] rounded-full" style=${{background:catColor(catName(p.category_id))}}></span>
@@ -4510,7 +4518,7 @@ function ZedithPicksView(){
       </div>
       <div className="flex gap-2">
         <button onClick=${()=>openProduct(p)} className="flex-1 py-[7px] rounded-[10px] border border-zinc-200 dark:border-zinc-700 text-[12px] font-[600] hover:bg-zinc-50 dark:hover:bg-[#262626] transition">Learn More</button>
-        <button onClick=${()=>clickWebsite(p)} className="flex-1 py-[7px] rounded-[10px] bg-[#20808d] text-white text-[12px] font-[600] hover:bg-[#1a6b76] transition">Visit Site</button>
+        <button onClick=${()=>clickWebsite(p)} className="flex-1 py-[7px] rounded-[10px] bg-[var(--zed)] text-white text-[12px] font-[600] hover:bg-[var(--zed-600)] transition">Visit Site</button>
       </div>
     </div>`;
 
@@ -4541,7 +4549,7 @@ function ZedithPicksView(){
     <div className="flex-1 overflow-y-auto">
       <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <${I} name="Compass" size=${18} className="text-[#20808d]"/>
+          <${I} name="Compass" size=${18} className="text-[var(--zed)]"/>
           <span className="font-[700] text-[14px] display">Zedith Picks</span>
         </div>
         <div className="text-[11px] text-zinc-400">${sorted.length} tools</div>
@@ -4608,7 +4616,7 @@ function ZedithPicksView(){
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-[12px] bg-zinc-100 dark:bg-[#242424] flex items-center justify-center overflow-hidden shrink-0">
-                ${selected.logo_url ? html`<img src=${selected.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${20} className="text-[#20808d]"/>`}
+                ${selected.logo_url ? html`<img src=${selected.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${20} className="text-[var(--zed)]"/>`}
               </div>
               <div>
                 <div className="font-[800] text-[17px] display">${selected.name}</div>
@@ -4637,8 +4645,8 @@ function ZedithPicksView(){
           `:null}
 
           ${selected.why_recommended ? html`
-            <div className="bg-[#e4f1f2] dark:bg-[#122a2d] border border-[#bedde0] dark:border-[#3a3436] rounded-[12px] p-3 mb-4">
-              <div className="font-[700] text-[12px] text-[#20808d] mb-1 flex items-center gap-1.5"><${ZedithMark} size=${13} color="#20808d"/> Why Zedith Recommends This</div>
+            <div className="bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] border border-[#bedde0] dark:border-[#3a3436] rounded-[12px] p-3 mb-4">
+              <div className="font-[700] text-[12px] text-[var(--zed)] mb-1 flex items-center gap-1.5"><${ZedithMark} size=${13} color="var(--zed)"/> Why Zedith Recommends This</div>
               <div className="text-[12.5px] text-zinc-600 dark:text-zinc-300">${selected.why_recommended}</div>
             </div>
           `:null}
@@ -4650,7 +4658,7 @@ function ZedithPicksView(){
           `:null}
 
           <div className="flex gap-2">
-            <button onClick=${()=>clickWebsite(selected)} className="flex-1 py-[10px] rounded-[12px] bg-[#20808d] text-white text-[13px] font-[600] hover:bg-[#1a6b76] transition flex items-center justify-center gap-1.5"><${I} name="ExternalLink" size=${14}/>Official Website</button>
+            <button onClick=${()=>clickWebsite(selected)} className="flex-1 py-[10px] rounded-[12px] bg-[var(--zed)] text-white text-[13px] font-[600] hover:bg-[var(--zed-600)] transition flex items-center justify-center gap-1.5"><${I} name="ExternalLink" size=${14}/>Official Website</button>
             ${selected.affiliate_url ? html`<button onClick=${()=>clickAffiliate(selected)} className="flex-1 py-[10px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 text-[13px] font-[600] hover:bg-zinc-50 dark:hover:bg-[#262626] transition">Get Deal</button>`:null}
           </div>
         </div>
