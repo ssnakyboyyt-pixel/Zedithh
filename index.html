@@ -1687,6 +1687,8 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const [typingId,setTypingId]=useState(null);
   const seenIdsRef=useRef(null);
   const recogRef=useRef(null);
+  const stopRequestedRef=useRef(false);
+  const sendTokenRef=useRef(0);
   const fileRef=useRef(null); const imgRef=useRef(null); const scrollRef=useRef(null);
 
   const toggleVoiceInput = ()=>{
@@ -1731,11 +1733,24 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     const text=(overrideText ?? input).trim();
     if(!text && !attached) return;
     if(loading) return;
+    const myToken = ++sendTokenRef.current;
+    stopRequestedRef.current = false;
     setLoading(true); setInput('');
     const att=attached; setAttached(null);
     setLoadingHasImage(!!att && att.type==='image');
     try{ await onSend({text, attachment:att, smart, webSearch, modelPref:'auto'}); }
-    finally{ setLoading(false); setLoadingHasImage(false); }
+    finally{
+      // Only clear loading if this send wasn't superseded by a stop/new send,
+      // so a stale response can't flip the button back after the user stopped it.
+      if(sendTokenRef.current === myToken){ setLoading(false); setLoadingHasImage(false); }
+    }
+  };
+
+  const stopGenerating = ()=>{
+    stopRequestedRef.current = true;
+    sendTokenRef.current++; // invalidate the in-flight send so its completion is ignored
+    setLoading(false);
+    setLoadingHasImage(false);
   };
 
   const pickFile = (e)=>{
@@ -1970,8 +1985,22 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           </button>
           <div className="flex-1"></div>
           <button onClick=${toggleVoiceInput} title=${listening?'Stop listening':'Voice input'} className=${`w-[33px] h-[33px] rounded-full border flex items-center justify-center shrink-0 ${listening?'border-red-400 bg-red-50 dark:bg-red-950/30 text-red-500 animate-pulse':'border-zinc-200 dark:border-zinc-700'}`}><${I} name="Mic" size=${14}/></button>
-          <button onClick=${()=>doSend()} disabled=${loading || (!input.trim() && !attached)} className="w-[38px] h-[38px] rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0">
-            <${I} name="ArrowUp" size=${17}/>
+          <button
+            onClick=${()=>{ if(loading){ stopGenerating(); } else { doSend(); } }}
+            disabled=${!loading && (!input.trim() && !attached)}
+            title=${loading?'Stop generating':'Send'}
+            className="w-[38px] h-[38px] rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white flex items-center justify-center shadow-zed-soft disabled:opacity-50 transition shrink-0"
+          >
+            ${loading ? html`
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="12" height="12" rx="2.5" fill="white"/>
+              </svg>
+            ` : html`
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19V5"/>
+                <path d="M5 12l7-7 7 7"/>
+              </svg>
+            `}
           </button>
         </div>
         <input type="file" ref=${fileRef} accept="*/*" onChange=${pickFile} className="hidden"/>
