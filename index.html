@@ -76,6 +76,10 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 .modal-in{animation:modalIn .24s cubic-bezier(.2,.9,.3,1)}
 @keyframes overlayIn{from{opacity:0}to{opacity:1}}
+@keyframes panelSlideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes panelSlideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
+@keyframes sheetSlideIn{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+@keyframes sheetSlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(100%)}}
 .overlay-in{animation:overlayIn .18s ease}
 .modal-panel{background:#ffffff;border:1px solid rgba(20,20,20,0.08);box-shadow:0 24px 60px -12px rgba(20,20,20,0.18),0 2px 8px rgba(20,20,20,0.06)}
 .dark .modal-panel{background:#2a2a2a;border:1px solid #3a3a3a;box-shadow:0 24px 60px -12px rgba(0,0,0,0.6),0 2px 10px rgba(0,0,0,0.3)}
@@ -1432,8 +1436,8 @@ function App(){
       openNotifications=${openNotifications}
     />
     ${sidebarCollapsed ? html`
-      <button onClick=${()=>setSidebarCollapsed(false)} className="md:hidden fixed top-[13px] left-[13px] z-40 w-[38px] h-[38px] rounded-[10px] bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 shadow-soft flex items-center justify-center" aria-label="Open sidebar">
-        <${I} name="Menu" size=${18}/>
+      <button onClick=${()=>setSidebarCollapsed(false)} className="md:hidden fixed top-[13px] left-[13px] z-40 w-[38px] h-[38px] rounded-[10px] bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 shadow-soft flex items-center justify-center text-zinc-900 dark:text-white" aria-label="Open sidebar">
+        <${ZedithMark} size=${20} color="currentColor" strokeWidth=${2.2}/>
       </button>
     ` : null}
     <div className="flex-1 flex min-w-0 h-full">
@@ -1453,15 +1457,10 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
   return html`
   <aside className=${`${collapsed?'w-0 md:w-[72px] border-r-0 md:border-r overflow-hidden':'w-[248px] border-r'} shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col transition-all duration-200`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#2a2a2a]">
-      <button onClick=${toggleCollapsed} className="p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Toggle sidebar">
-        <${I} name="Menu" size=${18}/>
+      <button onClick=${toggleCollapsed} className=${`flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
+        <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
+        ${!collapsed ? html`<span className="display font-[800] text-[18px] tracking-tight">Zedith</span>` : null}
       </button>
-      ${!collapsed ? html`
-        <div className="flex items-center gap-2">
-          <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
-          <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
-        </div>
-      ` : null}
     </div>
 
     <div className="px-[10px] pt-[12px]">
@@ -2646,18 +2645,24 @@ function TrendPill({value}){
   </span>`;
 }
 
-// ---------- Ask Studio (AI widget grounded in real channel analytics) ----------
+// ---------- Ask Zedith (AI widget grounded in real channel analytics) ----------
 function AskStudioWidget({data, connected}){
   const [open,setOpen]=useState(false);
+  const [closing,setClosing]=useState(false);
   const [msgs,setMsgs]=useState([]); // {role,text}
   const [input,setInput]=useState('');
   const [busy,setBusy]=useState(false);
   const [mobileSheet,setMobileSheet]=useState(false);
   const endRef=useRef(null);
 
+  const closePanel=()=>{
+    setClosing(true);
+    setTimeout(()=>{ setOpen(false); setMobileSheet(false); setClosing(false); }, 180);
+  };
+
   useEffect(()=>{ endRef.current?.scrollIntoView({behavior:'smooth'}); },[msgs,busy]);
 
-  const suggestions=['How can Ask Studio help me?','Summarise my channel performance','What should I improve first?','Suggest new video ideas'];
+  const suggestions=['How can Ask Zedith help me?','Summarise my channel performance','What should I improve first?','Suggest new video ideas'];
 
   const buildContext=()=>{
     if(!connected || !data) return 'The creator has not connected a YouTube channel yet, so no real analytics data is available. Encourage them to connect their channel for a grounded answer.';
@@ -2681,7 +2686,7 @@ ${top||'No video data yet.'}`;
     setInput('');
     setBusy(true);
     try{
-      const sys=`You are Ask Studio, an AI assistant embedded in Zedith's Channel Analytics page. Answer questions about the creator's own YouTube channel using ONLY the real data provided below — never invent numbers. If the data doesn't cover what's asked, say so plainly. Be concise, concrete, and actionable.\n\n${buildContext()}`;
+      const sys=`You are Ask Zedith, an AI assistant embedded in Zedith's Channel Analytics page. Answer questions about the creator's own YouTube channel using ONLY the real data provided below — never invent numbers. If the data doesn't cover what's asked, say so plainly. Be concise, concrete, and actionable.\n\n${buildContext()}`;
       const payload=[{role:'system',content:sys}, ...msgs.slice(-6).map(m=>({role:m.role,content:m.text})), {role:'user',content:text}];
       const {text:answer, error} = await callOR(payload,{smart:false, userText:text});
       setMsgs(m=>[...m, {role:'assistant', text: error ? "Couldn't get a response right now — please try again." : answer}]);
@@ -2696,9 +2701,9 @@ ${top||'No video data yet.'}`;
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2">
           <${ZedithMark} size=${16} color="var(--zed)"/>
-          <span className="font-[700] text-[13px] display">Ask Studio</span>
+          <span className="font-[700] text-[13px] display">Ask Zedith</span>
         </div>
-        <button onClick=${()=>{setOpen(false); setMobileSheet(false);}} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
+        <button onClick=${closePanel} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         ${msgs.length===0 ? html`
@@ -2728,21 +2733,21 @@ ${top||'No video data yet.'}`;
 
   return html`
     <!-- Trigger button -->
-    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Studio" className="relative w-[30px] h-[30px] rounded-[9px] bg-zinc-900 flex items-center justify-center hover:opacity-85 transition">
+    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Zedith" className="relative w-[30px] h-[30px] rounded-[9px] bg-zinc-900 flex items-center justify-center hover:opacity-85 transition">
       <${ZedithMark} size=${16} color="white"/>
     </button>
 
     <!-- Desktop: resizable side panel -->
     ${open ? html`
-      <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#232323] border-l border-zinc-200 dark:border-[#353535] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px'}}>
+      <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#232323] border-l border-zinc-200 dark:border-[#353535] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px', animation:`${closing?'panelSlideOut':'panelSlideIn'} .18s ease both`}}>
         <${PanelBody}/>
       </div>
     `:null}
 
     <!-- Mobile: bottom sheet -->
     ${mobileSheet ? html`
-      <div className="md:hidden fixed inset-0 z-[600] bg-black/50" onClick=${()=>{setOpen(false); setMobileSheet(false);}}>
-        <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#232323] rounded-t-[20px] overflow-hidden flex flex-col" onClick=${e=>e.stopPropagation()}>
+      <div className="md:hidden fixed inset-0 z-[600] bg-black/50" style=${{animation:`${closing?'overlayIn .18s ease reverse both':'overlayIn .18s ease both'}`}} onClick=${closePanel}>
+        <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#232323] rounded-t-[20px] overflow-hidden flex flex-col" style=${{animation:`${closing?'sheetSlideOut':'sheetSlideIn'} .18s ease both`}} onClick=${e=>e.stopPropagation()}>
           <${PanelBody}/>
         </div>
       </div>
