@@ -1400,6 +1400,8 @@ function App(){
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
       case 'analytics': return html`<${AnalyticsView} />`;
+      case 'seo': return html`<${SEOStudioView} />`;
+      case 'trends': return html`<${TrendExplorerView} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
@@ -1483,7 +1485,13 @@ function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, 
         </button>
       `)}
       <div className=${`pt-[10px] mt-[10px] border-t border-zinc-100 dark:border-[#2c2c2c] ${collapsed?'text-center':''}`}>
-        ${!collapsed ? html`<div className="px-3 pb-[6px] text-[10px] uppercase tracking-wider text-zinc-400 font-[700]">Tools</div>`:null}
+        ${!collapsed ? html`<div className="px-3 pb-[6px] text-[10px] uppercase tracking-wider text-zinc-400 font-[700]">Creator Tools</div>`:null}
+        <button onClick=${()=>setModule('seo')} className=${itemCls(module==='seo')} title="SEO Studio">
+          <${I} name="Search" size=${17}/> ${!collapsed ? 'SEO Studio' : ''}
+        </button>
+        <button onClick=${()=>setModule('trends')} className=${itemCls(module==='trends')} title="Trend Explorer">
+          <${I} name="TrendingUp" size=${17}/> ${!collapsed ? 'Trend Explorer' : ''}
+        </button>
         <button onClick=${()=>setModule('voice')} className=${itemCls(module==='voice')} title="AI Voice Studio">
           <${I} name="Mic" size=${17}/> ${!collapsed ? 'AI Voice Studio' : ''}
         </button>
@@ -4418,6 +4426,264 @@ function AdminSettings(){
       </div>
     </div>
     <button onClick=${save} disabled=${saving} className="mt-5 px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Settings'}</button>
+  </div>`;
+}
+
+// =====================================================================
+// SEO STUDIO
+// =====================================================================
+const SEO_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','Bluesky'];
+const SEO_NICHES = ['Gaming','AI','Technology','Finance','Education','Business','Lifestyle','Music','Sports','Other'];
+
+function seoPromptFor(platform, topic, niche){
+  const base = `You are Zedith's SEO Studio, an expert social growth strategist for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
+Respond with STRICT JSON only, no markdown fences, no commentary — matching exactly this shape for the platform:`;
+  const shapes = {
+    YouTube: `{"title":"...", "description":"...", "hashtags":["#...","..."], "tags":["tag1","tag2","..."]}`,
+    Instagram: `{"caption":"...", "hashtags":["#...","..."]}`,
+    TikTok: `{"caption":"...", "hashtags":["#...","..."]}`,
+    X: `{"post":"..."}`,
+    Threads: `{"thread":["post 1 text","post 2 text","post 3 text"]}`,
+    LinkedIn: `{"post":"..."}`,
+    Bluesky: `{"post":"..."}`,
+  };
+  return `${base}\n${shapes[platform]||shapes.X}\nMake it genuinely optimized for ${platform}'s algorithm and audience behavior, specific to the topic — not generic filler.`;
+}
+
+function SEOStudioView(){
+  const [topic,setTopic]=useState('');
+  const [platform,setPlatform]=useState('YouTube');
+  const [niche,setNiche]=useState('AI');
+  const [loading,setLoading]=useState(false);
+  const [result,setResult]=useState(null);
+  const [error,setError]=useState(null);
+
+  const generate=async()=>{
+    if(!topic.trim()) return;
+    setLoading(true); setError(null); setResult(null);
+    try{
+      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic});
+      if(r.error) throw new Error(r.text);
+      let parsed=null;
+      try{
+        const cleaned = r.text.replace(/```json|```/g,'').trim();
+        parsed = JSON.parse(cleaned);
+      }catch(e){ parsed = {post:r.text}; }
+      setResult(parsed);
+    }catch(e){
+      setError('Could not generate content right now. Please try again.');
+    }finally{ setLoading(false); }
+  };
+
+  const CardShell = ({label, icon, children})=> html`
+    <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[16px] p-[18px] backdrop-blur-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide"><${I} name=${icon} size=${13}/> ${label}</div>
+        <div className="flex items-center gap-1">
+          <button onClick=${generate} disabled=${loading} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"><${I} name="RefreshCw" size=${13} className=${loading?'animate-spin':''}/></button>
+        </div>
+      </div>
+      ${children}
+    </div>`;
+
+  const CopyRow=(text)=> html`
+    <div className="flex justify-end mt-3">
+      <button onClick=${()=>copyText(text)} className="flex items-center gap-1.5 text-[11.5px] font-[600] text-[var(--zed)] hover:opacity-70"><${I} name="Copy" size=${12}/> Copy</button>
+    </div>`;
+
+  const renderResult=()=>{
+    if(!result) return null;
+    if(platform==='YouTube') return html`
+      <div className="grid md:grid-cols-2 gap-4 mt-6">
+        <${CardShell} label="Title" icon="Type">
+          <p className="text-[14px] font-[600] select-text">${result.title}</p>
+          ${CopyRow(result.title||'')}
+        </${CardShell}>
+        <${CardShell} label="Description" icon="AlignLeft">
+          <p className="text-[13px] leading-relaxed whitespace-pre-wrap select-text text-zinc-700 dark:text-zinc-300">${result.description}</p>
+          ${CopyRow(result.description||'')}
+        </${CardShell}>
+        <${CardShell} label="Hashtags" icon="Hash">
+          <p className="text-[13px] select-text text-[var(--zed)]">${(result.hashtags||[]).join(' ')}</p>
+          ${CopyRow((result.hashtags||[]).join(' '))}
+        </${CardShell}>
+        <${CardShell} label="Tags" icon="Tag">
+          <p className="text-[13px] select-text text-zinc-700 dark:text-zinc-300">${(result.tags||[]).join(', ')}</p>
+          ${CopyRow((result.tags||[]).join(', '))}
+        </${CardShell}>
+      </div>`;
+    if(platform==='Instagram' || platform==='TikTok') return html`
+      <div className="grid md:grid-cols-2 gap-4 mt-6">
+        <${CardShell} label="Caption" icon="MessageSquare">
+          <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap select-text">${result.caption}</p>
+          ${CopyRow(result.caption||'')}
+        </${CardShell}>
+        <${CardShell} label="Hashtags" icon="Hash">
+          <p className="text-[13px] select-text text-[var(--zed)]">${(result.hashtags||[]).join(' ')}</p>
+          ${CopyRow((result.hashtags||[]).join(' '))}
+        </${CardShell}>
+      </div>`;
+    if(platform==='Threads') return html`
+      <div className="mt-6 space-y-3">
+        ${(result.thread||[]).map((t,i)=>html`
+          <${CardShell} label=${`Post ${i+1}`} icon="MessageCircle">
+            <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap select-text">${t}</p>
+            ${CopyRow(t)}
+          </${CardShell}>
+        `)}
+      </div>`;
+    // X, LinkedIn, Bluesky
+    return html`
+      <div className="mt-6">
+        <${CardShell} label=${platform==='LinkedIn'?'Professional Post':'Optimized Post'} icon="Send">
+          <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap select-text">${result.post}</p>
+          ${CopyRow(result.post||'')}
+        </${CardShell}>
+      </div>`;
+  };
+
+  return html`
+  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8">
+    <div className="max-w-[880px] mx-auto">
+      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Search" size=${20}/> SEO Studio</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Generate platform-optimized content in one click.</div>
+
+      <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[18px] p-[20px]">
+        <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic</label>
+        <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
+
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+          </div>
+        </div>
+
+        <button onClick=${generate} disabled=${loading || !topic.trim()} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
+          ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Sparkles" size=${15}/>`}
+          ${loading ? 'Generating…' : 'Generate'}
+        </button>
+        ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
+      </div>
+
+      ${renderResult()}
+    </div>
+  </div>`;
+}
+
+// =====================================================================
+// TREND EXPLORER
+// =====================================================================
+const TREND_PLATFORMS = ['YouTube','Instagram','TikTok','X'];
+const TREND_COUNTRIES = ['Global','India','United States','United Kingdom'];
+
+const OPP_LABELS = ['Best opportunity','Very good opportunity','Good opportunity','Moderate opportunity','Lowest opportunity'];
+const OPP_COLORS = ['#16a34a','#65a30d','#ca8a04','#ea580c','#dc2626'];
+
+function trendPromptFor(platform, niche, country, searchContext){
+  return `You are Zedith's Trend Explorer. Using ONLY the live web search results below (real, current data — do not invent trends from memory), identify the top 5 trending content opportunities right now for a "${niche}" creator on ${platform}${country && country!=='Global' ? ` in ${country}` : ' (global audience)'}.
+
+LIVE SEARCH RESULTS:
+${searchContext}
+
+Rank the 5 trends from best to worst opportunity. Respond with STRICT JSON only, no markdown fences, no commentary, in this exact shape:
+{"trends":[{"title":"...","score":0-100,"competition":"Low|Medium|High","opportunity":"Best opportunity|Very good opportunity|Good opportunity|Moderate opportunity|Lowest opportunity","why":"...","idea":"...","hook":"..."}]}
+Order the array from Best opportunity to Lowest opportunity. Ground every trend in the actual search results provided — do not fabricate trends absent from them.`;
+}
+
+function TrendExplorerView(){
+  const [platform,setPlatform]=useState('YouTube');
+  const [niche,setNiche]=useState('AI');
+  const [country,setCountry]=useState('Global');
+  const [loading,setLoading]=useState(false);
+  const [trends,setTrends]=useState(null);
+  const [error,setError]=useState(null);
+
+  const findTrends=async()=>{
+    setLoading(true); setError(null); setTrends(null);
+    try{
+      const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
+      const search = await realWebSearch(query);
+      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed');
+      const context = (search.results||[]).slice(0,5).map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
+      const r = await callOR([{role:'user', content: trendPromptFor(platform, niche, country, context)}], {smart:true, userText:query});
+      if(r.error) throw new Error(r.text);
+      const cleaned = r.text.replace(/```json|```/g,'').trim();
+      const parsed = JSON.parse(cleaned);
+      setTrends(parsed.trends||[]);
+    }catch(e){
+      setError('Could not fetch live trends right now. Please try again.');
+    }finally{ setLoading(false); }
+  };
+
+  return html`
+  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8">
+    <div className="max-w-[960px] mx-auto">
+      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="TrendingUp" size=${20}/> Trend Explorer</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Live trending opportunities, pulled from real-time web search.</div>
+
+      <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[18px] p-[20px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${TREND_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Country <span className="normal-case text-zinc-400">(optional)</span></label>
+            <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+          </div>
+        </div>
+
+        <button onClick=${findTrends} disabled=${loading} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
+          ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Search" size=${15}/>`}
+          ${loading ? 'Searching live web…' : 'Find Trends'}
+        </button>
+        ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
+      </div>
+
+      ${loading ? html`
+        <div className="mt-8 space-y-4">
+          ${[1,2,3].map(i=>html`<div key=${i} className="h-[110px] rounded-[16px] bg-zinc-100 dark:bg-[#2a2a2a] animate-pulse"></div>`)}
+        </div>
+      `:null}
+
+      ${trends ? html`
+        <div className="mt-8 space-y-4">
+          ${trends.map((t,i)=>html`
+            <div key=${i} className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[16px] p-[20px] transition hover:shadow-zed-soft">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[12px] font-[800] text-white shrink-0" style=${{background:OPP_COLORS[Math.min(i,4)]}}>${i+1}</span>
+                  <div className="font-[700] text-[15px] select-text">${t.title}</div>
+                </div>
+                <span className="text-[11px] font-[700] px-[10px] py-[4px] rounded-full text-white shrink-0" style=${{background:OPP_COLORS[Math.min(i,4)]}}>${t.opportunity||OPP_LABELS[Math.min(i,4)]}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-4 mt-3 text-[12px]">
+                <div className="flex items-center gap-1.5"><${I} name="Flame" size=${13} className="text-orange-500"/> Trend score: <span className="font-[700]">${t.score}/100</span></div>
+                <div className="flex items-center gap-1.5"><${I} name="Swords" size=${13} className="text-zinc-400"/> Competition: <span className="font-[700]">${t.competition}</span></div>
+              </div>
+
+              <div className="mt-3 text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed select-text"><span className="font-[650] text-zinc-800 dark:text-zinc-100">Why it's trending: </span>${t.why}</div>
+              <div className="mt-2 text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed select-text"><span className="font-[650] text-zinc-800 dark:text-zinc-100">Content idea: </span>${t.idea}</div>
+              <div className="mt-2 text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed select-text"><span className="font-[650] text-zinc-800 dark:text-zinc-100">Suggested hook: </span>"${t.hook}"</div>
+
+              <div className="flex justify-end mt-3">
+                <button onClick=${()=>copyText(`${t.title}\n\nIdea: ${t.idea}\nHook: ${t.hook}`)} className="flex items-center gap-1.5 text-[11.5px] font-[600] text-[var(--zed)] hover:opacity-70"><${I} name="Copy" size=${12}/> Copy</button>
+              </div>
+            </div>
+          `)}
+        </div>
+      `:null}
+    </div>
   </div>`;
 }
 
