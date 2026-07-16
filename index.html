@@ -861,6 +861,7 @@ function App(){
   const [profile,setProfile]=useState(null);
   const [theme,setTheme]=useState('dark');
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
+  const [mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
   const [module,setModule]=useState('chat');
   const [chats,setChats]=useState([]);
   const [activeChatId,setActiveChatId]=useState(null);
@@ -1442,7 +1443,7 @@ function App(){
     chat:activeChat, chats, onSend:sendMessage, onNewChat:startNewChat, updateMessage, updateChat,
     plan:profile?.plan||'free', credits:profile?.credits||0, isAdminUser:isAdmin(user),
     openUpgrade, openNotifications, profile, settings,
-    incognito, toggleIncognito
+    incognito, toggleIncognito, openSidebar:()=>setMobileSidebarOpen(true)
   };
 
   const renderModule=()=>{
@@ -1470,27 +1471,29 @@ function App(){
 
   return html`
   <div className="w-full h-[100dvh] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-100 flex overflow-hidden">
-    <${LeftSidebar}
-      collapsed=${sidebarCollapsed}
-      toggleCollapsed=${()=>setSidebarCollapsed(s=>!s)}
-      module=${module}
-      setModule=${setModule}
-      onNewChat=${startNewChat}
-      theme=${theme}
-      toggleTheme=${()=>setTheme(t=>t==='dark'?'light':'dark')}
-      profile=${profile}
-      isAdminUser=${isAdmin(user)}
-      credits=${profile?.credits||0}
-      monthlyCredits=${profile?.monthly_credits||50000}
-      signOut=${signOut}
-      openTool=${t=>setToolModal(t)}
-      openNotifications=${openNotifications}
-    />
-    ${sidebarCollapsed ? html`
-      <button onClick=${()=>setSidebarCollapsed(false)} className="md:hidden fixed top-[13px] left-[13px] z-40 w-[38px] h-[38px] rounded-[10px] bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 shadow-soft flex items-center justify-center text-zinc-900 dark:text-white" aria-label="Open sidebar">
-        <${ZedithMark} size=${20} color="currentColor" strokeWidth=${2.2}/>
-      </button>
+    <!-- Mobile backdrop + slide-over drawer -->
+    ${mobileSidebarOpen ? html`
+      <div className="md:hidden fixed inset-0 z-[70] bg-black/50" onClick=${()=>setMobileSidebarOpen(false)}></div>
     ` : null}
+    <div className=${`fixed md:static inset-y-0 left-0 z-[71] h-full transition-transform duration-200 md:transition-none ${mobileSidebarOpen?'translate-x-0':'-translate-x-full'} md:translate-x-0`}>
+      <${LeftSidebar}
+        collapsed=${sidebarCollapsed}
+        toggleCollapsed=${()=>setSidebarCollapsed(s=>!s)}
+        onCloseMobile=${()=>setMobileSidebarOpen(false)}
+        module=${module}
+        setModule=${m=>{ setModule(m); setMobileSidebarOpen(false); }}
+        onNewChat=${()=>{ startNewChat(); setMobileSidebarOpen(false); }}
+        theme=${theme}
+        toggleTheme=${()=>setTheme(t=>t==='dark'?'light':'dark')}
+        profile=${profile}
+        isAdminUser=${isAdmin(user)}
+        credits=${profile?.credits||0}
+        monthlyCredits=${profile?.monthly_credits||50000}
+        signOut=${signOut}
+        openTool=${t=>setToolModal(t)}
+        openNotifications=${openNotifications}
+      />
+    </div>
     <div className="flex-1 flex min-w-0 h-full">
       ${renderModule()}
       ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} onOpenChat=${openChat} />` : null}
@@ -1502,22 +1505,29 @@ function App(){
 }
 
 // ---------- LeftSidebar ----------
-function LeftSidebar({collapsed, toggleCollapsed, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
-  const itemCls = (active)=> `w-full flex items-center ${collapsed?'justify-center px-0':'gap-3 px-3'} py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
+function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
+  const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
   const unread = 0;
   return html`
-  <aside className=${`${collapsed?'w-0 md:w-[72px] border-r-0 md:border-r overflow-hidden':'w-[248px] border-r'} shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col transition-all duration-200`}>
+  <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col shadow-2xl md:shadow-none transition-all duration-200`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#2a2a2a]">
-      <button onClick=${toggleCollapsed} className=${`flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
+      <button onClick=${toggleCollapsed} className=${`hidden md:flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
         <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
         ${!collapsed ? html`<span className="display font-[800] text-[18px] tracking-tight">Zedith</span>` : null}
+      </button>
+      <div className="md:hidden flex items-center gap-2 flex-1">
+        <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
+        <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
+      </div>
+      <button onClick=${onCloseMobile} className="md:hidden p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto" aria-label="Close sidebar">
+        <${I} name="X" size=${18}/>
       </button>
     </div>
 
     <div className="px-[10px] pt-[12px]">
-      <button onClick=${onNewChat} className=${`w-full flex items-center ${collapsed?'justify-center':'gap-[8px]'} px-3 py-[10px] rounded-[12px] bg-[var(--zed-solid)] text-white text-[13px] font-[600] shadow-zed-soft hover:bg-[var(--zed-solid-600)] transition`}>
+      <button onClick=${onNewChat} className=${`w-full flex items-center ${collapsed?'md:justify-center':''} gap-[8px] px-3 py-[10px] rounded-[12px] bg-[var(--zed-solid)] text-white text-[13px] font-[600] shadow-zed-soft hover:bg-[var(--zed-solid-600)] transition`}>
         <${I} name="Plus" size=${16}/>
-        ${!collapsed ? html`<span>New Chat</span><span className="ml-auto text-[10px] bg-white/15 px-[6px] py-[1px] rounded">⌘K</span>`:null}
+        <span className=${collapsed?'md:hidden':''}>New Chat</span><span className=${`ml-auto text-[10px] bg-white/15 px-[6px] py-[1px] rounded ${collapsed?'md:hidden':''}`}>⌘K</span>
       </button>
     </div>
 
@@ -1675,7 +1685,7 @@ function ComingSoonModal({plan,onClose}){
 }
 
 // ---------- Chat ----------
-function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, plan, credits, isAdminUser, openUpgrade, openNotifications, profile, settings, incognito, toggleIncognito}){
+function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, plan, credits, isAdminUser, openUpgrade, openNotifications, profile, settings, incognito, toggleIncognito, openSidebar}){
   const [input,setInput]=useState('');
   const [smart,setSmart]=useState(false);
   const [webSearch,setWebSearch]=useState(settings?.webSearch ?? true);
@@ -1714,6 +1724,11 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     // Reset the "seen" set whenever we switch chats so history never re-animates.
     seenIdsRef.current = new Set(messages.map(m=>m.id));
     setTypingId(null);
+    // Clear the composer on chat switch (including New Chat) so a half-typed
+    // draft from the previous chat doesn't linger — this also brings back
+    // the mobile incognito toggle, which hides while there's text/attachment.
+    setInput('');
+    setAttached(null);
     // eslint-disable-next-line
   }, [chat?.id]);
 
@@ -1794,7 +1809,21 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
 
   return html`
   <div className="flex-1 flex flex-col h-full bg-[#fbfaf7] dark:bg-[#232323]">
-    <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur">
+    <!-- Mobile header: hamburger, centered title, credits pill -->
+    <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur relative">
+      <button onClick=${openSidebar} className="p-[8px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
+        <${I} name="Menu" size=${19}/>
+      </button>
+      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] text-[14.5px] font-[700]">
+        Zedith AI
+        ${incognito ? html`<${I} name="Ghost" size=${13}/>` : null}
+      </div>
+      <button onClick=${openNotifications} className="flex items-center gap-1 text-[11px] px-[10px] py-[6px] rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] font-[600]">
+        ✨ ${isAdminUser ? 'Unlimited' : credits.toLocaleString('en-IN')}
+      </button>
+    </div>
+    <!-- Desktop header -->
+    <div className="hidden md:flex h-[54px] px-4 items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur">
       <div className="flex items-center gap-2 text-[13.5px] font-[600]">
         Chat
         <${I} name="ChevronDown" size=${13} className="text-zinc-400"/>
@@ -1826,11 +1855,11 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
       </div>
     ` : null}
 
-    <div ref=${scrollRef} className="flex-1 overflow-y-auto px-[28px] py-[26px]">
+    <div ref=${scrollRef} className="flex-1 overflow-y-auto px-4 md:px-[28px] py-[26px]">
       ${!hasMessages ? html`
-        <div className="max-w-[740px] mx-auto pt-14 text-center">
-          <div className="text-[28px] font-[800] display">Hey ${profile?.display_name||'creator'}! 👋</div>
-          <div className="text-[15px] mt-2 text-zinc-600 dark:text-zinc-300">
+        <div className="max-w-[740px] mx-auto pt-20 md:pt-14 text-center">
+          <div className="text-[26px] md:text-[28px] font-[800] display">Hey ${profile?.display_name||'creator'}! 👋</div>
+          <div className="text-[14.5px] md:text-[15px] mt-2 text-zinc-600 dark:text-zinc-300">
             What would you like to <span className="text-[var(--zed)] font-[700]">create</span> or <span className="text-[var(--zed-lighter)] font-[700]">learn</span> today?
           </div>
           <div className="hidden md:grid md:grid-cols-4 gap-3 mt-7 text-left">
@@ -1980,6 +2009,12 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           <button onClick=${()=>fileRef.current?.click()} className="px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] border border-zinc-200 dark:border-zinc-700 flex items-center gap-[5px] shrink-0">
             <${I} name="Paperclip" size=${13}/><span className="hidden sm:inline">Attach</span>
           </button>
+          ${(!input.trim() && !attached) ? html`
+            <button onClick=${toggleIncognito} title=${incognito ? 'Turn off incognito mode' : 'Turn on incognito mode — this chat won\'t be saved anywhere'}
+              className=${`md:hidden w-[33px] h-[33px] rounded-[10px] border flex items-center justify-center shrink-0 transition ${incognito ? 'border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400'}`}>
+              <${I} name="Ghost" size=${15}/>
+            </button>
+          ` : null}
           <button onClick=${()=>{ setWebSearch(w=>!w); toast(webSearch?'Web search off':'Web search on'); }} className=${`px-[10px] sm:px-[11px] h-[33px] rounded-[10px] text-[12px] border flex items-center gap-[5px] shrink-0 ${webSearch ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-300':'border-zinc-200 dark:border-zinc-700'}`}>
             <${I} name="Globe" size=${13}/><span className="hidden sm:inline">Search</span>
           </button>
