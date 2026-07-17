@@ -1746,7 +1746,10 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
 
   const messages = chat?.messages || [];
 
+  const prevChatIdRef = useRef(chat?.id);
   useEffect(()=>{
+    if(prevChatIdRef.current === chat?.id) return; // guard: only run on a real chat switch
+    prevChatIdRef.current = chat?.id;
     // Reset the "seen" set whenever we switch chats so history never re-animates.
     seenIdsRef.current = new Set(messages.map(m=>m.id));
     setTypingId(null);
@@ -2019,6 +2022,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           </div>
         `:null}
         <input
+          key="zedith-main-composer"
           value=${input}
           onChange=${e=>setInput(e.target.value)}
           onKeyDown=${e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); doSend(); }}}
