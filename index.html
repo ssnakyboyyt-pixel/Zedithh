@@ -1506,10 +1506,24 @@ function App(){
         openNotifications=${openNotifications}
       />
     </div>
-    <div className="flex-1 flex min-w-0 h-full">
-      ${renderModule()}
-      ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} onOpenChat=${openChat} />` : null}
-      <!-- note: 'picks' module renders its own right-side ad sidebar internally, no RightRail here -->
+    <div className="flex-1 flex flex-col min-w-0 h-full">
+      <!-- Global mobile header: shown on every module so nav is always reachable on mobile -->
+      ${module!=='chat' ? html`
+      <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#1e1e1e]/90 backdrop-blur shrink-0 relative">
+        <button onClick=${()=>setMobileSidebarOpen(true)} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
+          <${ZedithMark} size=${24} color="currentColor"/>
+        </button>
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] text-[14.5px] font-[700]">
+          Zedith AI
+        </div>
+        <div className="w-[36px]"></div>
+      </div>
+      ` : null}
+      <div className="flex-1 flex min-w-0 h-full overflow-hidden">
+        ${renderModule()}
+        ${module==='chat' ? html`<${RightRail} chats=${recentChats} growth=${growth} openTool=${t=>setToolModal(t)} setModule=${setModule} onOpenChat=${openChat} />` : null}
+        <!-- note: 'picks' module renders its own right-side ad sidebar internally, no RightRail here -->
+      </div>
     </div>
     ${toolModal ? html`<${ToolModal} tool=${toolModal} onClose=${()=>setToolModal(null)} onSend=${sendMessage} />` : null}
     ${comingSoon ? html`<${ComingSoonModal} plan=${comingSoon} onClose=${()=>setComingSoon(null)} />` : null}
@@ -1823,8 +1837,8 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   <div className="flex-1 flex flex-col h-full bg-[#fbfaf7] dark:bg-[#232323]">
     <!-- Mobile header: hamburger, centered title, credits pill -->
     <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur relative">
-      <button onClick=${openSidebar} className="p-[8px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
-        <${I} name="Menu" size=${19}/>
+      <button onClick=${openSidebar} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
+        <${ZedithMark} size=${24} color="currentColor"/>
       </button>
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] text-[14.5px] font-[700]">
         Zedith AI
