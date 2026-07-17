@@ -2855,7 +2855,7 @@ ${top||'No video data yet.'}`;
     setBusy(false);
   };
 
-  const PanelBody = ()=> html`
+  const panelBody = html`
     <div className="flex flex-col h-full">
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2">
@@ -2883,7 +2883,7 @@ ${top||'No video data yet.'}`;
       `:null}
       <div className="p-3 border-t border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#2e2e2e] rounded-xl px-3 py-2">
-          <input value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
+          <input key="ask-zedith-composer" value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
           <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[var(--zed-solid)] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
         </div>
         <div className="text-[9.5px] text-zinc-400 mt-[6px] text-center">AI can make mistakes. You are responsible for the content that you publish.</div>
@@ -2899,7 +2899,7 @@ ${top||'No video data yet.'}`;
     <!-- Desktop: resizable side panel -->
     ${open ? html`
       <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#232323] border-l border-zinc-200 dark:border-[#353535] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px', animation:`${closing?'panelSlideOut':'panelSlideIn'} .18s ease both`}}>
-        <${PanelBody}/>
+        ${panelBody}
       </div>
     `:null}
 
@@ -2907,7 +2907,7 @@ ${top||'No video data yet.'}`;
     ${mobileSheet ? html`
       <div className="md:hidden fixed inset-0 z-[600] bg-black/50" style=${{animation:`${closing?'overlayIn .18s ease reverse both':'overlayIn .18s ease both'}`}} onClick=${closePanel}>
         <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#232323] rounded-t-[20px] overflow-hidden flex flex-col" style=${{animation:`${closing?'sheetSlideOut':'sheetSlideIn'} .18s ease both`}} onClick=${e=>e.stopPropagation()}>
-          <${PanelBody}/>
+          ${panelBody}
         </div>
       </div>
     `:null}
