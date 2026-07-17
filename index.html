@@ -1535,7 +1535,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
   const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
   const unread = 0;
   return html`
-  <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col shadow-2xl md:shadow-none transition-all duration-200`}>
+  <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col shadow-2xl md:shadow-none transition-all duration-200 overflow-hidden`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#2a2a2a]">
       <button onClick=${toggleCollapsed} className=${`hidden md:flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
         <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
@@ -1557,7 +1557,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
       </button>
     </div>
 
-    <nav className="px-[10px] mt-[16px] space-y-[3px]">
+    <nav className="px-[10px] mt-[16px] space-y-[3px] flex-1 min-h-0 overflow-y-auto">
       ${[
         ['chat','House','Home'],
         ['projects','FolderKanban','My Projects'],
@@ -1595,7 +1595,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
       </div>
     </nav>
 
-    <div className="mt-auto px-[10px] pb-[10px]">
+    <div className="mt-auto px-[10px] pb-[10px] shrink-0">
       ${!collapsed ? html`
         <div className="rounded-[16px] border border-zinc-200 dark:border-[#373737] bg-gradient-to-b from-[#f7f5ef] to-white dark:from-[#161a2b] dark:to-[#131727] p-[14px] text-center">
           <div className="flex justify-center text-amber-500"><${I} name="Crown" size=${20}/></div>
