@@ -1746,7 +1746,10 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
 
   const messages = chat?.messages || [];
 
+  const prevChatIdRef = useRef(chat?.id);
   useEffect(()=>{
+    if(prevChatIdRef.current === chat?.id) return; // guard: only run on a real chat switch
+    prevChatIdRef.current = chat?.id;
     // Reset the "seen" set whenever we switch chats so history never re-animates.
     seenIdsRef.current = new Set(messages.map(m=>m.id));
     setTypingId(null);
@@ -2019,6 +2022,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           </div>
         `:null}
         <input
+          key="zedith-main-composer"
           value=${input}
           onChange=${e=>setInput(e.target.value)}
           onKeyDown=${e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); doSend(); }}}
@@ -2851,7 +2855,7 @@ ${top||'No video data yet.'}`;
     setBusy(false);
   };
 
-  const PanelBody = ()=> html`
+  const panelBody = html`
     <div className="flex flex-col h-full">
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2">
@@ -2879,7 +2883,7 @@ ${top||'No video data yet.'}`;
       `:null}
       <div className="p-3 border-t border-zinc-200 dark:border-[#353535] shrink-0">
         <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#2e2e2e] rounded-xl px-3 py-2">
-          <input value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
+          <input key="ask-zedith-composer" value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
           <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[var(--zed-solid)] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
         </div>
         <div className="text-[9.5px] text-zinc-400 mt-[6px] text-center">AI can make mistakes. You are responsible for the content that you publish.</div>
@@ -2895,7 +2899,7 @@ ${top||'No video data yet.'}`;
     <!-- Desktop: resizable side panel -->
     ${open ? html`
       <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#232323] border-l border-zinc-200 dark:border-[#353535] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px', animation:`${closing?'panelSlideOut':'panelSlideIn'} .18s ease both`}}>
-        <${PanelBody}/>
+        ${panelBody}
       </div>
     `:null}
 
@@ -2903,23 +2907,53 @@ ${top||'No video data yet.'}`;
     ${mobileSheet ? html`
       <div className="md:hidden fixed inset-0 z-[600] bg-black/50" style=${{animation:`${closing?'overlayIn .18s ease reverse both':'overlayIn .18s ease both'}`}} onClick=${closePanel}>
         <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#232323] rounded-t-[20px] overflow-hidden flex flex-col" style=${{animation:`${closing?'sheetSlideOut':'sheetSlideIn'} .18s ease both`}} onClick=${e=>e.stopPropagation()}>
-          <${PanelBody}/>
+          ${panelBody}
         </div>
       </div>
     `:null}
   `;
 }
 
-// ---------- Channel Analytics ----------
+function MiniSpark({data, color='var(--zed)', w=46, h=20}){
+  if(!data || data.length<2) return null;
+  const max = Math.max(...data, 0);
+  const min = Math.min(...data, 0);
+  const range = (max-min) || 1;
+  const step = w/(data.length-1);
+  const pts = data.map((v,i)=>[i*step, h-((v-min)/range)*h]);
+  const line = pts.map((p,i)=>`${i===0?'M':'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  return html`
+  <svg width=${w} height=${h} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="none">
+    <path d=${line} fill="none" stroke=${color} stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+  </svg>`;
+}
+
+// ---------- Channel Analytics 2.0 ----------
+function ComingSoonCard({icon, title, note, className=''}){
+  return html`
+  <div className=${`relative overflow-hidden rounded-[20px] border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-[#232323]/60 p-6 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
+    <div className="w-9 h-9 rounded-full bg-zinc-200/70 dark:bg-zinc-700/50 flex items-center justify-center text-zinc-500">
+      <${I} name=${icon} size=${16}/>
+    </div>
+    <div className="font-[700] text-[12.5px] text-zinc-600 dark:text-zinc-300">${title}</div>
+    <div className="text-[11px] text-zinc-400 max-w-[260px]">${note||'Coming soon.'}</div>
+  </div>`;
+}
+
+function SkeletonBlock({className=''}){
+  return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[#262626] ${className}`}></div>`;
+}
+
 function AnalyticsView(){
-  const [tab,setTab]=useState('Overview');
   const [period,setPeriod]=useState('Daily'); // Daily | Monthly
+  const [platformFilter,setPlatformFilter]=useState('All'); // All | YouTube | Instagram | X
+  const [chartMetric,setChartMetric]=useState('Views'); // Views | Subscribers | Watch Time | Engagement
   const [connected,setConnected]=useState(false);
   const [loading,setLoading]=useState(true);
   const [connecting,setConnecting]=useState(false);
+  const [refreshing,setRefreshing]=useState(false);
   const [data,setData]=useState(null);
   const [err,setErr]=useState('');
-  const tabs=['Overview','Content','Audience','Engagement','Revenue','Trends'];
 
   const fmt=(n)=>{
     n=Number(n)||0;
@@ -2934,12 +2968,13 @@ function AnalyticsView(){
     return hrs.toFixed(0)+' hrs';
   };
 
-  const loadAnalytics=async()=>{
-    setLoading(true); setErr('');
+  const loadAnalytics=async(isRefresh)=>{
+    if(isRefresh) setRefreshing(true); else setLoading(true);
+    setErr('');
     try{
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-      if(!token){ setConnected(false); setLoading(false); return; }
+      if(!token){ setConnected(false); setLoading(false); setRefreshing(false); return; }
       const res = await fetch(`${supabase.projectUrl}/functions/v1/youtube-analytics-fetch`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -2947,6 +2982,7 @@ function AnalyticsView(){
       if(json.connected){
         setConnected(true);
         setData(json);
+        if(isRefresh) toast('Analytics refreshed');
       } else {
         setConnected(false);
       }
@@ -2955,6 +2991,7 @@ function AnalyticsView(){
       setConnected(false);
     }
     setLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(()=>{
@@ -2991,14 +3028,17 @@ function AnalyticsView(){
     }
   };
 
+  const handleExportPDF=()=>{
+    toast('PDF export is coming soon');
+  };
+
   const daily = data?.dailyStats ?? [];
 
-  // Group daily stats into monthly buckets when Monthly view is selected
   const monthly = useMemo(()=>{
     if(!daily.length) return [];
     const map = {};
     daily.forEach(d=>{
-      const key = (d.date||'').slice(0,7); // YYYY-MM
+      const key = (d.date||'').slice(0,7);
       if(!map[key]) map[key] = {date:key, views:0, watchTimeMinutes:0, subscribersGained:0, subscribersLost:0, likes:0, comments:0, shares:0};
       map[key].views += Number(d.views)||0;
       map[key].watchTimeMinutes += Number(d.watchTimeMinutes)||0;
@@ -3016,7 +3056,6 @@ function AnalyticsView(){
     ? new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})
     : new Date(d.date+'-01').toLocaleDateString('en-US',{month:'short',year:'2-digit'}));
 
-  // Rough % change vs first half -> second half of the series, for trend pills
   const pctChange=(arr)=>{
     if(arr.length<2) return 0;
     const mid = Math.floor(arr.length/2);
@@ -3030,191 +3069,348 @@ function AnalyticsView(){
   const watchSeries = series.map(d=>Number(d.watchTimeMinutes)||0);
   const engSeries = series.map(d=>(Number(d.likes)||0)+(Number(d.comments)||0)+(Number(d.shares)||0));
   const netSubSeries = series.map(d=>(Number(d.subscribersGained)||0)-(Number(d.subscribersLost)||0));
+  const uploadsSeries = series.map(()=>0); // no per-day upload count from the API yet
 
-  const stats = data ? [
-    ['Total Views', fmt(data.overview.views), pctChange(viewsSeries), 'Eye', 'var(--zed)'],
-    ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), pctChange(watchSeries), 'Clock', '#22c1c3'],
-    ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), pctChange(netSubSeries), 'Users', '#f5762e'],
-    ['Net Sub Change', (data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '') + fmt(data.overview.subscribersGained - data.overview.subscribersLost), pctChange(netSubSeries), 'UserPlus', '#22a06b'],
-  ] : [];
+  const engagementRate = data?.overview?.views
+    ? (((data.overview.likes||0)+(data.overview.comments||0)+(data.overview.shares||0)) / data.overview.views * 100)
+    : 0;
 
   const topVideos = data?.topVideos ?? [];
+  const uploadCount = topVideos.length;
 
-  const PeriodToggle = ()=> html`
-    <div className="flex items-center bg-zinc-100 dark:bg-[#313131] rounded-xl p-[3px] text-[11.5px]">
-      ${['Daily','Monthly'].map(p=>html`
-        <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[6px] rounded-[9px] font-[650] transition-all ${period===p?'bg-white dark:bg-[#404040] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${p}</button>
-      `)}
-    </div>`;
+  const metricCards = data ? [
+    {label:'Views', value:fmt(data.overview.views), change:pctChange(viewsSeries), icon:'Eye', color:'var(--zed)', series:viewsSeries},
+    {label:'Watch Time', value:fmtMinutes(data.overview.watchTimeMinutes), change:pctChange(watchSeries), icon:'Clock', color:'#22c1c3', series:watchSeries},
+    {label:'Subscribers', value:fmt(data.channel?.subscriberCount ?? 0), change:pctChange(netSubSeries), icon:'Users', color:'#f5762e', series:netSubSeries},
+    {label:'Engagement Rate', value:engagementRate.toFixed(1)+'%', change:pctChange(engSeries), icon:'Zap', color:'#e0457b', series:engSeries},
+    {label:'Uploads', value:String(uploadCount), change:0, icon:'Upload', color:'#22a06b', series:uploadsSeries, noTrend:true},
+    {label:'Est. Revenue', value:'—', change:0, icon:'DollarSign', color:'#9b6bf2', comingSoon:true},
+  ] : [];
+
+  const chartSeriesFor = (metric)=>{
+    if(metric==='Views') return {series:viewsSeries, color:'var(--zed)', fmt:v=>fmt(v)+' views'};
+    if(metric==='Subscribers') return {series:netSubSeries, color:'#f5762e', fmt:v=>(v>=0?'+':'')+fmt(v)+' net subs'};
+    if(metric==='Watch Time') return {series:watchSeries, color:'#22c1c3', fmt:v=>fmtMinutes(v)};
+    return {series:engSeries, color:'#e0457b', fmt:v=>fmt(v)+' engagements'};
+  };
+  const activeChart = chartSeriesFor(chartMetric);
+
+  const aiInsight = useMemo(()=>{
+    if(!data || !topVideos.length) return null;
+    const best = [...topVideos].sort((a,b)=>(b.views||0)-(a.views||0))[0];
+    const totalLikes = data.overview.likes||0, totalComments = data.overview.comments||0;
+    const lines = [];
+    if(best) lines.push(`Your top video "${best.title}" is driving a large share of views — content in this style is clearly resonating with your audience.`);
+    if(engagementRate>0) lines.push(`Your engagement rate is ${engagementRate.toFixed(1)}%. ${engagementRate>=5?'That\u2019s a strong signal — keep the format that\u2019s earning it.':'Try prompting comments directly in your videos to lift this.'}`);
+    if(totalComments>0 && totalLikes>0) lines.push(`You're getting ${fmt(totalLikes)} likes and ${fmt(totalComments)} comments in this period — replying to comments early tends to extend a video's reach.`);
+    return lines;
+  },[data, topVideos, engagementRate]);
+
+  const recommendations = useMemo(()=>{
+    if(!data) return [];
+    const recs=[];
+    if(pctChange(viewsSeries) < 0) recs.push({title:'Views are trending down this period', impact:'High impact', priority:'High', icon:'TrendingDown'});
+    if(engagementRate < 3) recs.push({title:'Engagement rate is below 3% — try a clearer call-to-action', impact:'Medium impact', priority:'Medium', icon:'MessageCircle'});
+    if(uploadCount < 3) recs.push({title:'Low upload count this period — consistency helps retention', impact:'High impact', priority:'High', icon:'CalendarClock'});
+    if((data.overview.subscribersLost||0) > (data.overview.subscribersGained||0)) recs.push({title:'You lost more subscribers than you gained this period', impact:'High impact', priority:'High', icon:'UserMinus'});
+    if(recs.length===0) recs.push({title:'Your channel is trending healthy — keep your current format and cadence', impact:'Steady growth', priority:'Low', icon:'CheckCircle2'});
+    return recs;
+  },[data, engagementRate, uploadCount]);
+
+  const priorityStyle = (p)=> p==='High' ? 'text-red-500 bg-red-50 dark:bg-red-500/10' : p==='Medium' ? 'text-amber-600 bg-amber-50 dark:bg-amber-500/10' : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10';
+
+  const performanceLabel=(v)=>{
+    const views = Number(v)||0;
+    if(views >= (data?.channel?.subscriberCount||0)*0.5 && views>1000) return {label:'Viral', emoji:'🔥', color:'text-red-500 bg-red-50 dark:bg-red-500/10'};
+    if(views > (viewsSeries.reduce((s,x)=>s+x,0)/Math.max(viewsSeries.length,1))) return {label:'Growing', emoji:'📈', color:'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10'};
+    return {label:'Average', emoji:'😐', color:'text-zinc-500 bg-zinc-100 dark:bg-zinc-800'};
+  };
+
+  const platformTabs = ['All','YouTube','Instagram','X'];
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1e1e1e] p-6 overflow-y-auto">
-    <div className="flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="BarChart3" size=${20}/> Channel Analytics</div>
-        <div className="text-[12px] text-zinc-500 mb-4">Track your performance, grow your audience, and get AI-powered insights.</div>
-      </div>
-      <div className="flex items-center gap-2">
-        ${connected ? html`<button onClick=${loadAnalytics} className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 hover:text-[var(--zed)] transition-colors px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700"><${I} name="RefreshCw" size=${12}/> Refresh</button> ` : null}
-        <${AskStudioWidget} data=${data} connected=${connected}/>
-      </div>
-    </div>
+  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1a1a1a] overflow-y-auto">
+    <div className="px-5 md:px-9 py-7 max-w-[1320px] mx-auto">
 
-    <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
-      ${tabs.map(t=> html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[var(--zed)] border-b-2 border-[var(--zed)] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
-    </div>
+      <!-- Hero -->
+      <div className="flex items-start justify-between flex-wrap gap-4 mb-7">
+        <div>
+          <div className="text-[26px] md:text-[30px] font-[800] display tracking-tight">Creator Analytics</div>
+          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Understand your growth. Improve every upload.</div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
+            <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
+          </button>
+          <button onClick=${handleExportPDF} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur">
+            <${I} name="FileDown" size=${13}/> Export PDF
+          </button>
+          <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+            ${['Daily','Monthly'].map(p=>html`
+              <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${period===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
+            `)}
+          </div>
+          <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+            ${platformTabs.map(p=>html`
+              <button key=${p} onClick=${()=>setPlatformFilter(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${platformFilter===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
+            `)}
+          </div>
+        </div>
+      </div>
 
-    ${loading ? html`
-      <div className="flex items-center justify-center py-20 text-zinc-400 text-[12.5px] gap-2">
-        <${I} name="Loader2" size=${16} className="animate-spin"/> Loading analytics…
-      </div>
-    ` : !connected ? html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-10 text-center max-w-[760px]">
-        <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
-        <div className="font-[700]">No Social Accounts Connected</div>
-        <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
-        ${err ? html`<div className="text-[11.5px] text-red-500 mt-2">${err}</div>` : null}
-        <button onClick=${handleConnect} disabled=${connecting} className="mt-4 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[9px] rounded-xl text-[12px] font-[600] disabled:opacity-60 transition-colors">${connecting?'Redirecting…':'Connect Your Account'}</button>
-        <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
-      </div>
-    ` : html`
-      <div className="space-y-5 max-w-[1080px]">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          ${data?.channel ? html`
-            <div className="flex items-center gap-3">
-              ${data.channel.thumbnail ? html`<img src=${data.channel.thumbnail} className="w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700"/>` : null}
+      ${loading ? html`
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+          ${[1,2,3,4,5,6].map(i=>html`<${SkeletonBlock} key=${i} className="h-[110px]"/>`)}
+        </div>
+        <${SkeletonBlock} className="h-[160px] mb-5"/>
+        <${SkeletonBlock} className="h-[320px] mb-5"/>
+      ` : !connected ? html`
+        <div className="bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-[#3a3a3a] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
+          <div className="font-[700] text-[15px]">No Social Accounts Connected</div>
+          <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
+          ${err ? html`<div className="text-[11.5px] text-red-500 mt-2">${err}</div>` : null}
+          <button onClick=${handleConnect} disabled=${connecting} className="mt-4 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-5 py-[10px] rounded-[14px] text-[12.5px] font-[650] disabled:opacity-60 transition-colors">${connecting?'Redirecting…':'Connect Your Account'}</button>
+          <div className="text-[10.5px] text-zinc-400 mt-3">Your data is secure and encrypted.</div>
+        </div>
+      ` : html`
+        <div className="space-y-6">
+
+          <!-- Platform-not-YouTube notice -->
+          ${platformFilter!=='All' && platformFilter!=='YouTube' ? html`
+            <${ComingSoonCard} icon="Sparkles" title=${`${platformFilter} analytics`} note=${`${platformFilter} isn't connected yet — this section will populate once it's linked.`}/>
+          ` : html`
+
+          <!-- Growth Overview cards -->
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            ${metricCards.map(m=>html`
+              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
+                <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-[0.10] group-hover:opacity-[0.16] transition-opacity" style=${{background:m.color}}></div>
+                <div className="flex items-center justify-between relative">
+                  <div className="text-[10.5px] text-zinc-500 font-[600] uppercase tracking-wide">${m.label}</div>
+                  <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style=${{background:m.color+'1a', color:m.color}}>
+                    <${I} name=${m.icon} size=${12.5}/>
+                  </div>
+                </div>
+                <div className="text-[21px] font-[800] display mt-1 relative">${m.value}</div>
+                <div className="mt-[6px] flex items-center justify-between relative">
+                  ${m.comingSoon ? html`<span className="text-[10px] text-zinc-400 font-[600]">Coming soon</span>` : m.noTrend ? html`<span className="text-[10px] text-zinc-400">this period</span>` : html`<${TrendPill} value=${m.change}/>`}
+                  ${!m.comingSoon && m.series?.length>1 ? html`<div className="w-[46px] h-[20px]"><${MiniSpark} data=${m.series} color=${m.color}/></div>` : null}
+                </div>
+              </div>
+            `)}
+          </div>
+
+          <!-- AI Summary -->
+          <div className="relative overflow-hidden rounded-[22px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+            <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full opacity-[0.06]" style=${{background:'var(--zed)'}}></div>
+            <div className="flex items-center gap-2 mb-3 relative">
+              <div className="w-8 h-8 rounded-[10px] bg-[var(--zed-solid)] text-white flex items-center justify-center"><${ZedithMark} size=${15} color="white"/></div>
+              <div className="font-[750] text-[14.5px] display">AI Analysis</div>
+            </div>
+            ${aiInsight===null ? html`
+              <div className="text-[12.5px] text-zinc-400">Not enough data yet to generate insights — check back after your next few uploads.</div>
+            ` : html`
+              <div className="space-y-2 relative">
+                ${aiInsight.map((line,i)=>html`<div key=${i} className="text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed">${line}</div>`)}
+              </div>
+            `}
+            <button className="mt-4 inline-flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors relative">
+              View Detailed Insights <${I} name="ArrowRight" size=${13}/>
+            </button>
+          </div>
+
+          <!-- Growth Chart -->
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
               <div>
-                <div className="font-[700] text-[13.5px]">${data.channel.title}</div>
-                <div className="text-[11px] text-zinc-500">Last 28 days · ${period==='Daily'?'Daily breakdown':'Monthly breakdown'}</div>
+                <div className="font-[750] text-[14px] display">Growth Chart</div>
+                <div className="text-[11px] text-zinc-500">${period==='Daily'?'Daily':'Monthly'} trend for the last 28 days</div>
               </div>
-            </div>
-          ` : html`<div></div>`}
-          <${PeriodToggle}/>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          ${stats.map(([l,v,c,icon,color])=>html`
-            <div key=${l} className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-4 relative overflow-hidden group hover:border-[var(--zed)]/40 transition-colors">
-              <div className="absolute -right-4 -top-4 w-16 h-16 rounded-full opacity-[0.08]" style=${{background:color}}></div>
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] text-zinc-500 font-[550]">${l}</div>
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style=${{background:color+'1a', color}}>
-                  <${I} name=${icon} size=${13}/>
-                </div>
-              </div>
-              <div className="text-[22px] font-[800] display mt-1">${v}</div>
-              <div className="mt-1"><${TrendPill} value=${c}/></div>
-            </div>
-          `)}
-        </div>
-
-        ${tab==='Overview' ? html`
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <div className="font-[700] text-[13.5px]">Views Over Time</div>
-                  <div className="text-[11px] text-zinc-500">${period==='Daily'?'Daily':'Monthly'} views for the last 28 days</div>
-                </div>
-                <div className="text-[11px] px-2 py-1 rounded-lg font-[700]" style=${{background:'var(--zed)1a',color:'var(--zed)'}}>${fmt(viewsSeries.reduce((s,v)=>s+v,0))} total</div>
-              </div>
-              <div className="mt-3">
-                <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="var(--zed)" fmt=${v=>fmt(v)+' views'}/>
-              </div>
-              <div className="flex justify-between text-[10px] text-zinc-400 mt-1 px-1">
-                <span>${seriesLabels[0]||''}</span><span>${seriesLabels[seriesLabels.length-1]||''}</span>
-              </div>
-            </div>
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-1">Watch Time</div>
-              <div className="text-[11px] text-zinc-500 mb-3">${period==='Daily'?'Daily':'Monthly'} minutes watched</div>
-              <${BarSpark} data=${watchSeries} labels=${seriesLabels} color="#22c1c3" fmt=${v=>fmtMinutes(v)} h=${150}/>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-1">Engagement</div>
-              <div className="text-[11px] text-zinc-500 mb-3">Likes + comments + shares</div>
-              <${AreaChart} data=${engSeries} labels=${seriesLabels} color="#f5762e" fmt=${v=>fmt(v)+' engagements'} h=${140}/>
-            </div>
-            <div className="lg:col-span-2 bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-3">Top Performing Content</div>
-              <div className="space-y-2">
-                ${topVideos.length ? topVideos.map((v,i)=>html`
-                  <div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] hover:bg-zinc-50 dark:hover:bg-[#2d2d2d] transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      ${v.thumbnail?html`<img src=${v.thumbnail} className="w-12 h-8 rounded-md object-cover flex-shrink-0"/>`:html`<div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 flex-shrink-0">${i+1}</div>`}
-                      <div className="font-[600] truncate">${v.title}</div>
-                    </div>
-                    <div className="flex gap-4 text-zinc-500 flex-shrink-0">
-                      <span>${fmt(v.views)} views</span><span>${v.likes} likes</span>
-                    </div>
-                  </div>
-                `) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet for this period.</div>`}
-              </div>
-            </div>
-          </div>
-        ` : tab==='Content' ? html`
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-3">Content Performance</div>
-              ${topVideos.length ? topVideos.map((v,i)=>html`<div key=${v.id||i} className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl text-[12px] mb-2"><div className="font-[600] max-w-[320px] truncate">${v.title}</div><div className="flex gap-4 text-zinc-500"><span>${fmt(v.views)} views</span><span>${fmtMinutes(v.watchTimeMinutes)}</span></div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-6">No video data yet.</div>`}
-            </div>
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-1">Views Trend</div>
-              <div className="text-[11px] text-zinc-500 mb-3">${period==='Daily'?'Daily':'Monthly'}</div>
-              <${AreaChart} data=${viewsSeries} labels=${seriesLabels} color="var(--zed)" fmt=${v=>fmt(v)+' views'} h=${160} w=${300}/>
-            </div>
-          </div>
-        ` : tab==='Audience' ? html`
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Age &amp; Gender</div>
-              ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`<div key=${i} className="flex items-center gap-3 mb-2 text-[12px]"><div className="w-20 truncate">${row[0]} · ${row[1]}</div><div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[var(--zed-solid)] rounded-full" style=${{width:(Number(row[2])||0)+'%'}}></div></div><div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div></div>`) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
-            </div>
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Top Countries</div>
-              ${(data?.topCountries ?? []).length ? html`
-                <div className="flex items-center gap-4">
-                  <${Donut} segments=${data.topCountries.slice(0,5).map((row,i)=>({value:Number(row[1])||0, color:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}))}/>
-                  <div className="flex-1 space-y-[6px]">
-                    ${data.topCountries.slice(0,5).map((row,i)=>html`<div key=${i} className="flex items-center justify-between text-[11.5px]"><span className="flex items-center gap-2"><span className="w-[8px] h-[8px] rounded-full" style=${{background:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}}></span>${row[0]}</span><span className="font-[600]">${fmt(row[1])}</span></div>`)}
-                  </div>
-                </div>
-              ` : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
-            </div>
-          </div>
-        ` : tab==='Engagement' ? html`
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-1">Engagement Over Time</div>
-              <div className="text-[11px] text-zinc-500 mb-3">Likes, comments &amp; shares combined</div>
-              <${AreaChart} data=${engSeries} labels=${seriesLabels} color="#f5762e" fmt=${v=>fmt(v)+' total'} h=${170}/>
-            </div>
-            <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5">
-              <div className="font-[700] text-[13.5px] mb-3">Breakdown</div>
-              <div className="space-y-3">
-                ${[['Likes',data?.overview.likes ?? 0,'var(--zed)'],['Comments',data?.overview.comments ?? 0,'#22c1c3'],['Shares',data?.overview.shares ?? 0,'#f5762e']].map(([l,v,color])=>html`
-                  <div key=${l} className="p-3 border border-zinc-100 dark:border-zinc-800 rounded-xl">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-500"><span>${l}</span><span className="font-[700] text-[14px] text-zinc-900 dark:text-zinc-100">${fmt(v)}</span></div>
-                    <div className="mt-2 h-[6px] rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full" style=${{width:'100%',background:color}}></div></div>
-                  </div>
+              <div className="flex items-center bg-zinc-100 dark:bg-[#2e2e2e] rounded-[11px] p-[3px] text-[11px]">
+                ${['Views','Subscribers','Watch Time','Engagement'].map(m=>html`
+                  <button key=${m} onClick=${()=>setChartMetric(m)} className=${`px-[10px] py-[6px] rounded-[8px] font-[650] transition-all ${chartMetric===m?'bg-white dark:bg-[#404040] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${m}</button>
                 `)}
               </div>
             </div>
+            <div className="mt-3">
+              <${AreaChart} data=${activeChart.series} labels=${seriesLabels} color=${activeChart.color} fmt=${activeChart.fmt} h=${220}/>
+            </div>
           </div>
-        ` : tab==='Revenue' ? html`
-          <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5 text-center">
-            <${I} name="Info" size=${20} className="mx-auto text-zinc-400 mb-2"/>
-            <div className="font-[650] text-[13px] mb-1">Revenue data not connected</div>
-            <div className="text-[12px] text-zinc-500">Revenue reporting requires an additional permission. Reconnect your account with monetary access to see this.</div>
+
+          <!-- Platform Comparison -->
+          <div>
+            <div className="font-[750] text-[14px] display mb-3">Platform Comparison</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 font-[700] text-[13px]"><${I} name="Youtube" size=${15} className="text-red-500"/> YouTube</div>
+                  <${TrendPill} value=${pctChange(viewsSeries)}/>
+                </div>
+                <div className="space-y-[6px] text-[11.5px] text-zinc-500">
+                  <div className="flex justify-between"><span>Best content</span><span className="font-[650] text-zinc-800 dark:text-zinc-200 truncate max-w-[130px]">${topVideos[0]?.title || '—'}</span></div>
+                  <div className="flex justify-between"><span>Avg. engagement</span><span className="font-[650] text-zinc-800 dark:text-zinc-200">${engagementRate.toFixed(1)}%</span></div>
+                  <div className="flex justify-between"><span>Follower change</span><span className="font-[650] text-zinc-800 dark:text-zinc-200">${(data.overview.subscribersGained - data.overview.subscribersLost >= 0 ? '+' : '')+fmt(data.overview.subscribersGained - data.overview.subscribersLost)}</span></div>
+                </div>
+                <div className="mt-3"><${BarSpark} data=${viewsSeries} color="var(--zed)" h=${60}/></div>
+              </div>
+              <${ComingSoonCard} icon="Instagram" title="Instagram" note="Connect Instagram to see growth, top content, and engagement here."/>
+              <${ComingSoonCard} icon="Twitter" title="X (Twitter)" note="Connect X to see growth, top content, and engagement here."/>
+            </div>
           </div>
-        ` : html`
-          <div className="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-5"><div className="font-[700] text-[13.5px] mb-3">Trending Topics</div>
-            <div className="text-[12px] text-zinc-400 text-center py-6">Trend insights are generated from your content history and will appear here soon.</div>
+
+          <!-- Best Performing Content -->
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+            <div className="font-[750] text-[14px] display mb-3">Best Performing Content</div>
+            ${topVideos.length ? html`
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-[12px] min-w-[640px]">
+                  <thead>
+                    <tr className="text-left text-zinc-400 text-[10.5px] uppercase tracking-wide">
+                      <th className="font-[600] pb-2 px-1">Video</th>
+                      <th className="font-[600] pb-2 px-1">Views</th>
+                      <th className="font-[600] pb-2 px-1">Likes</th>
+                      <th className="font-[600] pb-2 px-1">Comments</th>
+                      <th className="font-[600] pb-2 px-1">Watch Time</th>
+                      <th className="font-[600] pb-2 px-1">AI Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${topVideos.map((v,i)=>{
+                      const score = Math.min(100, Math.round(((v.views||0)/(Math.max(...topVideos.map(x=>x.views||1))))*100));
+                      return html`
+                      <tr key=${v.id||i} className="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-[#2d2d2d] transition-colors cursor-pointer">
+                        <td className="py-[10px] px-1">
+                          <div className="flex items-center gap-3 min-w-0">
+                            ${v.thumbnail?html`<img src=${v.thumbnail} className="w-14 h-9 rounded-[8px] object-cover flex-shrink-0"/>`:html`<div className="w-14 h-9 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 flex-shrink-0 text-[10px]">${i+1}</div>`}
+                            <div className="font-[600] truncate max-w-[220px]">${v.title}</div>
+                          </div>
+                        </td>
+                        <td className="px-1">${fmt(v.views)}</td>
+                        <td className="px-1">${fmt(v.likes)}</td>
+                        <td className="px-1">${fmt(v.comments)}</td>
+                        <td className="px-1">${fmtMinutes(v.watchTimeMinutes)}</td>
+                        <td className="px-1"><span className="px-2 py-[3px] rounded-full text-[10.5px] font-[700]" style=${{background: score>=70?'#22a06b1a':score>=40?'#f5762e1a':'#e0457b1a', color: score>=70?'#22a06b':score>=40?'#f5762e':'#e0457b'}}>${score}</span></td>
+                      </tr>`;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ` : html`<div className="text-[12px] text-zinc-400 text-center py-8">No video data yet for this period.</div>`}
           </div>
-        `}
-      </div>
-    `}
+
+          <!-- AI Recommendations -->
+          <div>
+            <div className="font-[750] text-[14px] display mb-3">AI Recommendations</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              ${recommendations.map((r,i)=>html`
+                <div key=${i} className="rounded-[18px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-4 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-[10px] bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0"><${I} name=${r.icon} size=${14}/></div>
+                      <div>
+                        <div className="text-[12.5px] font-[650] leading-snug">${r.title}</div>
+                        <div className="text-[10.5px] text-zinc-400 mt-1">${r.impact}</div>
+                      </div>
+                    </div>
+                    <span className=${`text-[9.5px] font-[700] px-2 py-[3px] rounded-full shrink-0 ${priorityStyle(r.priority)}`}>${r.priority}</span>
+                  </div>
+                  <button disabled className="mt-3 text-[11px] font-[650] text-zinc-400 flex items-center gap-1 cursor-not-allowed">Apply <${I} name="Lock" size=${11}/></button>
+                </div>
+              `)}
+            </div>
+          </div>
+
+          <!-- Audience -->
+          <div>
+            <div className="font-[750] text-[14px] display mb-3">Audience</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+                <div className="font-[700] text-[13px] mb-3">Age &amp; Gender</div>
+                ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`
+                  <div key=${i} className="flex items-center gap-3 mb-2 text-[12px]">
+                    <div className="w-20 truncate">${row[0]} · ${row[1]}</div>
+                    <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[var(--zed-solid)] rounded-full transition-all duration-500" style=${{width:(Number(row[2])||0)+'%'}}></div></div>
+                    <div className="w-10 text-right">${(Number(row[2])||0).toFixed(0)}%</div>
+                  </div>
+                `) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
+              </div>
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+                <div className="font-[700] text-[13px] mb-3">Top Countries</div>
+                ${(data?.topCountries ?? []).length ? html`
+                  <div className="flex items-center gap-4">
+                    <${Donut} segments=${data.topCountries.slice(0,5).map((row,i)=>({value:Number(row[1])||0, color:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}))}/>
+                    <div className="flex-1 space-y-[6px]">
+                      ${data.topCountries.slice(0,5).map((row,i)=>html`<div key=${i} className="flex items-center justify-between text-[11.5px]"><span className="flex items-center gap-2"><span className="w-[8px] h-[8px] rounded-full" style=${{background:['var(--zed)','#22c1c3','#f5762e','#22a06b','#e0457b'][i%5]}}></span>${row[0]}</span><span className="font-[600]">${fmt(row[1])}</span></div>`)}
+                    </div>
+                  </div>
+                ` : html`<div className="text-[12px] text-zinc-400 text-center py-4">No country data yet.</div>`}
+              </div>
+              <${ComingSoonCard} icon="Smartphone" title="Devices" note="Device breakdown will appear here once available from your connected account."/>
+              <${ComingSoonCard} icon="Repeat" title="Returning vs New Viewers" note="Viewer retention split will appear here once available from your connected account."/>
+            </div>
+          </div>
+
+          <!-- Upload Performance Timeline -->
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+            <div className="font-[750] text-[14px] display mb-3">Upload Performance Timeline</div>
+            ${topVideos.length ? html`
+              <div className="space-y-2">
+                ${topVideos.map((v,i)=>{
+                  const perf = performanceLabel(v.views);
+                  return html`
+                  <div key=${v.id||i} className="flex items-center gap-3 p-3 rounded-[14px] hover:bg-zinc-50 dark:hover:bg-[#2d2d2d] transition-colors">
+                    ${v.thumbnail?html`<img src=${v.thumbnail} className="w-16 h-10 rounded-[8px] object-cover flex-shrink-0"/>`:html`<div className="w-16 h-10 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 flex-shrink-0"></div>`}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-[600] text-[12.5px] truncate">${v.title}</div>
+                      <div className="text-[11px] text-zinc-500">${fmt(v.views)} views</div>
+                    </div>
+                    <span className=${`text-[10.5px] font-[700] px-[10px] py-[4px] rounded-full shrink-0 ${perf.color}`}>${perf.emoji} ${perf.label}</span>
+                  </div>`;
+                })}
+              </div>
+            ` : html`<div className="text-[12px] text-zinc-400 text-center py-8">No uploads yet for this period.</div>`}
+          </div>
+
+          <!-- Competitor Snapshot -->
+          <${ComingSoonCard} icon="Swords" title="Competitor Snapshot" note="Track competitor uploads, average views, engagement, and growth here once this feature is connected." className="py-10"/>
+
+          <!-- Goals -->
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+            <div className="font-[750] text-[14px] display mb-1">Goals</div>
+            <div className="text-[11px] text-zinc-500 mb-4">Custom goal tracking is coming soon — showing your current totals below.</div>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Subscribers</span><span className="text-zinc-500">${fmt(data.channel?.subscriberCount ?? 0)}</span></div>
+                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[var(--zed-solid)]" style=${{width:'100%'}}></div></div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Views (this period)</span><span className="text-zinc-500">${fmt(data.overview.views)}</span></div>
+                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[#22c1c3]" style=${{width:'100%'}}></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Weekly Report -->
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
+              <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
+            </div>
+            <button onClick=${handleExportPDF} className="flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors">
+              <${I} name="FileDown" size=${14}/> Download PDF
+            </button>
+          </div>
+
+          `}
+        </div>
+      `}
+    </div>
+
+    <!-- Floating AI Assistant -->
+    <div className="fixed bottom-6 right-6 z-[500]">
+      <${AskStudioWidget} data=${data} connected=${connected}/>
+    </div>
   </div>`;
 }
 
