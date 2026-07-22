@@ -2928,6 +2928,116 @@ function MiniSpark({data, color='var(--zed)', w=46, h=20}){
   </svg>`;
 }
 
+function fmt2(n){
+  n=Number(n)||0;
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return String(Math.round(n));
+}
+
+function GoalsCard({currentValues}){
+  // currentValues: {subscribers, views, watch_time_minutes}
+  const [goals,setGoals]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [adding,setAdding]=useState(false);
+  const [newMetric,setNewMetric]=useState('subscribers');
+  const [newTarget,setNewTarget]=useState('');
+  const [saving,setSaving]=useState(false);
+
+  const metricLabels = {subscribers:'Subscribers', views:'Views', watch_time_minutes:'Watch Time (min)', revenue:'Revenue'};
+  const metricColors = {subscribers:'var(--zed-solid)', views:'#22c1c3', watch_time_minutes:'#f5762e', revenue:'#9b6bf2'};
+
+  const loadGoals=async()=>{
+    setLoading(true);
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid){ setLoading(false); return; }
+      const { data: rows, error } = await supabase
+        .from('creator_goals')
+        .select('*')
+        .eq('user_id', uid)
+        .is('achieved_at', null)
+        .order('created_at', {ascending:false});
+      if(!error) setGoals(rows||[]);
+    }catch(e){}
+    setLoading(false);
+  };
+
+  useEffect(()=>{ loadGoals(); },[]);
+
+  const addGoal=async()=>{
+    const target = Number(newTarget);
+    if(!target || target<=0){ toast('Enter a valid target', 'err'); return; }
+    setSaving(true);
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid){ toast('Please sign in first','err'); setSaving(false); return; }
+      const { error } = await supabase.from('creator_goals').insert({
+        user_id: uid, platform: 'youtube', metric: newMetric, target_value: target
+      });
+      if(error){ toast('Could not save goal', 'err'); }
+      else { toast('Goal added'); setNewTarget(''); setAdding(false); loadGoals(); }
+    }catch(e){ toast('Could not save goal', 'err'); }
+    setSaving(false);
+  };
+
+  const removeGoal=async(id)=>{
+    try{
+      await supabase.from('creator_goals').delete().eq('id', id);
+      setGoals(g=>g.filter(x=>x.id!==id));
+    }catch(e){ toast('Could not remove goal', 'err'); }
+  };
+
+  const currentFor=(metric)=> Number(currentValues?.[metric] ?? 0);
+
+  return html`
+  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+    <div className="flex items-center justify-between mb-1">
+      <div className="font-[750] text-[14px] display">Goals</div>
+      <button onClick=${()=>setAdding(a=>!a)} className="text-[11.5px] font-[650] text-[var(--zed)] flex items-center gap-1 hover:opacity-70 transition-opacity">
+        <${I} name=${adding?'X':'Plus'} size=${13}/> ${adding?'Cancel':'Add Goal'}
+      </button>
+    </div>
+    <div className="text-[11px] text-zinc-500 mb-4">Set a target and track real progress from your connected account.</div>
+
+    ${adding ? html`
+      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700">
+        <select value=${newMetric} onChange=${e=>setNewMetric(e.target.value)} className="text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-2 py-[7px] outline-none">
+          ${Object.entries(metricLabels).filter(([k])=>k!=='revenue').map(([k,l])=>html`<option key=${k} value=${k}>${l}</option>`)}
+        </select>
+        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-3 py-[7px] outline-none"/>
+        <button onClick=${addGoal} disabled=${saving} className="text-[12px] font-[650] bg-[var(--zed-solid)] text-white rounded-[10px] px-3 py-[7px] disabled:opacity-50">${saving?'Saving…':'Save'}</button>
+      </div>
+    ` : null}
+
+    ${loading ? html`<div className="text-[12px] text-zinc-400 text-center py-4">Loading goals…</div>` : goals.length===0 ? html`
+      <div className="text-[12px] text-zinc-400 text-center py-6">No goals yet — tap "Add Goal" to set your first target.</div>
+    ` : html`
+      <div className="space-y-4">
+        ${goals.map(g=>{
+          const current = currentFor(g.metric);
+          const pct = Math.min(100, (current / g.target_value) * 100);
+          return html`
+          <div key=${g.id} className="group">
+            <div className="flex justify-between text-[12px] mb-1">
+              <span className="font-[600]">${metricLabels[g.metric]||g.metric}</span>
+              <span className="text-zinc-500 flex items-center gap-2">
+                ${fmt2(current)} / ${fmt2(g.target_value)}
+                <button onClick=${()=>removeGoal(g.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-500"><${I} name="Trash2" size=${11}/></button>
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700" style=${{width:pct+'%', background:metricColors[g.metric]}}></div>
+            </div>
+          </div>`;
+        })}
+      </div>
+    `}
+  </div>`;
+}
+
 // ---------- Channel Analytics 2.0 ----------
 function ComingSoonCard({icon, title, note, className=''}){
   return html`
@@ -3376,20 +3486,11 @@ function AnalyticsView(){
           <${ComingSoonCard} icon="Swords" title="Competitor Snapshot" note="Track competitor uploads, average views, engagement, and growth here once this feature is connected." className="py-10"/>
 
           <!-- Goals -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
-            <div className="font-[750] text-[14px] display mb-1">Goals</div>
-            <div className="text-[11px] text-zinc-500 mb-4">Custom goal tracking is coming soon — showing your current totals below.</div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Subscribers</span><span className="text-zinc-500">${fmt(data.channel?.subscriberCount ?? 0)}</span></div>
-                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[var(--zed-solid)]" style=${{width:'100%'}}></div></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Views (this period)</span><span className="text-zinc-500">${fmt(data.overview.views)}</span></div>
-                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[#22c1c3]" style=${{width:'100%'}}></div></div>
-              </div>
-            </div>
-          </div>
+          <${GoalsCard} currentValues=${{
+            subscribers: data.channel?.subscriberCount ?? 0,
+            views: data.overview.views ?? 0,
+            watch_time_minutes: data.overview.watchTimeMinutes ?? 0
+          }}/>
 
           <!-- Weekly Report -->
           <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
