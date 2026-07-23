@@ -5215,6 +5215,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       const realCost = estimateCreditCostV3({userText:topic, aiText:r.text||'', feature:'seo', smart:true});
       await deductCredits(realCost, 'seo', {topic:topic.slice(0,100), platform, niche});
     }catch(e){
+      console.error('[SEOStudio] generation failed:', e);
       setError('Could not generate content right now. Please try again.');
     }finally{ setLoading(false); }
   };
@@ -5360,17 +5361,20 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
     setLoading(true); setError(null); setTrends(null);
     try{
       const search = await realWebSearch(query);
-      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed');
+      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed: '+search.error);
       const context = (search.results||[]).slice(0,5).map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
       const r = await callOR([{role:'user', content: trendPromptFor(platform, niche, country, context)}], {smart:true, userText:query});
-      if(r.error) throw new Error(r.text);
+      if(r.error) throw new Error('ai-failed: '+r.text);
       const cleaned = r.text.replace(/```json|```/g,'').trim();
-      const parsed = JSON.parse(cleaned);
+      let parsed;
+      try{ parsed = JSON.parse(cleaned); }
+      catch(parseErr){ throw new Error('parse-failed: '+parseErr.message+' | raw: '+cleaned.slice(0,200)); }
       setTrends(parsed.trends||[]);
 
       const realCost = estimateCreditCostV3({userText:query, aiText:r.text||'', feature:'trend_explorer', smart:true});
       await deductCredits(realCost, 'trend_explorer', {platform, niche, country});
     }catch(e){
+      console.error('[TrendExplorer] generation failed:', e);
       setError('Could not fetch live trends right now. Please try again.');
     }finally{ setLoading(false); }
   };
