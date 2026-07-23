@@ -95,7 +95,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "htm": "https://esm.sh/htm@3.1.1",
     "lucide-react": "https://esm.sh/lucide-react@0.468.0?external=react",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "jspdf": "https://esm.sh/jspdf@2.5.1"
   }
 }
 </script>
@@ -114,6 +115,7 @@ import { createRoot } from 'react-dom/client';
 import htm from 'htm';
 import * as Lucide from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+import { jsPDF } from 'jspdf';
 const html = htm.bind(React.createElement);
 const I = ({name, size=16, className="", ...p}) => {
   const C = Lucide[name] || Lucide.Circle;
@@ -1467,7 +1469,7 @@ function App(){
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
-      case 'analytics': return html`<${AnalyticsView} />`;
+      case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
       case 'seo': return html`<${SEOStudioView} />`;
       case 'trends': return html`<${TrendExplorerView} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
@@ -3038,6 +3040,248 @@ function GoalsCard({currentValues}){
   </div>`;
 }
 
+function WeeklyInsightsView({data, goalRows, onClose}){
+  const [downloading,setDownloading]=useState(false);
+  const reportRef = useRef(null);
+
+  const fmt=(n)=>{
+    n=Number(n)||0;
+    if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+    if(n>=1000) return (n/1000).toFixed(1)+'K';
+    return String(n);
+  };
+  const fmtMinutes=(m)=>{
+    m=Number(m)||0;
+    const hrs=m/60;
+    if(hrs>=1000) return (hrs/1000).toFixed(1)+'K hrs';
+    return hrs.toFixed(0)+' hrs';
+  };
+
+  const daily = data?.dailyStats ?? [];
+  const half = Math.floor(daily.length/2);
+  const firstHalf = daily.slice(0, half);
+  const secondHalf = daily.slice(half);
+
+  const sum=(arr,key)=>arr.reduce((s,d)=>s+(Number(d[key])||0),0);
+  const pct=(a,b)=> a===0 ? (b>0?100:0) : ((b-a)/a)*100;
+
+  const viewsA = sum(firstHalf,'views'), viewsB = sum(secondHalf,'views');
+  const watchA = sum(firstHalf,'watchTimeMinutes'), watchB = sum(secondHalf,'watchTimeMinutes');
+  const likesA = sum(firstHalf,'likes'), likesB = sum(secondHalf,'likes');
+  const commentsA = sum(firstHalf,'comments'), commentsB = sum(secondHalf,'comments');
+  const netSubsA = sum(firstHalf,'subscribersGained') - sum(firstHalf,'subscribersLost');
+  const netSubsB = sum(secondHalf,'subscribersGained') - sum(secondHalf,'subscribersLost');
+
+  const viewsChange = pct(viewsA, viewsB);
+  const watchChange = pct(watchA, watchB);
+  const engChange = pct(likesA+commentsA, likesB+commentsB);
+  const subsChange = pct(netSubsA, netSubsB);
+
+  const isGrowing = viewsChange >= 0 && subsChange >= 0;
+  const topVideos = data?.topVideos ?? [];
+  const best = topVideos.length ? [...topVideos].sort((a,b)=>(b.views||0)-(a.views||0))[0] : null;
+  const worst = topVideos.length>1 ? [...topVideos].sort((a,b)=>(a.views||0)-(b.views||0))[0] : null;
+
+  const engagementRate = data?.overview?.views
+    ? (((data.overview.likes||0)+(data.overview.comments||0)+(data.overview.shares||0)) / data.overview.views * 100)
+    : 0;
+
+  const metricLabels = {subscribers:'Subscribers', views:'Views', watch_time_minutes:'Watch Time (min)', revenue:'Revenue'};
+  const currentFor = (metric)=>{
+    if(metric==='subscribers') return data.channel?.subscriberCount ?? 0;
+    if(metric==='views') return data.overview?.views ?? 0;
+    if(metric==='watch_time_minutes') return data.overview?.watchTimeMinutes ?? 0;
+    return 0;
+  };
+
+  const tips = [];
+  if(viewsChange < 0) tips.push('Views dropped compared to the first half of this period — try posting at the times your last high-performing video went live.');
+  if(engagementRate < 3) tips.push('Engagement rate is under 3%. Asking a direct question in your video or pinning a comment tends to lift replies.');
+  if(watchChange < 0) tips.push('Watch time is trending down — check if your intros are too long or your pacing dropped in recent uploads.');
+  if(best) tips.push(`"${best.title}" is your strongest video this period — a follow-up in the same format/topic is a safe next upload.`);
+  if(worst && topVideos.length>2) tips.push(`"${worst.title}" underperformed compared to the rest — compare its thumbnail and title against your top video.`);
+  if(tips.length===0) tips.push('Everything is trending in a healthy direction — keep your current upload cadence and format.');
+
+  const downloadPDF=async()=>{
+    setDownloading(true);
+    try{
+      const doc = new jsPDF({ unit:'pt', format:'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      let y = 50;
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(20);
+      doc.text('Zedith Weekly Insights Report', 40, y); y+=18;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+      doc.text(`${data.channel?.title || 'Your Channel'} · Generated ${new Date().toLocaleDateString()}`, 40, y); y+=30;
+
+      doc.setTextColor(0);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text(isGrowing ? 'Overall: Growing' : 'Overall: Needs Attention', 40, y); y+=20;
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      const lines = [
+        `Views: ${fmt(data.overview.views)} (${viewsChange>=0?'+':''}${viewsChange.toFixed(1)}% vs earlier this period)`,
+        `Watch Time: ${fmtMinutes(data.overview.watchTimeMinutes)} (${watchChange>=0?'+':''}${watchChange.toFixed(1)}%)`,
+        `Subscribers: ${fmt(data.channel?.subscriberCount ?? 0)} total (${subsChange>=0?'+':''}${subsChange.toFixed(1)}% net change this period)`,
+        `Engagement Rate: ${engagementRate.toFixed(1)}% (${engChange>=0?'+':''}${engChange.toFixed(1)}%)`,
+      ];
+      lines.forEach(l=>{ doc.text(l, 40, y); y+=18; });
+      y+=10;
+
+      if(goalRows?.length){
+        doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Progress Toward Goals', 40, y); y+=20;
+        doc.setFont('helvetica','normal'); doc.setFontSize(11);
+        goalRows.forEach(g=>{
+          const cur = currentFor(g.metric);
+          const remaining = Math.max(0, g.target_value - cur);
+          doc.text(`${metricLabels[g.metric]||g.metric}: ${fmt(cur)} / ${fmt(g.target_value)} — ${fmt(remaining)} to go`, 40, y);
+          y+=18;
+        });
+        y+=10;
+      }
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Top Content', 40, y); y+=20;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      if(topVideos.length){
+        topVideos.slice(0,5).forEach(v=>{
+          const t = doc.splitTextToSize(`${v.title} — ${fmt(v.views)} views, ${fmt(v.likes)} likes`, pageW-80);
+          doc.text(t, 40, y); y += 16*t.length;
+        });
+      } else {
+        doc.text('No video data yet for this period.', 40, y); y+=18;
+      }
+      y+=10;
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('AI Tips & Recommendations', 40, y); y+=20;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      tips.forEach(tip=>{
+        const t = doc.splitTextToSize(`• ${tip}`, pageW-80);
+        if(y > 760){ doc.addPage(); y = 50; }
+        doc.text(t, 40, y); y += 16*t.length + 4;
+      });
+
+      doc.save(`zedith-weekly-report-${new Date().toISOString().slice(0,10)}.pdf`);
+      toast('PDF downloaded');
+    }catch(e){
+      toast('Could not generate PDF', 'err');
+    }
+    setDownloading(false);
+  };
+
+  return html`
+  <div className="fixed inset-0 z-[700] bg-black/50 backdrop-blur-sm flex items-start md:items-center justify-center p-0 md:p-6 overflow-y-auto" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#1e1e1e] w-full md:max-w-[720px] md:rounded-[22px] min-h-full md:min-h-0 md:max-h-[88vh] overflow-y-auto shadow-2xl" onClick=${e=>e.stopPropagation()} ref=${reportRef}>
+
+      <div className="sticky top-0 z-10 bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur border-b border-zinc-200 dark:border-[#333] px-6 py-4 flex items-center justify-between">
+        <div>
+          <div className="font-[800] text-[16px] display">Weekly Insights Report</div>
+          <div className="text-[11px] text-zinc-500">${data.channel?.title || 'Your Channel'} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick=${downloadPDF} disabled=${downloading} className="flex items-center gap-[6px] text-[12px] font-[650] bg-[var(--zed-solid)] text-white px-3 py-[9px] rounded-[12px] disabled:opacity-60">
+            <${I} name=${downloading?'Loader2':'Download'} size=${13} className=${downloading?'animate-spin':''}/> ${downloading?'Generating…':'Download PDF'}
+          </button>
+          <button onClick=${onClose} className="p-[8px] rounded-[10px] hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
+        </div>
+      </div>
+
+      <div className="px-6 py-6 space-y-6">
+
+        <!-- Overall status -->
+        <div className=${`rounded-[18px] p-5 flex items-center gap-4 ${isGrowing ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}`}>
+          <div className=${`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${isGrowing?'bg-emerald-500':'bg-amber-500'} text-white`}>
+            <${I} name=${isGrowing?'TrendingUp':'AlertTriangle'} size=${20}/>
+          </div>
+          <div>
+            <div className="font-[750] text-[14.5px]">${isGrowing ? "You're growing" : "Growth has slowed"}</div>
+            <div className="text-[12px] text-zinc-600 dark:text-zinc-300 mt-[2px]">
+              ${isGrowing
+                ? `Views are up ${viewsChange.toFixed(1)}% and subscribers are trending positive this period.`
+                : `Views are ${viewsChange>=0?'up':'down'} ${Math.abs(viewsChange).toFixed(1)}% — worth reviewing what changed recently.`}
+            </div>
+          </div>
+        </div>
+
+        <!-- Core numbers -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">This Period, In Numbers</div>
+          <div className="grid grid-cols-2 gap-3">
+            ${[
+              ['Views', fmt(data.overview.views), viewsChange],
+              ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), watchChange],
+              ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), subsChange],
+              ['Engagement Rate', engagementRate.toFixed(1)+'%', engChange],
+            ].map(([l,v,c])=>html`
+              <div key=${l} className="rounded-[14px] border border-zinc-200 dark:border-[#333] p-3">
+                <div className="text-[10.5px] text-zinc-500 font-[600]">${l}</div>
+                <div className="text-[18px] font-[800] display">${v}</div>
+                <${TrendPill} value=${c}/>
+              </div>
+            `)}
+          </div>
+        </div>
+
+        <!-- Distance to goals -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">How Far From Your Goals</div>
+          ${goalRows?.length ? html`
+            <div className="space-y-3">
+              ${goalRows.map(g=>{
+                const cur = currentFor(g.metric);
+                const remaining = Math.max(0, g.target_value - cur);
+                const p = Math.min(100, (cur/g.target_value)*100);
+                return html`
+                <div key=${g.id} className="rounded-[14px] border border-zinc-200 dark:border-[#333] p-3">
+                  <div className="flex justify-between text-[12px] mb-1">
+                    <span className="font-[650]">${metricLabels[g.metric]||g.metric}</span>
+                    <span className="text-zinc-500">${fmt(cur)} / ${fmt(g.target_value)} · ${fmt(remaining)} to go</span>
+                  </div>
+                  <div className="h-[6px] rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-[var(--zed-solid)]" style=${{width:p+'%'}}></div>
+                  </div>
+                </div>`;
+              })}
+            </div>
+          ` : html`<div className="text-[12px] text-zinc-400">No goals set yet — add one from the Analytics page to track distance here.</div>`}
+        </div>
+
+        <!-- Top content -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">Top Content This Period</div>
+          ${topVideos.length ? html`
+            <div className="space-y-2">
+              ${topVideos.slice(0,5).map((v,i)=>html`
+                <div key=${v.id||i} className="flex items-center gap-3 rounded-[12px] border border-zinc-200 dark:border-[#333] p-2">
+                  ${v.thumbnail?html`<img src=${v.thumbnail} className="w-14 h-9 rounded-[8px] object-cover shrink-0"/>`:html`<div className="w-14 h-9 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 shrink-0"></div>`}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-[600] truncate">${v.title}</div>
+                    <div className="text-[10.5px] text-zinc-500">${fmt(v.views)} views · ${fmt(v.likes)} likes</div>
+                  </div>
+                </div>
+              `)}
+            </div>
+          ` : html`<div className="text-[12px] text-zinc-400">No video data yet for this period.</div>`}
+        </div>
+
+        <!-- AI Tips -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">AI Tips &amp; What To Change</div>
+          <div className="space-y-2">
+            ${tips.map((t,i)=>html`
+              <div key=${i} className="flex items-start gap-2 rounded-[12px] bg-zinc-50 dark:bg-[#262626] p-3 text-[12px] leading-relaxed">
+                <${I} name="Lightbulb" size=${14} className="text-[var(--zed)] mt-[1px] shrink-0"/>
+                <span>${t}</span>
+              </div>
+            `)}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-zinc-400 text-center pt-2">Generated by Zedith AI · based on your connected YouTube data</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ---------- Channel Analytics 2.0 ----------
 function ComingSoonCard({icon, title, note, className=''}){
   return html`
@@ -3054,7 +3298,7 @@ function SkeletonBlock({className=''}){
   return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[#262626] ${className}`}></div>`;
 }
 
-function AnalyticsView(){
+function AnalyticsView({addNotification}){
   const [period,setPeriod]=useState('Daily'); // Daily | Monthly
   const [platformFilter,setPlatformFilter]=useState('All'); // All | YouTube | Instagram | X
   const [chartMetric,setChartMetric]=useState('Views'); // Views | Subscribers | Watch Time | Engagement
@@ -3064,6 +3308,9 @@ function AnalyticsView(){
   const [refreshing,setRefreshing]=useState(false);
   const [data,setData]=useState(null);
   const [err,setErr]=useState('');
+  const [showInsights,setShowInsights]=useState(false);
+  const [goalRows,setGoalRows]=useState([]);
+  const notifiedRef=useRef(false);
 
   const fmt=(n)=>{
     n=Number(n)||0;
@@ -3092,7 +3339,17 @@ function AnalyticsView(){
       if(json.connected){
         setConnected(true);
         setData(json);
+        loadGoalsForReport();
         if(isRefresh) toast('Analytics refreshed');
+        if(!notifiedRef.current && addNotification){
+          notifiedRef.current = true;
+          const views = json.overview?.views ?? 0;
+          const subs = json.channel?.subscriberCount ?? 0;
+          addNotification(
+            'Your Weekly Insights are ready',
+            `${fmt2(views)} views and ${fmt2(subs)} subscribers so far this period. Tap to view your full report.`
+          );
+        }
       } else {
         setConnected(false);
       }
@@ -3138,8 +3395,18 @@ function AnalyticsView(){
     }
   };
 
-  const handleExportPDF=()=>{
-    toast('PDF export is coming soon');
+  const openInsights=()=>{
+    setShowInsights(true);
+  };
+
+  const loadGoalsForReport=async()=>{
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid) return;
+      const { data: rows } = await supabase.from('creator_goals').select('*').eq('user_id', uid).is('achieved_at', null);
+      setGoalRows(rows||[]);
+    }catch(e){}
   };
 
   const daily = data?.dailyStats ?? [];
@@ -3252,7 +3519,7 @@ function AnalyticsView(){
           <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
             <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
           </button>
-          <button onClick=${handleExportPDF} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur">
+          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
             <${I} name="FileDown" size=${13}/> Export PDF
           </button>
           <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
@@ -3325,7 +3592,7 @@ function AnalyticsView(){
                 ${aiInsight.map((line,i)=>html`<div key=${i} className="text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed">${line}</div>`)}
               </div>
             `}
-            <button className="mt-4 inline-flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors relative">
+            <button onClick=${openInsights} className="mt-4 inline-flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors relative">
               View Detailed Insights <${I} name="ArrowRight" size=${13}/>
             </button>
           </div>
@@ -3498,7 +3765,7 @@ function AnalyticsView(){
               <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
               <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
             </div>
-            <button onClick=${handleExportPDF} className="flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors">
+            <button onClick=${openInsights} className="flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors">
               <${I} name="FileDown" size=${14}/> Download PDF
             </button>
           </div>
@@ -3512,6 +3779,10 @@ function AnalyticsView(){
     <div className="fixed bottom-6 right-6 z-[500]">
       <${AskStudioWidget} data=${data} connected=${connected}/>
     </div>
+
+    ${showInsights && data ? html`
+      <${WeeklyInsightsView} data=${data} goalRows=${goalRows} onClose=${()=>setShowInsights(false)}/>
+    ` : null}
   </div>`;
 }
 
