@@ -351,6 +351,8 @@ const FEATURE_MULTIPLIERS = {
   image_gen: 8,           // 🎨 AI image generation
   video_analysis: 10,     // 🎥 video analysis
   agent: 12,              // 🤖 future AI agent
+  seo: 3,                 // 🔎 SEO Studio content generation
+  trend_explorer: 2.5,    // 📈 live trend search + AI synthesis
 };
 const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
@@ -1470,8 +1472,8 @@ function App(){
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
       case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
-      case 'seo': return html`<${SEOStudioView} />`;
-      case 'trends': return html`<${TrendExplorerView} />`;
+      case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
+      case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
@@ -4488,6 +4490,8 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
     vision:{label:'Vision / Image analysis', icon:'Eye', color:'#f59e0b'},
     image_gen:{label:'Image Generation', icon:'Image', color:'#ec4899'},
     voice:{label:'Voice Studio', icon:'Mic', color:'var(--zed-lighter)'},
+    seo:{label:'SEO Studio', icon:'Search', color:'#8b5cf6'},
+    trend_explorer:{label:'Trend Explorer', icon:'TrendingUp', color:'#10b981'},
   };
   const usageByFeature = {};
   let totalSpent = 0;
@@ -5178,7 +5182,7 @@ Respond with STRICT JSON only, no markdown fences, no commentary — matching ex
   return `${base}\n${shapes[platform]||shapes.X}\nMake it genuinely optimized for ${platform}'s algorithm and audience behavior, specific to the topic — not generic filler.`;
 }
 
-function SEOStudioView(){
+function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
   const [topic,setTopic]=useState('');
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
@@ -5188,6 +5192,15 @@ function SEOStudioView(){
 
   const generate=async()=>{
     if(!topic.trim()) return;
+    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
+
+    // Estimate cost up front and block before the paid AI call if the user can't cover it.
+    const estCost = estimateCreditCostV3({userText:topic, aiText:'', feature:'seo', smart:true});
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(estCost);
+      if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
+    }
+
     setLoading(true); setError(null); setResult(null);
     try{
       const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic});
@@ -5198,6 +5211,9 @@ function SEOStudioView(){
         parsed = JSON.parse(cleaned);
       }catch(e){ parsed = {post:r.text}; }
       setResult(parsed);
+
+      const realCost = estimateCreditCostV3({userText:topic, aiText:r.text||'', feature:'seo', smart:true});
+      await deductCredits(realCost, 'seo', {topic:topic.slice(0,100), platform, niche});
     }catch(e){
       setError('Could not generate content right now. Please try again.');
     }finally{ setLoading(false); }
@@ -5323,7 +5339,7 @@ Rank the 5 trends from best to worst opportunity. Respond with STRICT JSON only,
 Order the array from Best opportunity to Lowest opportunity. Ground every trend in the actual search results provided — do not fabricate trends absent from them.`;
 }
 
-function TrendExplorerView(){
+function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
   const [country,setCountry]=useState('Global');
@@ -5332,9 +5348,17 @@ function TrendExplorerView(){
   const [error,setError]=useState(null);
 
   const findTrends=async()=>{
+    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
+
+    const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
+    const estCost = estimateCreditCostV3({userText:query, aiText:'', feature:'trend_explorer', smart:true});
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(estCost);
+      if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
+    }
+
     setLoading(true); setError(null); setTrends(null);
     try{
-      const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
       const search = await realWebSearch(query);
       if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed');
       const context = (search.results||[]).slice(0,5).map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
@@ -5343,6 +5367,9 @@ function TrendExplorerView(){
       const cleaned = r.text.replace(/```json|```/g,'').trim();
       const parsed = JSON.parse(cleaned);
       setTrends(parsed.trends||[]);
+
+      const realCost = estimateCreditCostV3({userText:query, aiText:r.text||'', feature:'trend_explorer', smart:true});
+      await deductCredits(realCost, 'trend_explorer', {platform, niche, country});
     }catch(e){
       setError('Could not fetch live trends right now. Please try again.');
     }finally{ setLoading(false); }
