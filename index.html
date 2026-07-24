@@ -4453,18 +4453,24 @@ function AdminUsers(){
 function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever, unbanUser, setConfirm}){
   const [chats,setChats]=useState([]);
   const [loadingChats,setLoadingChats]=useState(true);
+  const [chatsError,setChatsError]=useState(null);
   const [openChat,setOpenChat]=useState(null);
   const [banHours,setBanHours]=useState('24');
   const [banReason,setBanReason]=useState('');
   const [creditTx,setCreditTx]=useState([]);
   const [loadingTx,setLoadingTx]=useState(true);
+  const [txError,setTxError]=useState(null);
 
   useEffect(()=>{
     let cancelled=false;
     const load=async()=>{
-      setLoadingChats(true);
+      setLoadingChats(true); setChatsError(null);
       const {data,error}=await supabase.from('chats').select('*').eq('user_id',user.id).order('updated_at',{ascending:false});
-      if(!cancelled){ if(!error) setChats(data||[]); setLoadingChats(false); }
+      if(!cancelled){
+        if(error){ console.error('[Admin] chats load error:', error); setChatsError(error.message); }
+        else setChats(data||[]);
+        setLoadingChats(false);
+      }
     };
     load();
     return ()=>{ cancelled=true; };
@@ -4473,9 +4479,13 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
   useEffect(()=>{
     let cancelled=false;
     const loadTx=async()=>{
-      setLoadingTx(true);
+      setLoadingTx(true); setTxError(null);
       const {data,error}=await supabase.from('credit_transactions').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(500);
-      if(!cancelled){ if(!error) setCreditTx(data||[]); setLoadingTx(false); }
+      if(!cancelled){
+        if(error){ console.error('[Admin] credit_transactions load error:', error); setTxError(error.message); }
+        else setCreditTx(data||[]);
+        setLoadingTx(false);
+      }
     };
     loadTx();
     return ()=>{ cancelled=true; };
@@ -4570,7 +4580,9 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <span className="text-zinc-400 font-[500] text-[11.5px]">${creditTx.length} logged transaction${creditTx.length===1?'':'s'}</span>
         </div>
 
-        ${loadingTx ? html`<div className="text-zinc-500 text-[12px]">Loading usage…</div>` : creditTx.length===0 ? html`
+        ${loadingTx ? html`<div className="text-zinc-500 text-[12px]">Loading usage…</div>` : txError ? html`
+          <div className="text-red-500 text-[12px] p-4 text-center border border-dashed border-red-300 dark:border-red-800 rounded-xl">Could not load credit usage: ${txError}</div>
+        ` : creditTx.length===0 ? html`
           <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No credit usage recorded yet</div>
         ` : html`
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3 text-[12px]">
@@ -4663,7 +4675,9 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <span>Chat History</span>
           <span className="text-zinc-400 font-[500] text-[11.5px]">${chats.length} chat${chats.length===1?'':'s'}</span>
         </div>
-        ${loadingChats ? html`<div className="text-zinc-500 text-[12px]">Loading chats…</div>` : chats.length===0 ? html`
+        ${loadingChats ? html`<div className="text-zinc-500 text-[12px]">Loading chats…</div>` : chatsError ? html`
+          <div className="text-red-500 text-[12px] p-4 text-center border border-dashed border-red-300 dark:border-red-800 rounded-xl">Could not load chats: ${chatsError}</div>
+        ` : chats.length===0 ? html`
           <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No chats yet</div>
         ` : html`
           <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
@@ -5192,12 +5206,10 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
 
   const generate=async()=>{
     if(!topic.trim()) return;
-    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
 
-    // Estimate cost up front and block before the paid AI call if the user can't cover it.
-    const estCost = estimateCreditCostV3({userText:topic, aiText:'', feature:'seo', smart:true});
+    const SEO_COST = 100;
     if(!isAdminUser){
-      const enough = await hasEnoughCredits(estCost);
+      const enough = await hasEnoughCredits(SEO_COST);
       if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
     }
 
@@ -5212,8 +5224,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       }catch(e){ parsed = {post:r.text}; }
       setResult(parsed);
 
-      const realCost = estimateCreditCostV3({userText:topic, aiText:r.text||'', feature:'seo', smart:true});
-      await deductCredits(realCost, 'seo', {topic:topic.slice(0,100), platform, niche});
+      await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform, niche});
     }catch(e){
       console.error('[SEOStudio] generation failed:', e);
       setError('Could not generate content right now. Please try again.');
@@ -5349,14 +5360,13 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
   const [error,setError]=useState(null);
 
   const findTrends=async()=>{
-    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
-
-    const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
-    const estCost = estimateCreditCostV3({userText:query, aiText:'', feature:'trend_explorer', smart:true});
+    const TREND_COST = 150;
     if(!isAdminUser){
-      const enough = await hasEnoughCredits(estCost);
+      const enough = await hasEnoughCredits(TREND_COST);
       if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
     }
+
+    const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
 
     setLoading(true); setError(null); setTrends(null);
     try{
@@ -5371,8 +5381,7 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
       catch(parseErr){ throw new Error('parse-failed: '+parseErr.message+' | raw: '+cleaned.slice(0,200)); }
       setTrends(parsed.trends||[]);
 
-      const realCost = estimateCreditCostV3({userText:query, aiText:r.text||'', feature:'trend_explorer', smart:true});
-      await deductCredits(realCost, 'trend_explorer', {platform, niche, country});
+      await deductCredits(TREND_COST, 'trend_explorer', {platform, niche, country});
     }catch(e){
       console.error('[TrendExplorer] generation failed:', e);
       setError('Could not fetch live trends right now. Please try again.');
