@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
 <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png"/>
-<meta name="theme-color" content="#0b0b12"/>
+<meta name="theme-color" content="#1e1e1e"/>
 
 <!-- Open Graph / social share -->
 <meta property="og:type" content="website"/>
@@ -39,68 +39,76 @@ tailwind.config = {
   theme: {
     extend: {
       fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
-      colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} }
     }
   }
 }
 </script>
 <style>
+:root{ --zed-solid:#27272a; --zed-solid-600:#000000; --zed-accent:#E8622C; }
+.dark{ --zed-solid:#3f3f46; --zed-solid-600:#52525b; --zed-accent:#E8622C; }
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
 </style>
 </head>
-<body class="bg-[#090a10] text-white antialiased">
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#090a10]/80 backdrop-blur-xl">
+<body class="bg-[#fbfaf7] dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-100 antialiased transition-colors">
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-zinc-200 dark:border-[#353535] bg-[#fbfaf7]/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl">
     <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg></div>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="currentColor" class="text-zinc-900 dark:text-zinc-100" stroke-width="2.4" stroke-linecap="round">
+            <path d="M7 12 L7 7.2"/><path d="M7 12 L11 9.6"/><path d="M7 12 L11 14.4"/><path d="M7 12 L7 16.8"/><path d="M7 12 L2.6 14.4"/>
+          </g>
+          <g stroke="#E8622C" stroke-width="2.4" stroke-linecap="round">
+            <path d="M17 12 L17 7.2"/><path d="M17 12 L13 9.6"/><path d="M17 12 L13 14.4"/><path d="M17 12 L17 16.8"/><path d="M17 12 L21.4 14.4"/>
+          </g>
+        </svg>
         <span class="display font-[800] text-xl">Zedith</span>
       </div>
       <div class="flex items-center gap-4">
-        <a href="auth.html?mode=login" class="text-sm font-medium text-zinc-300 hover:text-white">Log in</a>
-        <a href="auth.html?mode=signup" class="px-4 py-2 rounded-full bg-[#7c5cff] text-white text-sm font-semibold hover:bg-[#6b48f5] transition">Get Started</a>
+        <a href="auth.html?mode=login" class="text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors">Log in</a>
+        <a href="auth.html?mode=signup" class="px-4 py-2 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-sm font-semibold transition-colors">Get Started</a>
       </div>
     </div>
   </nav>
 
   <section class="pt-32 pb-20 px-6">
     <div class="max-w-4xl mx-auto text-center">
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-300 mb-6">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-300 mb-6">
         <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Now in Milestone 2
       </div>
       <h1 class="display text-5xl md:text-7xl font-[800] leading-tight mb-6">
-        Create faster with <span class="text-[#7c5cff]">Zedith AI</span>
+        Create faster with <span class="text-[var(--zed-accent)]">Zedith AI</span>
       </h1>
-      <p class="text-lg text-zinc-400 mb-8 max-w-2xl mx-auto">
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
         The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI.
       </p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <a href="auth.html?mode=signup" class="px-8 py-4 rounded-full bg-[#7c5cff] text-white font-semibold hover:bg-[#6b48f5] transition">Get Started Free</a>
-        <a href="auth.html?mode=login" class="px-8 py-4 rounded-full border border-white/20 text-white font-semibold hover:bg-white/5 transition">Already have an account?</a>
+        <a href="auth.html?mode=signup" class="px-8 py-4 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold transition-colors">Get Started Free</a>
+        <a href="auth.html?mode=login" class="px-8 py-4 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-semibold hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">Already have an account?</a>
       </div>
       <p class="text-xs text-zinc-500 mt-4">Free plan includes 50,000 credits/month. No credit card required.</p>
     </div>
   </section>
 
-  <section class="py-20 px-6 border-t border-white/5">
+  <section class="py-20 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
     <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <h3 class="font-[700] text-lg mb-2">Content Planner</h3>
-        <p class="text-sm text-zinc-400">Plan, schedule, and manage your content calendar in one place.</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">Plan, schedule, and manage your content calendar in one place.</p>
       </div>
-      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <h3 class="font-[700] text-lg mb-2">AI Chat & Images</h3>
-        <p class="text-sm text-zinc-400">Generate scripts, thumbnails, hooks, and analyze content with AI.</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">Generate scripts, thumbnails, hooks, and analyze content with AI.</p>
       </div>
-      <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <h3 class="font-[700] text-lg mb-2">Channel Analytics</h3>
-        <p class="text-sm text-zinc-400">Track views, CTR, audience growth, and get AI-powered insights.</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">Track views, CTR, audience growth, and get AI-powered insights.</p>
       </div>
     </div>
   </section>
 
-  <footer class="py-8 px-6 border-t border-white/10 text-center text-xs text-zinc-500">
-    © 2026 Zedith. Support: zedithsupport@gmail.com · <a href="/privacy.html" class="underline hover:text-zinc-300">Privacy Policy</a> · <a href="/terms.html" class="underline hover:text-zinc-300">Terms of Service</a>
+  <footer class="py-8 px-6 border-t border-zinc-200 dark:border-[#2a2a2a] text-center text-xs text-zinc-500">
+    © 2026 Zedith. Support: zedithsupport@gmail.com · <a href="/privacy.html" class="underline hover:text-zinc-700 dark:hover:text-zinc-300">Privacy Policy</a> · <a href="/terms.html" class="underline hover:text-zinc-700 dark:hover:text-zinc-300">Terms of Service</a>
   </footer>
 </body>
 </html>

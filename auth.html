@@ -4,6 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Zedith — Sign In</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
@@ -14,12 +17,17 @@ tailwind.config = {
   theme: {
     extend: {
       fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['"Plus Jakarta Sans"','Inter','sans-serif'] },
-      colors: { zed:{DEFAULT:'#7c5cff',600:'#6b48f0'} }
     }
   }
 }
 </script>
 <style>
+:root{
+  --zed:#18181b; --zed-solid:#27272a; --zed-solid-600:#000000; --zed-accent:#E8622C;
+}
+.dark{
+  --zed:#f4f4f5; --zed-solid:#3f3f46; --zed-solid-600:#52525b; --zed-accent:#E8622C;
+}
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
 </style>
@@ -31,36 +39,59 @@ tailwind.config = {
 }
 </script>
 </head>
-<body class="bg-[#090a10] text-white min-h-screen flex items-center justify-center p-4">
+<body class="bg-[#fbfaf7] dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-100 min-h-screen flex items-center justify-center p-4 transition-colors">
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
-      <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#845bff] to-[#6236ff] flex items-center justify-center mx-auto mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+      <div class="w-14 h-14 mx-auto mb-4 flex items-center justify-center">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="currentColor" class="text-zinc-900 dark:text-zinc-100" stroke-width="2.4" stroke-linecap="round">
+            <path d="M7 12 L7 7.2"/><path d="M7 12 L11 9.6"/><path d="M7 12 L11 14.4"/><path d="M7 12 L7 16.8"/><path d="M7 12 L2.6 14.4"/>
+          </g>
+          <g stroke="#E8622C" stroke-width="2.4" stroke-linecap="round">
+            <path d="M17 12 L17 7.2"/><path d="M17 12 L13 9.6"/><path d="M17 12 L13 14.4"/><path d="M17 12 L17 16.8"/><path d="M17 12 L21.4 14.4"/>
+          </g>
+        </svg>
       </div>
       <h1 class="display text-2xl font-[800]">Welcome to Zedith</h1>
-      <p class="text-zinc-400 text-sm mt-1">AI workspace for creators</p>
+      <p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1">AI workspace for creators</p>
     </div>
 
-    <div class="bg-[#13141f] border border-white/10 rounded-2xl p-6">
-      <div class="flex bg-white/5 rounded-xl p-1 mb-5">
+    <div class="bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] rounded-2xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div class="flex bg-zinc-100 dark:bg-[#333] rounded-xl p-1 mb-5">
         <button id="tab-signup" class="flex-1 py-2 rounded-lg text-sm font-semibold transition">Sign Up</button>
         <button id="tab-login" class="flex-1 py-2 rounded-lg text-sm font-semibold transition">Log In</button>
       </div>
 
+      <button id="google-btn" type="button" class="w-full flex items-center justify-center gap-3 py-[11px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] hover:bg-zinc-50 dark:hover:bg-[#333] text-sm font-semibold transition mb-4">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.84z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.11C3.25 21.3 7.31 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.27 14.28A7.19 7.19 0 0 1 4.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11z"/>
+          <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.6 4.59 1.79l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-700"></div>
+        <span class="text-[11px] text-zinc-400">or</span>
+        <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-700"></div>
+      </div>
+
       <form id="auth-form" class="space-y-4">
         <div id="name-field">
-          <label class="text-xs text-zinc-400 block mb-1">Display Name</label>
-          <input id="name" type="text" placeholder="snakyboyYT" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-[#7c5cff] text-sm"/>
+          <label class="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Display Name</label>
+          <input id="name" type="text" placeholder="snakyboyYT" class="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 outline-none focus:border-[var(--zed-accent)] text-sm"/>
         </div>
         <div>
-          <label class="text-xs text-zinc-400 block mb-1">Email</label>
-          <input id="email" type="email" placeholder="you@creator.com" required class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-[#7c5cff] text-sm"/>
+          <label class="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Email</label>
+          <input id="email" type="email" placeholder="you@creator.com" required class="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 outline-none focus:border-[var(--zed-accent)] text-sm"/>
         </div>
         <div>
-          <label class="text-xs text-zinc-400 block mb-1">Password</label>
-          <input id="password" type="password" placeholder="••••••••" required minlength="6" class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-[#7c5cff] text-sm"/>
+          <label class="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Password</label>
+          <input id="password" type="password" placeholder="••••••••" required minlength="6" class="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-[#2c2c2c] border border-zinc-200 dark:border-zinc-700 outline-none focus:border-[var(--zed-accent)] text-sm"/>
         </div>
-        <button type="submit" id="submit-btn" class="w-full py-3 rounded-xl bg-[#7c5cff] hover:bg-[#6b48f5] text-white font-semibold text-sm transition">Continue</button>
+        <button type="submit" id="submit-btn" class="w-full py-3 rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold text-sm transition">Continue</button>
       </form>
 
       <div id="message" class="mt-4 text-xs text-center hidden"></div>
@@ -88,19 +119,20 @@ tailwind.config = {
     const tabLogin = document.getElementById('tab-login');
     const nameField = document.getElementById('name-field');
     const submitBtn = document.getElementById('submit-btn');
+    const googleBtn = document.getElementById('google-btn');
     const msg = document.getElementById('message');
 
     function setMode(m){
       mode = m;
       history.replaceState(null,'','?mode='+m);
       if(m==='signup'){
-        tabSignup.className='flex-1 py-2 rounded-lg text-sm font-semibold transition bg-[#7c5cff] text-white';
-        tabLogin.className='flex-1 py-2 rounded-lg text-sm font-semibold transition text-zinc-400 hover:text-white';
+        tabSignup.className='flex-1 py-2 rounded-lg text-sm font-semibold transition bg-[var(--zed-solid)] text-white';
+        tabLogin.className='flex-1 py-2 rounded-lg text-sm font-semibold transition text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white';
         nameField.style.display='block';
         submitBtn.textContent='Create account';
       } else {
-        tabLogin.className='flex-1 py-2 rounded-lg text-sm font-semibold transition bg-[#7c5cff] text-white';
-        tabSignup.className='flex-1 py-2 rounded-lg text-sm font-semibold transition text-zinc-400 hover:text-white';
+        tabLogin.className='flex-1 py-2 rounded-lg text-sm font-semibold transition bg-[var(--zed-solid)] text-white';
+        tabSignup.className='flex-1 py-2 rounded-lg text-sm font-semibold transition text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white';
         nameField.style.display='none';
         submitBtn.textContent='Log in';
       }
@@ -112,9 +144,25 @@ tailwind.config = {
 
     function showMessage(text, type='info'){
       msg.textContent = text;
-      msg.className = 'mt-4 text-xs text-center ' + (type==='err'?'text-red-400':'text-emerald-400');
+      msg.className = 'mt-4 text-xs text-center ' + (type==='err'?'text-red-500':'text-emerald-500');
       msg.classList.remove('hidden');
     }
+
+    googleBtn.onclick = async ()=>{
+      googleBtn.disabled = true;
+      try{
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: location.origin + '/index.html' }
+        });
+        if(error) throw error;
+        // Browser redirects to Google here; no further code runs on success.
+      }catch(err){
+        console.error('Google sign-in error:', err);
+        showMessage(err?.message || 'Could not start Google sign-in.', 'err');
+        googleBtn.disabled = false;
+      }
+    };
 
     document.getElementById('auth-form').onsubmit = async (e)=>{
       e.preventDefault();
@@ -136,11 +184,8 @@ tailwind.config = {
           if(data.session){
             // Supabase gave us a session immediately — email confirmation is
             // OFF in project settings, so the account is already usable.
-            // Don't show the "check your email" message, just go straight in.
             location.href = 'index.html';
           } else {
-            // No session yet — email confirmation is ON, so this account
-            // really does need the verification link before it can log in.
             showMessage('Check your email and click the verification link.', 'ok');
           }
         } else {
@@ -149,9 +194,9 @@ tailwind.config = {
           location.href = 'index.html';
         }
       } catch(err){
-        console.error('Signup error object:', err);
-        const msg = (err && err.message) ? err.message : JSON.stringify(err);
-        showMessage(msg, 'err');
+        console.error('Auth error object:', err);
+        const message = (err && err.message) ? err.message : JSON.stringify(err);
+        showMessage(message, 'err');
         submitBtn.disabled = false;
         submitBtn.textContent = mode==='signup'?'Create account':'Log in';
       }
