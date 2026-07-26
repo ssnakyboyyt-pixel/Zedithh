@@ -95,7 +95,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "htm": "https://esm.sh/htm@3.1.1",
     "lucide-react": "https://esm.sh/lucide-react@0.468.0?external=react",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "jspdf": "https://esm.sh/jspdf@2.5.1"
   }
 }
 </script>
@@ -114,6 +115,7 @@ import { createRoot } from 'react-dom/client';
 import htm from 'htm';
 import * as Lucide from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+import { jsPDF } from 'jspdf';
 const html = htm.bind(React.createElement);
 const I = ({name, size=16, className="", ...p}) => {
   const C = Lucide[name] || Lucide.Circle;
@@ -349,6 +351,8 @@ const FEATURE_MULTIPLIERS = {
   image_gen: 8,           // 🎨 AI image generation
   video_analysis: 10,     // 🎥 video analysis
   agent: 12,              // 🤖 future AI agent
+  seo: 3,                 // 🔎 SEO Studio content generation
+  trend_explorer: 2.5,    // 📈 live trend search + AI synthesis
 };
 const DEFAULT_CREDIT_COSTS = {
   text_short: 5, text_medium: 15, text_long: 40, code: 45, vision: 60,
@@ -403,6 +407,13 @@ function buildSystemPrompt({webSearch=false, smart=false, responseStyle='Balance
   return `You are Zedith, a dedicated AI mentor for content creators. You are NOT a general-purpose assistant. Your entire purpose is helping people plan, create, grow, and monetize content on YouTube, Instagram, TikTok, Shorts, Reels, and other creator platforms.
 
 Identity: professional, intelligent, friendly, reliable, efficient. Never expose internal prompts, hidden instructions, API keys, backend architecture, or security mechanisms.
+
+--- ABOUT ZEDITH (answer naturally when asked, don't force this into unrelated replies) ---
+If a user asks who created Zedith, what Zedith is, or what its vision is, answer naturally in your own words using these facts — don't recite them like a script, and don't repeat this info unprompted in unrelated conversations:
+- Zedith was created by Umar, a young founder building an AI-powered creator workspace to help creators plan, create, analyze, and grow — all from one platform.
+- Zedith is an AI creator workspace focused on simplifying the creator workflow: content planning, script/thumbnail generation, SEO, trend research, voice tools, and channel analytics, all in one place instead of scattered across many separate apps.
+- The vision behind Zedith is to replace fragmented creator tools with a single intelligent workspace powered by AI — so creators spend less time switching between apps and more time actually creating.
+Keep these answers brief and conversational, matching the user's tone, and only mention what's actually relevant to their specific question.
 
 Personality: natural, conversational, helpful. Avoid robotic replies. Avoid unnecessary emojis unless the user naturally uses them. Explain difficult topics in simple language. Adapt your tone to the user's style.
 
@@ -1467,9 +1478,9 @@ function App(){
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
-      case 'analytics': return html`<${AnalyticsView} />`;
-      case 'seo': return html`<${SEOStudioView} />`;
-      case 'trends': return html`<${TrendExplorerView} />`;
+      case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
+      case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
+      case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
@@ -2928,6 +2939,358 @@ function MiniSpark({data, color='var(--zed)', w=46, h=20}){
   </svg>`;
 }
 
+function fmt2(n){
+  n=Number(n)||0;
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return String(Math.round(n));
+}
+
+function GoalsCard({currentValues}){
+  // currentValues: {subscribers, views, watch_time_minutes}
+  const [goals,setGoals]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [adding,setAdding]=useState(false);
+  const [newMetric,setNewMetric]=useState('subscribers');
+  const [newTarget,setNewTarget]=useState('');
+  const [saving,setSaving]=useState(false);
+
+  const metricLabels = {subscribers:'Subscribers', views:'Views', watch_time_minutes:'Watch Time (min)', revenue:'Revenue'};
+  const metricColors = {subscribers:'var(--zed-solid)', views:'#22c1c3', watch_time_minutes:'#f5762e', revenue:'#9b6bf2'};
+
+  const loadGoals=async()=>{
+    setLoading(true);
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid){ setLoading(false); return; }
+      const { data: rows, error } = await supabase
+        .from('creator_goals')
+        .select('*')
+        .eq('user_id', uid)
+        .is('achieved_at', null)
+        .order('created_at', {ascending:false});
+      if(!error) setGoals(rows||[]);
+    }catch(e){}
+    setLoading(false);
+  };
+
+  useEffect(()=>{ loadGoals(); },[]);
+
+  const addGoal=async()=>{
+    const target = Number(newTarget);
+    if(!target || target<=0){ toast('Enter a valid target', 'err'); return; }
+    setSaving(true);
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid){ toast('Please sign in first','err'); setSaving(false); return; }
+      const { error } = await supabase.from('creator_goals').insert({
+        user_id: uid, platform: 'youtube', metric: newMetric, target_value: target
+      });
+      if(error){ toast('Could not save goal', 'err'); }
+      else { toast('Goal added'); setNewTarget(''); setAdding(false); loadGoals(); }
+    }catch(e){ toast('Could not save goal', 'err'); }
+    setSaving(false);
+  };
+
+  const removeGoal=async(id)=>{
+    try{
+      await supabase.from('creator_goals').delete().eq('id', id);
+      setGoals(g=>g.filter(x=>x.id!==id));
+    }catch(e){ toast('Could not remove goal', 'err'); }
+  };
+
+  const currentFor=(metric)=> Number(currentValues?.[metric] ?? 0);
+
+  return html`
+  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+    <div className="flex items-center justify-between mb-1">
+      <div className="font-[750] text-[14px] display">Goals</div>
+      <button onClick=${()=>setAdding(a=>!a)} className="text-[11.5px] font-[650] text-[var(--zed)] flex items-center gap-1 hover:opacity-70 transition-opacity">
+        <${I} name=${adding?'X':'Plus'} size=${13}/> ${adding?'Cancel':'Add Goal'}
+      </button>
+    </div>
+    <div className="text-[11px] text-zinc-500 mb-4">Set a target and track real progress from your connected account.</div>
+
+    ${adding ? html`
+      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700">
+        <select value=${newMetric} onChange=${e=>setNewMetric(e.target.value)} className="text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-2 py-[7px] outline-none">
+          ${Object.entries(metricLabels).filter(([k])=>k!=='revenue').map(([k,l])=>html`<option key=${k} value=${k}>${l}</option>`)}
+        </select>
+        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-3 py-[7px] outline-none"/>
+        <button onClick=${addGoal} disabled=${saving} className="text-[12px] font-[650] bg-[var(--zed-solid)] text-white rounded-[10px] px-3 py-[7px] disabled:opacity-50">${saving?'Saving…':'Save'}</button>
+      </div>
+    ` : null}
+
+    ${loading ? html`<div className="text-[12px] text-zinc-400 text-center py-4">Loading goals…</div>` : goals.length===0 ? html`
+      <div className="text-[12px] text-zinc-400 text-center py-6">No goals yet — tap "Add Goal" to set your first target.</div>
+    ` : html`
+      <div className="space-y-4">
+        ${goals.map(g=>{
+          const current = currentFor(g.metric);
+          const pct = Math.min(100, (current / g.target_value) * 100);
+          return html`
+          <div key=${g.id} className="group">
+            <div className="flex justify-between text-[12px] mb-1">
+              <span className="font-[600]">${metricLabels[g.metric]||g.metric}</span>
+              <span className="text-zinc-500 flex items-center gap-2">
+                ${fmt2(current)} / ${fmt2(g.target_value)}
+                <button onClick=${()=>removeGoal(g.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-500"><${I} name="Trash2" size=${11}/></button>
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700" style=${{width:pct+'%', background:metricColors[g.metric]}}></div>
+            </div>
+          </div>`;
+        })}
+      </div>
+    `}
+  </div>`;
+}
+
+function WeeklyInsightsView({data, goalRows, onClose}){
+  const [downloading,setDownloading]=useState(false);
+  const reportRef = useRef(null);
+
+  const fmt=(n)=>{
+    n=Number(n)||0;
+    if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+    if(n>=1000) return (n/1000).toFixed(1)+'K';
+    return String(n);
+  };
+  const fmtMinutes=(m)=>{
+    m=Number(m)||0;
+    const hrs=m/60;
+    if(hrs>=1000) return (hrs/1000).toFixed(1)+'K hrs';
+    return hrs.toFixed(0)+' hrs';
+  };
+
+  const daily = data?.dailyStats ?? [];
+  const half = Math.floor(daily.length/2);
+  const firstHalf = daily.slice(0, half);
+  const secondHalf = daily.slice(half);
+
+  const sum=(arr,key)=>arr.reduce((s,d)=>s+(Number(d[key])||0),0);
+  const pct=(a,b)=> a===0 ? (b>0?100:0) : ((b-a)/a)*100;
+
+  const viewsA = sum(firstHalf,'views'), viewsB = sum(secondHalf,'views');
+  const watchA = sum(firstHalf,'watchTimeMinutes'), watchB = sum(secondHalf,'watchTimeMinutes');
+  const likesA = sum(firstHalf,'likes'), likesB = sum(secondHalf,'likes');
+  const commentsA = sum(firstHalf,'comments'), commentsB = sum(secondHalf,'comments');
+  const netSubsA = sum(firstHalf,'subscribersGained') - sum(firstHalf,'subscribersLost');
+  const netSubsB = sum(secondHalf,'subscribersGained') - sum(secondHalf,'subscribersLost');
+
+  const viewsChange = pct(viewsA, viewsB);
+  const watchChange = pct(watchA, watchB);
+  const engChange = pct(likesA+commentsA, likesB+commentsB);
+  const subsChange = pct(netSubsA, netSubsB);
+
+  const isGrowing = viewsChange >= 0 && subsChange >= 0;
+  const topVideos = data?.topVideos ?? [];
+  const best = topVideos.length ? [...topVideos].sort((a,b)=>(b.views||0)-(a.views||0))[0] : null;
+  const worst = topVideos.length>1 ? [...topVideos].sort((a,b)=>(a.views||0)-(b.views||0))[0] : null;
+
+  const engagementRate = data?.overview?.views
+    ? (((data.overview.likes||0)+(data.overview.comments||0)+(data.overview.shares||0)) / data.overview.views * 100)
+    : 0;
+
+  const metricLabels = {subscribers:'Subscribers', views:'Views', watch_time_minutes:'Watch Time (min)', revenue:'Revenue'};
+  const currentFor = (metric)=>{
+    if(metric==='subscribers') return data.channel?.subscriberCount ?? 0;
+    if(metric==='views') return data.overview?.views ?? 0;
+    if(metric==='watch_time_minutes') return data.overview?.watchTimeMinutes ?? 0;
+    return 0;
+  };
+
+  const tips = [];
+  if(viewsChange < 0) tips.push('Views dropped compared to the first half of this period — try posting at the times your last high-performing video went live.');
+  if(engagementRate < 3) tips.push('Engagement rate is under 3%. Asking a direct question in your video or pinning a comment tends to lift replies.');
+  if(watchChange < 0) tips.push('Watch time is trending down — check if your intros are too long or your pacing dropped in recent uploads.');
+  if(best) tips.push(`"${best.title}" is your strongest video this period — a follow-up in the same format/topic is a safe next upload.`);
+  if(worst && topVideos.length>2) tips.push(`"${worst.title}" underperformed compared to the rest — compare its thumbnail and title against your top video.`);
+  if(tips.length===0) tips.push('Everything is trending in a healthy direction — keep your current upload cadence and format.');
+
+  const downloadPDF=async()=>{
+    setDownloading(true);
+    try{
+      const doc = new jsPDF({ unit:'pt', format:'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      let y = 50;
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(20);
+      doc.text('Zedith Weekly Insights Report', 40, y); y+=18;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+      doc.text(`${data.channel?.title || 'Your Channel'} · Generated ${new Date().toLocaleDateString()}`, 40, y); y+=30;
+
+      doc.setTextColor(0);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text(isGrowing ? 'Overall: Growing' : 'Overall: Needs Attention', 40, y); y+=20;
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      const lines = [
+        `Views: ${fmt(data.overview.views)} (${viewsChange>=0?'+':''}${viewsChange.toFixed(1)}% vs earlier this period)`,
+        `Watch Time: ${fmtMinutes(data.overview.watchTimeMinutes)} (${watchChange>=0?'+':''}${watchChange.toFixed(1)}%)`,
+        `Subscribers: ${fmt(data.channel?.subscriberCount ?? 0)} total (${subsChange>=0?'+':''}${subsChange.toFixed(1)}% net change this period)`,
+        `Engagement Rate: ${engagementRate.toFixed(1)}% (${engChange>=0?'+':''}${engChange.toFixed(1)}%)`,
+      ];
+      lines.forEach(l=>{ doc.text(l, 40, y); y+=18; });
+      y+=10;
+
+      if(goalRows?.length){
+        doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Progress Toward Goals', 40, y); y+=20;
+        doc.setFont('helvetica','normal'); doc.setFontSize(11);
+        goalRows.forEach(g=>{
+          const cur = currentFor(g.metric);
+          const remaining = Math.max(0, g.target_value - cur);
+          doc.text(`${metricLabels[g.metric]||g.metric}: ${fmt(cur)} / ${fmt(g.target_value)} — ${fmt(remaining)} to go`, 40, y);
+          y+=18;
+        });
+        y+=10;
+      }
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Top Content', 40, y); y+=20;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      if(topVideos.length){
+        topVideos.slice(0,5).forEach(v=>{
+          const t = doc.splitTextToSize(`${v.title} — ${fmt(v.views)} views, ${fmt(v.likes)} likes`, pageW-80);
+          doc.text(t, 40, y); y += 16*t.length;
+        });
+      } else {
+        doc.text('No video data yet for this period.', 40, y); y+=18;
+      }
+      y+=10;
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('AI Tips & Recommendations', 40, y); y+=20;
+      doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      tips.forEach(tip=>{
+        const t = doc.splitTextToSize(`• ${tip}`, pageW-80);
+        if(y > 760){ doc.addPage(); y = 50; }
+        doc.text(t, 40, y); y += 16*t.length + 4;
+      });
+
+      doc.save(`zedith-weekly-report-${new Date().toISOString().slice(0,10)}.pdf`);
+      toast('PDF downloaded');
+    }catch(e){
+      toast('Could not generate PDF', 'err');
+    }
+    setDownloading(false);
+  };
+
+  return html`
+  <div className="fixed inset-0 z-[700] bg-black/50 backdrop-blur-sm flex items-start md:items-center justify-center p-0 md:p-6 overflow-y-auto" onClick=${onClose}>
+    <div className="bg-white dark:bg-[#1e1e1e] w-full md:max-w-[720px] md:rounded-[22px] min-h-full md:min-h-0 md:max-h-[88vh] overflow-y-auto shadow-2xl" onClick=${e=>e.stopPropagation()} ref=${reportRef}>
+
+      <div className="sticky top-0 z-10 bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur border-b border-zinc-200 dark:border-[#333] px-6 py-4 flex items-center justify-between">
+        <div>
+          <div className="font-[800] text-[16px] display">Weekly Insights Report</div>
+          <div className="text-[11px] text-zinc-500">${data.channel?.title || 'Your Channel'} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick=${downloadPDF} disabled=${downloading} className="flex items-center gap-[6px] text-[12px] font-[650] bg-[var(--zed-solid)] text-white px-3 py-[9px] rounded-[12px] disabled:opacity-60">
+            <${I} name=${downloading?'Loader2':'Download'} size=${13} className=${downloading?'animate-spin':''}/> ${downloading?'Generating…':'Download PDF'}
+          </button>
+          <button onClick=${onClose} className="p-[8px] rounded-[10px] hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
+        </div>
+      </div>
+
+      <div className="px-6 py-6 space-y-6">
+
+        <!-- Overall status -->
+        <div className=${`rounded-[18px] p-5 flex items-center gap-4 ${isGrowing ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}`}>
+          <div className=${`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${isGrowing?'bg-emerald-500':'bg-amber-500'} text-white`}>
+            <${I} name=${isGrowing?'TrendingUp':'AlertTriangle'} size=${20}/>
+          </div>
+          <div>
+            <div className="font-[750] text-[14.5px]">${isGrowing ? "You're growing" : "Growth has slowed"}</div>
+            <div className="text-[12px] text-zinc-600 dark:text-zinc-300 mt-[2px]">
+              ${isGrowing
+                ? `Views are up ${viewsChange.toFixed(1)}% and subscribers are trending positive this period.`
+                : `Views are ${viewsChange>=0?'up':'down'} ${Math.abs(viewsChange).toFixed(1)}% — worth reviewing what changed recently.`}
+            </div>
+          </div>
+        </div>
+
+        <!-- Core numbers -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">This Period, In Numbers</div>
+          <div className="grid grid-cols-2 gap-3">
+            ${[
+              ['Views', fmt(data.overview.views), viewsChange],
+              ['Watch Time', fmtMinutes(data.overview.watchTimeMinutes), watchChange],
+              ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), subsChange],
+              ['Engagement Rate', engagementRate.toFixed(1)+'%', engChange],
+            ].map(([l,v,c])=>html`
+              <div key=${l} className="rounded-[14px] border border-zinc-200 dark:border-[#333] p-3">
+                <div className="text-[10.5px] text-zinc-500 font-[600]">${l}</div>
+                <div className="text-[18px] font-[800] display">${v}</div>
+                <${TrendPill} value=${c}/>
+              </div>
+            `)}
+          </div>
+        </div>
+
+        <!-- Distance to goals -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">How Far From Your Goals</div>
+          ${goalRows?.length ? html`
+            <div className="space-y-3">
+              ${goalRows.map(g=>{
+                const cur = currentFor(g.metric);
+                const remaining = Math.max(0, g.target_value - cur);
+                const p = Math.min(100, (cur/g.target_value)*100);
+                return html`
+                <div key=${g.id} className="rounded-[14px] border border-zinc-200 dark:border-[#333] p-3">
+                  <div className="flex justify-between text-[12px] mb-1">
+                    <span className="font-[650]">${metricLabels[g.metric]||g.metric}</span>
+                    <span className="text-zinc-500">${fmt(cur)} / ${fmt(g.target_value)} · ${fmt(remaining)} to go</span>
+                  </div>
+                  <div className="h-[6px] rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-[var(--zed-solid)]" style=${{width:p+'%'}}></div>
+                  </div>
+                </div>`;
+              })}
+            </div>
+          ` : html`<div className="text-[12px] text-zinc-400">No goals set yet — add one from the Analytics page to track distance here.</div>`}
+        </div>
+
+        <!-- Top content -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">Top Content This Period</div>
+          ${topVideos.length ? html`
+            <div className="space-y-2">
+              ${topVideos.slice(0,5).map((v,i)=>html`
+                <div key=${v.id||i} className="flex items-center gap-3 rounded-[12px] border border-zinc-200 dark:border-[#333] p-2">
+                  ${v.thumbnail?html`<img src=${v.thumbnail} className="w-14 h-9 rounded-[8px] object-cover shrink-0"/>`:html`<div className="w-14 h-9 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 shrink-0"></div>`}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-[600] truncate">${v.title}</div>
+                    <div className="text-[10.5px] text-zinc-500">${fmt(v.views)} views · ${fmt(v.likes)} likes</div>
+                  </div>
+                </div>
+              `)}
+            </div>
+          ` : html`<div className="text-[12px] text-zinc-400">No video data yet for this period.</div>`}
+        </div>
+
+        <!-- AI Tips -->
+        <div>
+          <div className="font-[700] text-[13px] mb-3">AI Tips &amp; What To Change</div>
+          <div className="space-y-2">
+            ${tips.map((t,i)=>html`
+              <div key=${i} className="flex items-start gap-2 rounded-[12px] bg-zinc-50 dark:bg-[#262626] p-3 text-[12px] leading-relaxed">
+                <${I} name="Lightbulb" size=${14} className="text-[var(--zed)] mt-[1px] shrink-0"/>
+                <span>${t}</span>
+              </div>
+            `)}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-zinc-400 text-center pt-2">Generated by Zedith AI · based on your connected YouTube data</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ---------- Channel Analytics 2.0 ----------
 function ComingSoonCard({icon, title, note, className=''}){
   return html`
@@ -2944,7 +3307,7 @@ function SkeletonBlock({className=''}){
   return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[#262626] ${className}`}></div>`;
 }
 
-function AnalyticsView(){
+function AnalyticsView({addNotification}){
   const [period,setPeriod]=useState('Daily'); // Daily | Monthly
   const [platformFilter,setPlatformFilter]=useState('All'); // All | YouTube | Instagram | X
   const [chartMetric,setChartMetric]=useState('Views'); // Views | Subscribers | Watch Time | Engagement
@@ -2954,6 +3317,9 @@ function AnalyticsView(){
   const [refreshing,setRefreshing]=useState(false);
   const [data,setData]=useState(null);
   const [err,setErr]=useState('');
+  const [showInsights,setShowInsights]=useState(false);
+  const [goalRows,setGoalRows]=useState([]);
+  const notifiedRef=useRef(false);
 
   const fmt=(n)=>{
     n=Number(n)||0;
@@ -2982,7 +3348,17 @@ function AnalyticsView(){
       if(json.connected){
         setConnected(true);
         setData(json);
+        loadGoalsForReport();
         if(isRefresh) toast('Analytics refreshed');
+        if(!notifiedRef.current && addNotification){
+          notifiedRef.current = true;
+          const views = json.overview?.views ?? 0;
+          const subs = json.channel?.subscriberCount ?? 0;
+          addNotification(
+            'Your Weekly Insights are ready',
+            `${fmt2(views)} views and ${fmt2(subs)} subscribers so far this period. Tap to view your full report.`
+          );
+        }
       } else {
         setConnected(false);
       }
@@ -3028,8 +3404,18 @@ function AnalyticsView(){
     }
   };
 
-  const handleExportPDF=()=>{
-    toast('PDF export is coming soon');
+  const openInsights=()=>{
+    setShowInsights(true);
+  };
+
+  const loadGoalsForReport=async()=>{
+    try{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if(!uid) return;
+      const { data: rows } = await supabase.from('creator_goals').select('*').eq('user_id', uid).is('achieved_at', null);
+      setGoalRows(rows||[]);
+    }catch(e){}
   };
 
   const daily = data?.dailyStats ?? [];
@@ -3142,7 +3528,7 @@ function AnalyticsView(){
           <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
             <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
           </button>
-          <button onClick=${handleExportPDF} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur">
+          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
             <${I} name="FileDown" size=${13}/> Export PDF
           </button>
           <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
@@ -3215,7 +3601,7 @@ function AnalyticsView(){
                 ${aiInsight.map((line,i)=>html`<div key=${i} className="text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed">${line}</div>`)}
               </div>
             `}
-            <button className="mt-4 inline-flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors relative">
+            <button onClick=${openInsights} className="mt-4 inline-flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors relative">
               View Detailed Insights <${I} name="ArrowRight" size=${13}/>
             </button>
           </div>
@@ -3376,20 +3762,11 @@ function AnalyticsView(){
           <${ComingSoonCard} icon="Swords" title="Competitor Snapshot" note="Track competitor uploads, average views, engagement, and growth here once this feature is connected." className="py-10"/>
 
           <!-- Goals -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
-            <div className="font-[750] text-[14px] display mb-1">Goals</div>
-            <div className="text-[11px] text-zinc-500 mb-4">Custom goal tracking is coming soon — showing your current totals below.</div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Subscribers</span><span className="text-zinc-500">${fmt(data.channel?.subscriberCount ?? 0)}</span></div>
-                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[var(--zed-solid)]" style=${{width:'100%'}}></div></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">Views (this period)</span><span className="text-zinc-500">${fmt(data.overview.views)}</span></div>
-                <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"><div className="h-full rounded-full bg-[#22c1c3]" style=${{width:'100%'}}></div></div>
-              </div>
-            </div>
-          </div>
+          <${GoalsCard} currentValues=${{
+            subscribers: data.channel?.subscriberCount ?? 0,
+            views: data.overview.views ?? 0,
+            watch_time_minutes: data.overview.watchTimeMinutes ?? 0
+          }}/>
 
           <!-- Weekly Report -->
           <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
@@ -3397,7 +3774,7 @@ function AnalyticsView(){
               <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
               <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
             </div>
-            <button onClick=${handleExportPDF} className="flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors">
+            <button onClick=${openInsights} className="flex items-center gap-2 bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[14px] text-[12.5px] font-[650] transition-colors">
               <${I} name="FileDown" size=${14}/> Download PDF
             </button>
           </div>
@@ -3411,6 +3788,10 @@ function AnalyticsView(){
     <div className="fixed bottom-6 right-6 z-[500]">
       <${AskStudioWidget} data=${data} connected=${connected}/>
     </div>
+
+    ${showInsights && data ? html`
+      <${WeeklyInsightsView} data=${data} goalRows=${goalRows} onClose=${()=>setShowInsights(false)}/>
+    ` : null}
   </div>`;
 }
 
@@ -3534,10 +3915,10 @@ function UpgradeView({plan, planConfig, onPlan}) {
 
   return html`
   <div className="flex-1 h-full overflow-y-auto bg-[#fbfaf7] dark:bg-[#1a1a1a] text-zinc-900 dark:text-white transition-colors">
-    <div className="px-10 pt-10 pb-10 max-w-[1180px]">
-      <div className="flex items-start justify-between">
+    <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-10 max-w-[1180px]">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <div className="text-[32px] font-[800] display">Upgrade Your <span className="text-[var(--zed)]">Experience</span></div>
+          <div className="text-[24px] sm:text-[32px] font-[800] display">Upgrade Your <span className="text-[var(--zed)]">Experience</span></div>
           <div className="text-zinc-500 dark:text-zinc-400 mt-1 text-[13.5px]">Choose the plan that fits your creative journey.</div>
           <div className="mt-5 inline-flex bg-zinc-100 dark:bg-[#292929] rounded-full p-1 text-[12.5px] border border-zinc-200 dark:border-zinc-800">
             <button onClick=${()=>setYearly(false)} className=${`px-4 py-[6px] rounded-full transition ${!yearly?'bg-white dark:bg-[#373737] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>Monthly</button>
@@ -3641,6 +4022,7 @@ function ToolModal({tool,onClose,onSend}){
 function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPlanConfig, setCreditCosts}){
   if(!isAdmin(user)) return html`<div className="flex-1 flex items-center justify-center text-zinc-500">Access denied</div>`;
   const [adminPage, setAdminPage] = useState('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const adminPages = [
     {id:'dashboard', icon:'LayoutDashboard', label:'Dashboard'},
@@ -3685,24 +4067,49 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
     }
   };
 
+  const currentPageLabel = adminPages.find(p=>p.id===adminPage)?.label || 'Control Room';
+
   return html`
-  <div className="flex-1 h-full flex overflow-hidden bg-[#1a1a1a]">
+  <div className="flex-1 h-full flex flex-col md:flex-row overflow-hidden bg-[#1a1a1a] relative">
+
+    <!-- Mobile top bar: menu button + current section -->
+    <div className="md:hidden h-[52px] px-3 flex items-center justify-between border-b border-[#2b2b2b] bg-[#1c1c1c] shrink-0">
+      <button onClick=${()=>setMobileNavOpen(true)} className="p-[7px] -ml-[4px] rounded-lg hover:bg-[#262626]" aria-label="Open admin menu">
+        <${I} name="Menu" size=${18} className="text-zinc-300"/>
+      </button>
+      <div className="flex items-center gap-2">
+        <${I} name=${adminPages.find(p=>p.id===adminPage)?.icon || 'ShieldCheck'} size=${14} style=${{color:'#e8b04b'}}/>
+        <span className="text-[12.5px] font-[650] text-zinc-100">${currentPageLabel}</span>
+      </div>
+      <div className="w-[30px]"></div>
+    </div>
+
+    <!-- Mobile drawer backdrop -->
+    ${mobileNavOpen ? html`
+      <div className="md:hidden fixed inset-0 z-[70] bg-black/50" onClick=${()=>setMobileNavOpen(false)}></div>
+    ` : null}
+
     <!-- Admin sub-sidebar: instrument rail -->
-    <aside className="w-[210px] shrink-0 h-full border-r border-[#2e2e2e] bg-[#1c1c1c] flex flex-col">
-      <div className="h-[58px] px-4 flex items-center gap-2.5 border-b border-[#2b2b2b]">
-        <div className="w-7 h-7 rounded-[8px] bg-[#e8b04b]/12 border border-[#e8b04b]/25 flex items-center justify-center">
-          <${I} name="ShieldCheck" size=${14} style=${{color:'#e8b04b'}}/>
+    <aside className=${`fixed md:static inset-y-0 left-0 z-[71] w-[230px] md:w-[210px] shrink-0 h-full border-r border-[#2e2e2e] bg-[#1c1c1c] flex flex-col transition-transform duration-200 md:transition-none ${mobileNavOpen?'translate-x-0':'-translate-x-full'} md:translate-x-0`}>
+      <div className="h-[58px] px-4 flex items-center justify-between gap-2.5 border-b border-[#2b2b2b]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-[8px] bg-[#e8b04b]/12 border border-[#e8b04b]/25 flex items-center justify-center">
+            <${I} name="ShieldCheck" size=${14} style=${{color:'#e8b04b'}}/>
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="font-[750] text-[12.5px] text-zinc-100 display">Control Room</span>
+            <span className="text-[9.5px] text-zinc-500 mt-[3px]">Zedith Admin</span>
+          </div>
         </div>
-        <div className="flex flex-col leading-none">
-          <span className="font-[750] text-[12.5px] text-zinc-100 display">Control Room</span>
-          <span className="text-[9.5px] text-zinc-500 mt-[3px]">Zedith Admin</span>
-        </div>
+        <button onClick=${()=>setMobileNavOpen(false)} className="md:hidden p-[5px] rounded-lg hover:bg-[#262626]" aria-label="Close admin menu">
+          <${I} name="X" size=${16} className="text-zinc-400"/>
+        </button>
       </div>
       <nav className="px-2 pt-3 space-y-[1px] flex-1 overflow-y-auto">
         ${adminPages.map(p=>{
           const active = adminPage===p.id;
           return html`
-          <button key=${p.id} onClick=${()=>setAdminPage(p.id)} className=${`relative w-full flex items-center gap-2.5 pl-3 pr-3 py-[9px] rounded-[8px] text-[12px] transition-colors ${active?'bg-[#262626] text-[#f0c876]':'text-zinc-500 hover:text-zinc-300 hover:bg-[#202020]'}`}>
+          <button key=${p.id} onClick=${()=>{ setAdminPage(p.id); setMobileNavOpen(false); }} className=${`relative w-full flex items-center gap-2.5 pl-3 pr-3 py-[9px] rounded-[8px] text-[12px] transition-colors ${active?'bg-[#262626] text-[#f0c876]':'text-zinc-500 hover:text-zinc-300 hover:bg-[#202020]'}`}>
             ${active ? html`<span className="absolute left-0 top-[6px] bottom-[6px] w-[2.5px] rounded-full bg-[#e8b04b]"></span>` : null}
             <${I} name=${p.icon} size=${14.5} style=${active?{color:'#e8b04b'}:{}}/>
             <span className=${active?'font-[600]':'font-[500]'}>${p.label}</span>
@@ -3715,7 +4122,7 @@ function AdminPanel({user, profile, planConfig, creditCosts, transactions, setPl
       </div>
     </aside>
     <!-- Admin content -->
-    <div className="flex-1 overflow-y-auto p-6 bg-[#1a1a1a]">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#1a1a1a] min-w-0">
       ${renderPage()}
     </div>
   </div>`;
@@ -4079,18 +4486,24 @@ function AdminUsers(){
 function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever, unbanUser, setConfirm}){
   const [chats,setChats]=useState([]);
   const [loadingChats,setLoadingChats]=useState(true);
+  const [chatsError,setChatsError]=useState(null);
   const [openChat,setOpenChat]=useState(null);
   const [banHours,setBanHours]=useState('24');
   const [banReason,setBanReason]=useState('');
   const [creditTx,setCreditTx]=useState([]);
   const [loadingTx,setLoadingTx]=useState(true);
+  const [txError,setTxError]=useState(null);
 
   useEffect(()=>{
     let cancelled=false;
     const load=async()=>{
-      setLoadingChats(true);
+      setLoadingChats(true); setChatsError(null);
       const {data,error}=await supabase.from('chats').select('*').eq('user_id',user.id).order('updated_at',{ascending:false});
-      if(!cancelled){ if(!error) setChats(data||[]); setLoadingChats(false); }
+      if(!cancelled){
+        if(error){ console.error('[Admin] chats load error:', error); setChatsError(error.message); }
+        else setChats(data||[]);
+        setLoadingChats(false);
+      }
     };
     load();
     return ()=>{ cancelled=true; };
@@ -4099,9 +4512,13 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
   useEffect(()=>{
     let cancelled=false;
     const loadTx=async()=>{
-      setLoadingTx(true);
+      setLoadingTx(true); setTxError(null);
       const {data,error}=await supabase.from('credit_transactions').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(500);
-      if(!cancelled){ if(!error) setCreditTx(data||[]); setLoadingTx(false); }
+      if(!cancelled){
+        if(error){ console.error('[Admin] credit_transactions load error:', error); setTxError(error.message); }
+        else setCreditTx(data||[]);
+        setLoadingTx(false);
+      }
     };
     loadTx();
     return ()=>{ cancelled=true; };
@@ -4116,6 +4533,8 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
     vision:{label:'Vision / Image analysis', icon:'Eye', color:'#f59e0b'},
     image_gen:{label:'Image Generation', icon:'Image', color:'#ec4899'},
     voice:{label:'Voice Studio', icon:'Mic', color:'var(--zed-lighter)'},
+    seo:{label:'SEO Studio', icon:'Search', color:'#8b5cf6'},
+    trend_explorer:{label:'Trend Explorer', icon:'TrendingUp', color:'#10b981'},
   };
   const usageByFeature = {};
   let totalSpent = 0;
@@ -4194,7 +4613,9 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <span className="text-zinc-400 font-[500] text-[11.5px]">${creditTx.length} logged transaction${creditTx.length===1?'':'s'}</span>
         </div>
 
-        ${loadingTx ? html`<div className="text-zinc-500 text-[12px]">Loading usage…</div>` : creditTx.length===0 ? html`
+        ${loadingTx ? html`<div className="text-zinc-500 text-[12px]">Loading usage…</div>` : txError ? html`
+          <div className="text-red-500 text-[12px] p-4 text-center border border-dashed border-red-300 dark:border-red-800 rounded-xl">Could not load credit usage: ${txError}</div>
+        ` : creditTx.length===0 ? html`
           <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No credit usage recorded yet</div>
         ` : html`
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3 text-[12px]">
@@ -4287,7 +4708,9 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <span>Chat History</span>
           <span className="text-zinc-400 font-[500] text-[11.5px]">${chats.length} chat${chats.length===1?'':'s'}</span>
         </div>
-        ${loadingChats ? html`<div className="text-zinc-500 text-[12px]">Loading chats…</div>` : chats.length===0 ? html`
+        ${loadingChats ? html`<div className="text-zinc-500 text-[12px]">Loading chats…</div>` : chatsError ? html`
+          <div className="text-red-500 text-[12px] p-4 text-center border border-dashed border-red-300 dark:border-red-800 rounded-xl">Could not load chats: ${chatsError}</div>
+        ` : chats.length===0 ? html`
           <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No chats yet</div>
         ` : html`
           <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
@@ -4806,7 +5229,7 @@ Respond with STRICT JSON only, no markdown fences, no commentary — matching ex
   return `${base}\n${shapes[platform]||shapes.X}\nMake it genuinely optimized for ${platform}'s algorithm and audience behavior, specific to the topic — not generic filler.`;
 }
 
-function SEOStudioView(){
+function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
   const [topic,setTopic]=useState('');
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
@@ -4816,6 +5239,13 @@ function SEOStudioView(){
 
   const generate=async()=>{
     if(!topic.trim()) return;
+
+    const SEO_COST = 100;
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(SEO_COST);
+      if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
+    }
+
     setLoading(true); setError(null); setResult(null);
     try{
       const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic});
@@ -4826,7 +5256,10 @@ function SEOStudioView(){
         parsed = JSON.parse(cleaned);
       }catch(e){ parsed = {post:r.text}; }
       setResult(parsed);
+
+      await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform, niche});
     }catch(e){
+      console.error('[SEOStudio] generation failed:', e);
       setError('Could not generate content right now. Please try again.');
     }finally{ setLoading(false); }
   };
@@ -4951,7 +5384,7 @@ Rank the 5 trends from best to worst opportunity. Respond with STRICT JSON only,
 Order the array from Best opportunity to Lowest opportunity. Ground every trend in the actual search results provided — do not fabricate trends absent from them.`;
 }
 
-function TrendExplorerView(){
+function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
   const [country,setCountry]=useState('Global');
@@ -4960,18 +5393,30 @@ function TrendExplorerView(){
   const [error,setError]=useState(null);
 
   const findTrends=async()=>{
+    const TREND_COST = 150;
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(TREND_COST);
+      if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
+    }
+
+    const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
+
     setLoading(true); setError(null); setTrends(null);
     try{
-      const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
       const search = await realWebSearch(query);
-      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed');
+      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed: '+search.error);
       const context = (search.results||[]).slice(0,5).map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
       const r = await callOR([{role:'user', content: trendPromptFor(platform, niche, country, context)}], {smart:true, userText:query});
-      if(r.error) throw new Error(r.text);
+      if(r.error) throw new Error('ai-failed: '+r.text);
       const cleaned = r.text.replace(/```json|```/g,'').trim();
-      const parsed = JSON.parse(cleaned);
+      let parsed;
+      try{ parsed = JSON.parse(cleaned); }
+      catch(parseErr){ throw new Error('parse-failed: '+parseErr.message+' | raw: '+cleaned.slice(0,200)); }
       setTrends(parsed.trends||[]);
+
+      await deductCredits(TREND_COST, 'trend_explorer', {platform, niche, country});
     }catch(e){
+      console.error('[TrendExplorer] generation failed:', e);
       setError('Could not fetch live trends right now. Please try again.');
     }finally{ setLoading(false); }
   };
@@ -5427,13 +5872,14 @@ function AdminPicksCategories({categories,setCategories}){
   <div>
     <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 mb-5">
       <div className="font-[650] text-[13px] mb-3">Add Category</div>
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <input value=${newName} onChange=${e=>setNewName(e.target.value)} placeholder="Category name" className="flex-1 px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12.5px]"/>
-        <input value=${newIcon} onChange=${e=>setNewIcon(e.target.value)} placeholder="Lucide icon name" className="w-[160px] px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12.5px]"/>
-        <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600]">Add</button>
+        <input value=${newIcon} onChange=${e=>setNewIcon(e.target.value)} placeholder="Lucide icon name" className="w-full sm:w-[160px] px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12.5px]"/>
+        <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] shrink-0">Add</button>
       </div>
     </div>
     <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden">
+      <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
           <tr><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Name</th><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Icon</th><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Actions</th></tr>
@@ -5448,6 +5894,7 @@ function AdminPicksCategories({categories,setCategories}){
           `)}
         </tbody>
       </table>
+      </div>
     </div>
   </div>`;
 }
