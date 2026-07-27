@@ -595,7 +595,7 @@ function looksLikeHardReasoning(text){
   return !isTrivialChat;
 }
 
-async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText='',_isRetry=false}={}){
+async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText='',maxTokens=1300,_isRetry=false}={}){
   const wantsSmart = smart || looksLikeHardReasoning(userText);
   const poolBase = vision
     ? [...FREE_VISION_MODELS, ...NORMAL_TEXT_MODELS]
@@ -606,7 +606,7 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: 1300 })
+      body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: maxTokens })
     });
     const d = await r.json().catch(()=>null);
     if (r.ok && d?.text) return { text: d.text.trim(), model: d.model, tried: d.tried || 1, usedSmart: wantsSmart };
@@ -620,7 +620,7 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
   // multimodal model in the pool) — give it exactly one automatic silent retry
   // before showing the user a "couldn't see your image" message.
   if(vision && !_isRetry){
-    return callOR(messages, {vision, smart, modelPref, hasImage, userText, _isRetry:true});
+    return callOR(messages, {vision, smart, modelPref, hasImage, userText, maxTokens, _isRetry:true});
   }
 
   // Honest fallback: never pretend to have analyzed an image or fabricate unrelated
@@ -2733,7 +2733,9 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
       audio.onended = ()=>setPreviewingVoice(null);
       audio.play();
     }catch(e){
-      toast('Could not preview this voice', 'err');
+      console.error('[VoicePreview] failed for', voiceName, e);
+      const msg = isAdmin(user) ? `Could not preview "${voiceName}": ${e.message}` : `Could not preview "${voiceName}". Try again.`;
+      toast(msg, 'err');
       setPreviewingVoice(null);
     }
   };
@@ -5382,18 +5384,48 @@ const SEO_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','
 const SEO_NICHES = ['Gaming','AI','Technology','Finance','Education','Business','Lifestyle','Music','Sports','Other'];
 
 function seoPromptFor(platform, topic, niche){
-  const base = `You are Zedith's SEO Studio, an expert social growth strategist for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
-Respond with STRICT JSON only, no markdown fences, no commentary — matching exactly this shape for the platform:`;
-  const shapes = {
-    YouTube: `{"title":"...", "description":"...", "hashtags":["#...","..."], "tags":["tag1","tag2","..."]}`,
-    Instagram: `{"caption":"...", "hashtags":["#...","..."]}`,
-    TikTok: `{"caption":"...", "hashtags":["#...","..."]}`,
-    X: `{"post":"..."}`,
-    Threads: `{"thread":["post 1 text","post 2 text","post 3 text"]}`,
-    LinkedIn: `{"post":"..."}`,
-    Bluesky: `{"post":"..."}`,
+  const base = `You are Zedith's SEO Studio, an expert social growth strategist and copywriter for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
+
+CRITICAL: Respond with STRICT JSON only. No markdown code fences, no commentary before or after, no extra keys beyond what's specified below. The JSON value for the main text field must be a single clean string — never nested JSON, never additional metadata fields like "image", "cta_link", "engagement_rate", "timestamp", or similar. Only return the exact keys listed.`;
+
+  const specs = {
+    YouTube: {
+      shape: `{"title":"...", "description":"...", "hashtags":["#...","..."], "tags":["tag1","tag2","..."]}`,
+      depth: `- title: 60-70 characters, curiosity-driven, includes the main keyword naturally, no clickbait that misleads.
+- description: 200-350 words, fully SEO-optimized for YouTube search — open with a strong 2-3 sentence hook that also works as the preview text, naturally include the primary keyword and 3-5 related keywords/phrases throughout, add a short paragraph on what the viewer will learn/gain, include a soft call-to-action to subscribe/comment, and end with a line of relevant keywords for search. Write in complete paragraphs, not bullet fragments.
+- hashtags: 8-12 relevant hashtags mixing broad and niche-specific.
+- tags: 15-20 real YouTube search tags (keywords/phrases viewers would actually search, not hashtags).`,
+    },
+    Instagram: {
+      shape: `{"caption":"...", "hashtags":["#...","..."]}`,
+      depth: `- caption: 150-250 words. Strong scroll-stopping first line (this is what shows before "more"), then genuinely valuable content in the body — a story, a tip breakdown, or a mini-lesson tied to the topic — written in short punchy lines with line breaks for readability, ending with a clear engagement question or call-to-action.
+- hashtags: 15-20 hashtags mixing high-volume, medium, and niche-specific tags for real discoverability.`,
+    },
+    TikTok: {
+      shape: `{"caption":"...", "hashtags":["#...","..."]}`,
+      depth: `- caption: 80-150 words. Punchy hook in the first line, then a tight value-packed caption that complements a short-form video, ending with a call-to-action (follow/comment/save).
+- hashtags: 8-12 hashtags mixing trending and niche-specific tags.`,
+    },
+    X: {
+      shape: `{"post":"..."}`,
+      depth: `- post: a genuinely well-crafted X/Twitter post, 200-280 characters, that hooks in the first line, delivers a specific insight or angle on the topic (not generic filler), and ends with either a question or a clear next step. No hashtag spam — at most 1-2 relevant hashtags woven in naturally, if any.`,
+    },
+    Threads: {
+      shape: `{"thread":["post 1 text","post 2 text","post 3 text","post 4 text","post 5 text"]}`,
+      depth: `- thread: a 5-7 post thread. Post 1 is a strong hook establishing the topic and promising value. Posts 2-5 each deliver one specific, concrete point, tip, or insight (not vague generalities) — genuinely useful standalone content, each under 500 characters. Final post is a clear call-to-action (follow, reply, share). Write like a real creator explaining something they know well, not like ad copy.`,
+    },
+    LinkedIn: {
+      shape: `{"post":"..."}`,
+      depth: `- post: 250-400 words, professional but genuinely engaging (not corporate-stiff). Open with a strong hook line (this determines if people click "see more"), develop a real insight or story about the topic with specific, concrete detail, use short paragraphs and line breaks for readability, and end with a discussion-provoking question. Include 3-5 relevant hashtags at the very end.`,
+    },
+    Bluesky: {
+      shape: `{"post":"..."}`,
+      depth: `- post: 200-300 characters, conversational and specific (Bluesky's culture rewards genuine voice over polished marketing tone), delivers one clear insight about the topic, no hashtag spam.`,
+    },
   };
-  return `${base}\n${shapes[platform]||shapes.X}\nMake it genuinely optimized for ${platform}'s algorithm and audience behavior, specific to the topic — not generic filler.`;
+
+  const spec = specs[platform] || specs.X;
+  return `${base}\n\nRequired JSON shape:\n${spec.shape}\n\nContent requirements:\n${spec.depth}\n\nMake it genuinely specific to the topic "${topic}" and the "${niche}" niche — real, usable content a creator could post immediately, not generic template filler.`;
 }
 
 function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
@@ -5415,13 +5447,39 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
 
     setLoading(true); setError(null); setResult(null);
     try{
-      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic});
+      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic, maxTokens:2200});
       if(r.error) throw new Error(r.text);
+      const cleaned = r.text.replace(/```json|```/g,'').trim();
       let parsed=null;
-      try{
-        const cleaned = r.text.replace(/```json|```/g,'').trim();
-        parsed = JSON.parse(cleaned);
-      }catch(e){ parsed = {post:r.text}; }
+      try{ parsed = JSON.parse(cleaned); }catch(e){ parsed = null; }
+
+      // The free model pool sometimes ignores the requested JSON shape and
+      // either returns extra unrequested fields or wraps everything as one
+      // long string. Validate the shape we actually need is present and
+      // usable before trusting it — otherwise fall back to a clean-text
+      // extraction so the raw/bloated JSON never leaks into the UI.
+      const shapeOk = (()=>{
+        if(!parsed || typeof parsed!=='object') return false;
+        if(platform==='YouTube') return typeof parsed.title==='string' && typeof parsed.description==='string';
+        if(platform==='Instagram' || platform==='TikTok') return typeof parsed.caption==='string';
+        if(platform==='Threads') return Array.isArray(parsed.thread) && parsed.thread.length>0;
+        return typeof parsed.post==='string' && parsed.post.length>0;
+      })();
+
+      if(!shapeOk){
+        // Strip any stray JSON punctuation/keys and keep just readable text
+        // as a safe fallback, instead of showing the malformed object.
+        const fallbackText = cleaned
+          .replace(/^\{|\}$/g,'')
+          .replace(/"[a-z_]+"\s*:\s*/gi,'')
+          .replace(/[",{}[\]]/g,'')
+          .replace(/\\n/g,'\n')
+          .trim();
+        if(platform==='YouTube') parsed = {title:topic, description:fallbackText, hashtags:[], tags:[]};
+        else if(platform==='Instagram' || platform==='TikTok') parsed = {caption:fallbackText, hashtags:[]};
+        else if(platform==='Threads') parsed = {thread:[fallbackText]};
+        else parsed = {post:fallbackText};
+      }
       setResult(parsed);
 
       await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform, niche});
