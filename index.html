@@ -364,6 +364,21 @@ const LOW_CREDIT_WARNING_RATIO = 0.10; // warn under 10% of the plan's monthly a
 // Heuristically detect which feature multiplier applies to a message, since the
 // user doesn't explicitly tag "this is an analytics question" — we infer it from
 // content so YouTube/channel analytics questions get charged at the right tier.
+function detectImageGenIntent(text=''){
+  const t = (text||'').trim();
+  if(!t) return null;
+  // Matches: "make an image of X", "generate a picture of X", "draw X",
+  // "create a thumbnail of X", "image of X", etc. Extracts X as the prompt.
+  const re = /^(?:please\s+)?(?:can you\s+)?(?:make|generate|create|draw|design)\s+(?:me\s+)?(?:an?\s+)?(image|picture|photo|illustration|drawing|thumbnail|artwork|art|logo|icon|graphic)\s+(?:of|showing|depicting|for|about)\s+(.+)/i;
+  const m = t.match(re);
+  if(m && m[2]) return m[2].trim().replace(/[.!?]+$/,'');
+  // Also matches a shorter form: "image of X" / "picture of X" with no leading verb.
+  const re2 = /^(image|picture|photo|illustration|drawing|thumbnail|artwork)\s+of\s+(.+)/i;
+  const m2 = t.match(re2);
+  if(m2 && m2[2]) return m2[2].trim().replace(/[.!?]+$/,'');
+  return null;
+}
+
 function detectCreditFeature({text='', attachment=null, webSearch=false}={}){
   const t = text.toLowerCase();
   if(attachment?.type==='image') return 'image_analysis';
@@ -705,18 +720,26 @@ async function composeThumbnail(bgPrompt, titleText){
 
   return canvas.toDataURL('image/png');
 }
-async function ttsFetch(text, voiceName='Brian'){
-  // StreamElements' TTS endpoint proxies Amazon Polly voices. These four are
-  // confirmed distinct Polly voices (2 male, 2 female) — using the exact
-  // Polly voice IDs here (not close-sounding aliases) so each preset card
-  // actually sounds different, not just named differently.
-  const map={Brian:'Brian', Joey:'Joey', Amy:'Amy', Emma:'Emma'};
-  const v=map[voiceName]||'Brian';
-  const url=`https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(v)}&text=${encodeURIComponent(text.slice(0,900))}`;
-  const res=await fetch(url); if(!res.ok) throw new Error('tts '+res.status);
-  const blob=await res.blob();
-  if(blob.size < 200) throw new Error('tts returned empty audio'); // StreamElements sometimes 200s with a near-empty file on bad voice names
-  return URL.createObjectURL(blob);
+const GEMINI_VOICES = [
+  'Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe',
+  'Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome',
+  'Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux',
+  'Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia',
+  'Sadaltager','Sulafat',
+];
+
+async function ttsFetch(text, voiceName='Kore'){
+  const v = GEMINI_VOICES.includes(voiceName) ? voiceName : 'Kore';
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  const res = await fetch('/api/tts', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
+    body: JSON.stringify({ text: text.slice(0,2000), voice: v })
+  });
+  const json = await res.json();
+  if(!res.ok || !json.audioUrl) throw new Error(json.error || 'tts failed');
+  return json.audioUrl;
 }
 
 
@@ -900,10 +923,36 @@ function App(){
   const [plannerItems,setPlannerItems]=useState([]);
   const [voiceHistory,setVoiceHistory]=useState([]);
   const [myVoices,setMyVoices]=useState([
-    {id:'v1', name:'Brian', gender:'Male', accent:'US', cloned:false},
-    {id:'v2', name:'Amy', gender:'Female', accent:'US', cloned:false},
-    {id:'v3', name:'Emma', gender:'Female', accent:'US', cloned:false},
-    {id:'v4', name:'Joey', gender:'Male', accent:'US', cloned:false},
+    {id:'v1', name:'Zephyr', gender:'Female', accent:'Bright', cloned:false},
+    {id:'v2', name:'Puck', gender:'Male', accent:'Upbeat', cloned:false},
+    {id:'v3', name:'Charon', gender:'Male', accent:'Informative', cloned:false},
+    {id:'v4', name:'Kore', gender:'Female', accent:'Firm', cloned:false},
+    {id:'v5', name:'Fenrir', gender:'Male', accent:'Excitable', cloned:false},
+    {id:'v6', name:'Leda', gender:'Female', accent:'Youthful', cloned:false},
+    {id:'v7', name:'Orus', gender:'Male', accent:'Firm', cloned:false},
+    {id:'v8', name:'Aoede', gender:'Female', accent:'Breezy', cloned:false},
+    {id:'v9', name:'Callirrhoe', gender:'Female', accent:'Easy-going', cloned:false},
+    {id:'v10', name:'Autonoe', gender:'Female', accent:'Bright', cloned:false},
+    {id:'v11', name:'Enceladus', gender:'Male', accent:'Breathy', cloned:false},
+    {id:'v12', name:'Iapetus', gender:'Male', accent:'Clear', cloned:false},
+    {id:'v13', name:'Umbriel', gender:'Male', accent:'Easy-going', cloned:false},
+    {id:'v14', name:'Algieba', gender:'Male', accent:'Smooth', cloned:false},
+    {id:'v15', name:'Despina', gender:'Female', accent:'Smooth', cloned:false},
+    {id:'v16', name:'Erinome', gender:'Female', accent:'Clear', cloned:false},
+    {id:'v17', name:'Algenib', gender:'Male', accent:'Gravelly', cloned:false},
+    {id:'v18', name:'Rasalgethi', gender:'Male', accent:'Informative', cloned:false},
+    {id:'v19', name:'Laomedeia', gender:'Female', accent:'Upbeat', cloned:false},
+    {id:'v20', name:'Achernar', gender:'Female', accent:'Soft', cloned:false},
+    {id:'v21', name:'Alnilam', gender:'Male', accent:'Firm', cloned:false},
+    {id:'v22', name:'Schedar', gender:'Male', accent:'Even', cloned:false},
+    {id:'v23', name:'Gacrux', gender:'Female', accent:'Mature', cloned:false},
+    {id:'v24', name:'Pulcherrima', gender:'Female', accent:'Forward', cloned:false},
+    {id:'v25', name:'Achird', gender:'Male', accent:'Friendly', cloned:false},
+    {id:'v26', name:'Zubenelgenubi', gender:'Male', accent:'Casual', cloned:false},
+    {id:'v27', name:'Vindemiatrix', gender:'Female', accent:'Gentle', cloned:false},
+    {id:'v28', name:'Sadachbia', gender:'Male', accent:'Lively', cloned:false},
+    {id:'v29', name:'Sadaltager', gender:'Male', accent:'Knowledgeable', cloned:false},
+    {id:'v30', name:'Sulafat', gender:'Female', accent:'Warm', cloned:false},
   ]);
   const [notifications,setNotifications]=useState([]);
   const [settings,setSettings]=useState({
@@ -1152,12 +1201,64 @@ function App(){
       if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
     }
 
-    // NOTE: Direct image generation is temporarily disabled. Requests that ask
-    // for an image now fall through to the normal AI chat path below — the
-    // system prompt instructs the model to hand back a detailed prompt the
-    // user can paste into another AI image tool, and to politely decline
-    // (as a normal chat reply, not an error) if the user insists on an
-    // actual generated image.
+    // Detect an image-generation request ("make an image of...", "generate a
+    // picture of...", "draw...", etc.) and route it to Gemini's image model
+    // via our backend, instead of the normal text chat path.
+    const imagePrompt = detectImageGenIntent(text);
+    if(imagePrompt && !attachment){
+      const IMAGE_COST = DEFAULT_CREDIT_COSTS.image_gen;
+      if(!(await hasEnoughCredits(IMAGE_COST))){
+        toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err');
+        return;
+      }
+
+      const genMsgId = uid('m');
+      const genMsg = {id:genMsgId, role:'assistant', type:'image_generating', prompt:imagePrompt, ts:Date.now()};
+      let messagesWithGen = [...updatedMessages, genMsg];
+      const nowGen = new Date().toISOString();
+      if(incognito){
+        setIncognitoChat({...chat, messages:messagesWithGen, updated_at:nowGen});
+      } else {
+        setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:messagesWithGen, updated_at:nowGen}:c));
+      }
+
+      try{
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const res = await fetch('/api/generate-image', {
+          method:'POST',
+          headers:{'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
+          body: JSON.stringify({prompt:imagePrompt})
+        });
+        const json = await res.json();
+        if(!res.ok || !json.imageUrl) throw new Error(json.error || 'Image generation failed');
+
+        const finalMsg = {id:genMsgId, role:'assistant', type:'image', imageUrl:json.imageUrl, text:`Here's your image for: "${imagePrompt}"`, ts:Date.now()};
+        const finalMessages = messagesWithGen.map(m=>m.id===genMsgId?finalMsg:m);
+        const nowFinal = new Date().toISOString();
+        if(incognito){
+          setIncognitoChat({...chat, messages:finalMessages, updated_at:nowFinal});
+        } else {
+          setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:nowFinal}:c));
+          await supabase.from('chats').update({messages:finalMessages, updated_at:nowFinal}).eq('id',chatId);
+        }
+        if(!isAdmin(user)){
+          await deductCredits(IMAGE_COST, 'image_gen', {prompt:imagePrompt.slice(0,150)});
+        }
+      }catch(e){
+        console.error('[ImageGen] failed:', e);
+        const errMsg = {id:genMsgId, role:'assistant', type:'text', text:"Sorry, I couldn't generate that image right now. Please try again in a moment.", ts:Date.now()};
+        const errMessages = messagesWithGen.map(m=>m.id===genMsgId?errMsg:m);
+        const nowErr = new Date().toISOString();
+        if(incognito){
+          setIncognitoChat({...chat, messages:errMessages, updated_at:nowErr});
+        } else {
+          setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:errMessages, updated_at:nowErr}:c));
+          await supabase.from('chats').update({messages:errMessages, updated_at:nowErr}).eq('id',chatId);
+        }
+      }
+      return;
+    }
 
     const creditFeature = detectCreditFeature({text, attachment, webSearch});
     const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
@@ -2586,12 +2687,45 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
 // ---------- Voice Studio ----------
 function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits}){
   const [text,setText]=useState('Welcome to Zedith AI Voice Studio. Create realistic AI voices for your YouTube content.');
-  const [voice,setVoice]=useState('Brian');
+  const [voice,setVoice]=useState('Kore');
   const [audioUrl,setAudioUrl]=useState(null);
+  const [audioOn,setAudioOn]=useState(true);
   const [busy,setBusy]=useState(false);
+  const [previewingVoice,setPreviewingVoice]=useState(null); // name of voice currently loading/playing preview
   const [tab,setTab]=useState('Voice Generator');
   const [cloneName,setCloneName]=useState('');
   const [cloneFile,setCloneFile]=useState(null);
+  const previewAudioRef=useRef(null);
+  const previewCacheRef=useRef({}); // voiceName -> audioUrl, so re-previewing doesn't re-call the API
+
+  const stopPreview=()=>{
+    if(previewAudioRef.current){
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+    setPreviewingVoice(null);
+  };
+
+  const previewVoice=async(voiceName)=>{
+    // Tapping the currently-playing preview again just stops it.
+    if(previewingVoice===voiceName){ stopPreview(); return; }
+    stopPreview();
+    setPreviewingVoice(voiceName);
+    try{
+      let url = previewCacheRef.current[voiceName];
+      if(!url){
+        url = await ttsFetch(`Hi, I'm ${voiceName}. This is how I sound in Zedith Voice Studio.`, voiceName);
+        previewCacheRef.current[voiceName] = url;
+      }
+      const audio = new Audio(url);
+      previewAudioRef.current = audio;
+      audio.onended = ()=>setPreviewingVoice(null);
+      audio.play();
+    }catch(e){
+      toast('Could not preview this voice', 'err');
+      setPreviewingVoice(null);
+    }
+  };
 
   const gen = async ()=>{
     if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
@@ -2599,14 +2733,15 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
     const {ok} = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
     if(!ok && !isAdminUser){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
 
-    setBusy(true); setAudioUrl(null);
+    setBusy(true); setAudioUrl(null); setAudioOn(true);
     try{
       const url = await ttsFetch(text, voice);
       setAudioUrl(url);
       await createVoiceEntry({text, voice, url});
       toast('Voice ready');
     }catch(e){
-      try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); toast('Played via browser TTS (fallback)'); }catch{ toast('Voice failed','err'); }
+      console.error('[VoiceStudio] generation failed:', e);
+      toast('Voice generation failed. Please try again.', 'err');
     }finally{ setBusy(false); }
   };
 
@@ -2633,31 +2768,45 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
 
     ${tab==='Voice Generator' ? html`
       <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[880px] space-y-4">
-        <div className="font-[600] text-[13px]">1. Choose a Voice</div>
-        <div className="flex gap-3 flex-wrap">
-          ${[...new Set(myVoices.map(v=>v.name))].map(n=> html`
-            <button key=${n} onClick=${()=>setVoice(n)} className=${`px-4 py-[10px] rounded-[12px] border text-[12px] text-left ${voice===n?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700'}`}>
-              <div className="font-[600]">${n}</div><div className="text-[10.5px] text-zinc-500">${myVoices.find(v=>v.name===n)?.gender||'Voice'} • ${myVoices.find(v=>v.name===n)?.accent||'US'}</div>
-            </button>
+        <div className="flex items-center justify-between">
+          <div className="font-[600] text-[13px]">1. Choose a Voice</div>
+          <div className="text-[10.5px] text-zinc-400">${myVoices.length} voices · tap play to preview</div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[280px] overflow-y-auto pr-1">
+          ${myVoices.map(v=> html`
+            <div key=${v.id} onClick=${()=>setVoice(v.name)} className=${`px-3 py-[10px] rounded-[12px] border text-[12px] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors ${voice===v.name?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'}`}>
+              <div className="min-w-0">
+                <div className="font-[600] truncate">${v.name}</div>
+                <div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div>
+              </div>
+              <button onClick=${(e)=>{ e.stopPropagation(); previewVoice(v.name); }} className="w-7 h-7 rounded-full border border-zinc-300 dark:border-zinc-600 flex items-center justify-center shrink-0 hover:border-[var(--zed)] transition-colors" aria-label=${previewingVoice===v.name?'Stop preview':'Preview voice'}>
+                <${I} name=${previewingVoice===v.name?'Square':'Play'} size=${11}/>
+              </button>
+            </div>
           `)}
         </div>
         <div className="font-[600] text-[13px]">2. Enter your text</div>
         <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#252525] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
-        <div className="flex gap-3 items-center">
-          <button onClick=${gen} disabled=${busy} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2">
+        <div className="flex gap-3 items-center flex-wrap">
+          <button onClick=${gen} disabled=${busy} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2 disabled:opacity-60">
             <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
           </button>
-          <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); }catch{} }} className="px-[14px] py-[10px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Preview (10s)</button>
+          <div className="text-[11px] text-zinc-500">Selected voice: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
           <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estimateCreditCost({text,feature:'voice',creditCosts:DEFAULT_CREDIT_COSTS})} Credits`}</div>
         </div>
         ${audioUrl ? html`
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#252525]">
-            <div className="text-[11px] text-zinc-500 mb-2">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
-            <audio controls src=${audioUrl} className="w-full"></audio>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] text-zinc-500">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
+              <button onClick=${()=>setAudioOn(o=>!o)} className="flex items-center gap-[6px] text-[11px] font-[600] px-[10px] py-[5px] rounded-full border border-zinc-300 dark:border-zinc-600">
+                <${I} name=${audioOn?'Volume2':'VolumeX'} size=${12}/> ${audioOn?'On':'Off'}
+              </button>
+            </div>
+            ${audioOn ? html`<audio controls autoPlay src=${audioUrl} className="w-full"></audio>` : html`<div className="text-[11px] text-zinc-400 py-[10px] text-center border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">Audio muted — tap "On" to play</div>`}
             <div className="flex gap-3 text-[11px] mt-2">
-              <a href=${audioUrl} download="zedith-voice.mp3" className="text-[var(--zed)] hover:underline">Download MP3</a>
-              <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline">Copy link</button>
-              ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline">Share</button>`:null}
+              <a href=${audioUrl} download="zedith-voice.wav" className="text-[var(--zed)] hover:underline flex items-center gap-1"><${I} name="Download" size=${12}/> Download</a>
+              <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline flex items-center gap-1"><${I} name="Copy" size=${12}/> Copy link</button>
+              ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline flex items-center gap-1"><${I} name="Share2" size=${12}/> Share</button>`:null}
             </div>
           </div>
         `:null}
