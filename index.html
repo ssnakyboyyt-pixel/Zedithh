@@ -1247,7 +1247,9 @@ function App(){
         }
       }catch(e){
         console.error('[ImageGen] failed:', e);
-        const errMsg = {id:genMsgId, role:'assistant', type:'text', text:"Sorry, I couldn't generate that image right now. Please try again in a moment.", ts:Date.now()};
+        const friendly = "Sorry, I couldn't generate that image right now. Please try again in a moment.";
+        const errText = isAdmin(user) ? `${friendly}\n\n[Admin debug] ${e.message}` : friendly;
+        const errMsg = {id:genMsgId, role:'assistant', type:'text', text:errText, ts:Date.now()};
         const errMessages = messagesWithGen.map(m=>m.id===genMsgId?errMsg:m);
         const nowErr = new Date().toISOString();
         if(incognito){
@@ -1578,7 +1580,7 @@ function App(){
       case 'planner': return html`<${PlannerView} items=${plannerItems} createPlannerItem=${createPlannerItem} />`;
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
-      case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
+      case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
       case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
@@ -2685,7 +2687,7 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
 }
 
 // ---------- Voice Studio ----------
-function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits}){
+function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits, hasEnoughCredits}){
   const [text,setText]=useState('Welcome to Zedith AI Voice Studio. Create realistic AI voices for your YouTube content.');
   const [voice,setVoice]=useState('Kore');
   const [audioUrl,setAudioUrl]=useState(null);
@@ -2697,6 +2699,15 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   const [cloneFile,setCloneFile]=useState(null);
   const previewAudioRef=useRef(null);
   const previewCacheRef=useRef({}); // voiceName -> audioUrl, so re-previewing doesn't re-call the API
+
+  // 700 credits per 1,000 characters of input, rounded UP to the next 1,000-char block.
+  const voiceCreditCost=(t)=>{
+    const len = (t||'').length;
+    if(len===0) return 0;
+    const blocks = Math.ceil(len/1000);
+    return blocks*700;
+  };
+  const estCost = voiceCreditCost(text);
 
   const stopPreview=()=>{
     if(previewAudioRef.current){
@@ -2728,16 +2739,23 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   };
 
   const gen = async ()=>{
-    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
-    const cost = estimateCreditCost({text, feature:'voice', creditCosts:DEFAULT_CREDIT_COSTS});
-    const {ok} = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
-    if(!ok && !isAdminUser){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+    if(!text.trim()) return;
+    const cost = voiceCreditCost(text);
+
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(cost);
+      if(!enough){ toast('Not enough credits. You need '+cost+' credits for this voice generation.', 'err'); return; }
+    }
 
     setBusy(true); setAudioUrl(null); setAudioOn(true);
     try{
       const url = await ttsFetch(text, voice);
       setAudioUrl(url);
       await createVoiceEntry({text, voice, url});
+      // Only deduct credits after generation has actually succeeded.
+      if(!isAdminUser){
+        await deductCredits(cost, 'voice', {text:text.slice(0,100), chars:text.length});
+      }
       toast('Voice ready');
     }catch(e){
       console.error('[VoiceStudio] generation failed:', e);
@@ -2792,7 +2810,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
             <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
           </button>
           <div className="text-[11px] text-zinc-500">Selected voice: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
-          <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estimateCreditCost({text,feature:'voice',creditCosts:DEFAULT_CREDIT_COSTS})} Credits`}</div>
+          <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estCost} Credits (${text.length} chars)`}</div>
         </div>
         ${audioUrl ? html`
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#252525]">

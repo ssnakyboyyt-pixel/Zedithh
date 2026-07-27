@@ -40,7 +40,10 @@ export default async function handler(req, res) {
 
     if (!geminiRes.ok) {
       console.error('[generate-image] Gemini error:', data);
-      const msg = data?.error?.message || 'Image generation failed';
+      let msg = data?.error?.message || 'Image generation failed';
+      if (geminiRes.status === 404) {
+        msg = `Model "gemini-2.5-flash-image" not available for this API key (404). This usually means the key's Google Cloud project doesn't have this model enabled, or it needs billing enabled even on the free tier. Original error: ${msg}`;
+      }
       return res.status(geminiRes.status).json({ error: msg });
     }
 
