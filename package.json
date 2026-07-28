@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@andresaya/edge-tts": "^1.8.0"
+  }
+}

@@ -720,26 +720,55 @@ async function composeThumbnail(bgPrompt, titleText){
 
   return canvas.toDataURL('image/png');
 }
-const GEMINI_VOICES = [
-  'Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe',
-  'Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome',
-  'Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux',
-  'Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia',
-  'Sadaltager','Sulafat',
+// 15 female + 15 male Edge TTS voices — real Microsoft neural voice
+// short-names, matching myVoices in the App component below. Free, no
+// API key, no daily cap, unlike Gemini's paid-tier-gated TTS.
+const EDGE_VOICES = [
+  'en-US-JennyNeural','en-US-AriaNeural','en-US-AmberNeural','en-US-MichelleNeural',
+  'en-GB-SoniaNeural','en-GB-LibbyNeural','en-AU-NatashaNeural','en-IN-NeerjaNeural',
+  'en-CA-ClaraNeural','hi-IN-SwaraNeural','es-ES-ElviraNeural','fr-FR-DeniseNeural',
+  'de-DE-KatjaNeural','pt-BR-FranciscaNeural','ja-JP-NanamiNeural',
+  'en-US-GuyNeural','en-US-DavisNeural','en-US-BrandonNeural','en-US-ChristopherNeural',
+  'en-GB-RyanNeural','en-GB-ThomasNeural','en-AU-WilliamNeural','en-IN-PrabhatNeural',
+  'en-CA-LiamNeural','hi-IN-MadhurNeural','es-MX-JorgeNeural','fr-FR-HenriNeural',
+  'de-DE-ConradNeural','ar-EG-ShakirNeural','ko-KR-InJoonNeural',
 ];
 
-async function ttsFetch(text, voiceName='Kore'){
-  const v = GEMINI_VOICES.includes(voiceName) ? voiceName : 'Kore';
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData?.session?.access_token;
-  const res = await fetch('/api/tts', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
-    body: JSON.stringify({ text: text.slice(0,2000), voice: v })
-  });
-  const json = await res.json();
-  if(!res.ok || !json.audioUrl) throw new Error(json.error || 'tts failed');
-  return json.audioUrl;
+async function ttsFetch(text, voiceName='en-US-JennyNeural'){
+  const v = EDGE_VOICES.includes(voiceName) ? voiceName : 'en-US-JennyNeural';
+  try{
+    const res = await fetch('/api/edge-tts', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text: text.slice(0,5000), voice: v })
+    });
+    const json = await res.json();
+    if(!res.ok || !json.audioUrl) throw new Error(json.error || 'edge-tts failed');
+    return json.audioUrl;
+  }catch(edgeErr){
+    // Edge TTS is unofficial and could go down without notice — automatically
+    // fall back to Gemini TTS so voice generation still works. Gemini's own
+    // voice names don't map 1:1 to Edge voice names, so this uses a
+    // reasonable default matched loosely by gender in the display name.
+    console.warn('[ttsFetch] Edge TTS failed, falling back to Gemini:', edgeErr.message);
+    try{
+      const isFemale = /jenny|aria|amber|michelle|sonia|libby|natasha|neerja|clara|swara|elvira|denise|katja|francisca|nanami/i.test(v);
+      const fallbackVoice = isFemale ? 'Kore' : 'Puck';
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res2 = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
+        body: JSON.stringify({ text: text.slice(0,2000), voice: fallbackVoice })
+      });
+      const json2 = await res2.json();
+      if(!res2.ok || !json2.audioUrl) throw new Error(json2.error || 'gemini fallback failed');
+      return json2.audioUrl;
+    }catch(geminiErr){
+      console.error('[ttsFetch] Both Edge TTS and Gemini fallback failed:', geminiErr.message);
+      throw new Error('Voice generation is temporarily unavailable. Please try again shortly.');
+    }
+  }
 }
 
 
@@ -923,36 +952,38 @@ function App(){
   const [plannerItems,setPlannerItems]=useState([]);
   const [voiceHistory,setVoiceHistory]=useState([]);
   const [myVoices,setMyVoices]=useState([
-    {id:'v1', name:'Zephyr', gender:'Female', accent:'Bright', cloned:false},
-    {id:'v2', name:'Puck', gender:'Male', accent:'Upbeat', cloned:false},
-    {id:'v3', name:'Charon', gender:'Male', accent:'Informative', cloned:false},
-    {id:'v4', name:'Kore', gender:'Female', accent:'Firm', cloned:false},
-    {id:'v5', name:'Fenrir', gender:'Male', accent:'Excitable', cloned:false},
-    {id:'v6', name:'Leda', gender:'Female', accent:'Youthful', cloned:false},
-    {id:'v7', name:'Orus', gender:'Male', accent:'Firm', cloned:false},
-    {id:'v8', name:'Aoede', gender:'Female', accent:'Breezy', cloned:false},
-    {id:'v9', name:'Callirrhoe', gender:'Female', accent:'Easy-going', cloned:false},
-    {id:'v10', name:'Autonoe', gender:'Female', accent:'Bright', cloned:false},
-    {id:'v11', name:'Enceladus', gender:'Male', accent:'Breathy', cloned:false},
-    {id:'v12', name:'Iapetus', gender:'Male', accent:'Clear', cloned:false},
-    {id:'v13', name:'Umbriel', gender:'Male', accent:'Easy-going', cloned:false},
-    {id:'v14', name:'Algieba', gender:'Male', accent:'Smooth', cloned:false},
-    {id:'v15', name:'Despina', gender:'Female', accent:'Smooth', cloned:false},
-    {id:'v16', name:'Erinome', gender:'Female', accent:'Clear', cloned:false},
-    {id:'v17', name:'Algenib', gender:'Male', accent:'Gravelly', cloned:false},
-    {id:'v18', name:'Rasalgethi', gender:'Male', accent:'Informative', cloned:false},
-    {id:'v19', name:'Laomedeia', gender:'Female', accent:'Upbeat', cloned:false},
-    {id:'v20', name:'Achernar', gender:'Female', accent:'Soft', cloned:false},
-    {id:'v21', name:'Alnilam', gender:'Male', accent:'Firm', cloned:false},
-    {id:'v22', name:'Schedar', gender:'Male', accent:'Even', cloned:false},
-    {id:'v23', name:'Gacrux', gender:'Female', accent:'Mature', cloned:false},
-    {id:'v24', name:'Pulcherrima', gender:'Female', accent:'Forward', cloned:false},
-    {id:'v25', name:'Achird', gender:'Male', accent:'Friendly', cloned:false},
-    {id:'v26', name:'Zubenelgenubi', gender:'Male', accent:'Casual', cloned:false},
-    {id:'v27', name:'Vindemiatrix', gender:'Female', accent:'Gentle', cloned:false},
-    {id:'v28', name:'Sadachbia', gender:'Male', accent:'Lively', cloned:false},
-    {id:'v29', name:'Sadaltager', gender:'Male', accent:'Knowledgeable', cloned:false},
-    {id:'v30', name:'Sulafat', gender:'Female', accent:'Warm', cloned:false},
+    // Female (15)
+    {id:'v1', name:'en-US-JennyNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v2', name:'en-US-AriaNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v3', name:'en-US-AmberNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v4', name:'en-US-MichelleNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v5', name:'en-GB-SoniaNeural', gender:'Female', accent:'British English', cloned:false},
+    {id:'v6', name:'en-GB-LibbyNeural', gender:'Female', accent:'British English', cloned:false},
+    {id:'v7', name:'en-AU-NatashaNeural', gender:'Female', accent:'Australian English', cloned:false},
+    {id:'v8', name:'en-IN-NeerjaNeural', gender:'Female', accent:'Indian English', cloned:false},
+    {id:'v9', name:'en-CA-ClaraNeural', gender:'Female', accent:'Canadian English', cloned:false},
+    {id:'v10', name:'hi-IN-SwaraNeural', gender:'Female', accent:'Hindi', cloned:false},
+    {id:'v11', name:'es-ES-ElviraNeural', gender:'Female', accent:'Spanish (Spain)', cloned:false},
+    {id:'v12', name:'fr-FR-DeniseNeural', gender:'Female', accent:'French', cloned:false},
+    {id:'v13', name:'de-DE-KatjaNeural', gender:'Female', accent:'German', cloned:false},
+    {id:'v14', name:'pt-BR-FranciscaNeural', gender:'Female', accent:'Portuguese (Brazil)', cloned:false},
+    {id:'v15', name:'ja-JP-NanamiNeural', gender:'Female', accent:'Japanese', cloned:false},
+    // Male (15)
+    {id:'v16', name:'en-US-GuyNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v17', name:'en-US-DavisNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v18', name:'en-US-BrandonNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v19', name:'en-US-ChristopherNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v20', name:'en-GB-RyanNeural', gender:'Male', accent:'British English', cloned:false},
+    {id:'v21', name:'en-GB-ThomasNeural', gender:'Male', accent:'British English', cloned:false},
+    {id:'v22', name:'en-AU-WilliamNeural', gender:'Male', accent:'Australian English', cloned:false},
+    {id:'v23', name:'en-IN-PrabhatNeural', gender:'Male', accent:'Indian English', cloned:false},
+    {id:'v24', name:'en-CA-LiamNeural', gender:'Male', accent:'Canadian English', cloned:false},
+    {id:'v25', name:'hi-IN-MadhurNeural', gender:'Male', accent:'Hindi', cloned:false},
+    {id:'v26', name:'es-MX-JorgeNeural', gender:'Male', accent:'Spanish (Mexico)', cloned:false},
+    {id:'v27', name:'fr-FR-HenriNeural', gender:'Male', accent:'French', cloned:false},
+    {id:'v28', name:'de-DE-ConradNeural', gender:'Male', accent:'German', cloned:false},
+    {id:'v29', name:'ar-EG-ShakirNeural', gender:'Male', accent:'Arabic (Egypt)', cloned:false},
+    {id:'v30', name:'ko-KR-InJoonNeural', gender:'Male', accent:'Korean', cloned:false},
   ]);
   const [notifications,setNotifications]=useState([]);
   const [settings,setSettings]=useState({
