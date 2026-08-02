@@ -65,7 +65,7 @@ async function tryGroq(messages, temperature, max_tokens, failures) {
     return null;
   }
   const safeMessages = toTextOnlyMessages(messages);
-  const models = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'];
+  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
   for (const model of models) {
     try {
       const r = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
@@ -99,7 +99,7 @@ async function tryCerebras(messages, temperature, max_tokens, failures) {
     return null;
   }
   const safeMessages = toTextOnlyMessages(messages);
-  const models = ['llama3.1-8b', 'llama-3.3-70b'];
+  const models = ['gpt-oss-120b', 'llama-3.3-70b', 'llama3.1-8b'];
   for (const model of models) {
     try {
       const r = await fetchWithRetry('https://api.cerebras.ai/v1/chat/completions', {
@@ -200,14 +200,16 @@ async function tryGemini(messages, temperature, max_tokens, failures) {
 async function tryOpenRouter(messages, temperature, max_tokens, models, failures, needsVision) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) { failures.push('openrouter: no OPENROUTER_API_KEY set on server'); return null; }
+  // NOTE: OpenRouter's free model roster rotates frequently (providers add/remove
+  // :free variants without notice — confirmed weekly churn as of mid-2026).
+  // If chat quality drops again later, check https://openrouter.ai/models?max_price=0
+  // and update these IDs — this is a known maintenance point, not a one-time fix.
   const visionModels = [
     'google/gemma-4-31b-it:free',
-    'google/gemma-4-26b-a4b-it:free',
     'nvidia/nemotron-nano-12b-v2-vl:free',
-    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
     'mistralai/mistral-small-3.2-24b-instruct:free',
   ];
-  const textModels = ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'];
+  const textModels = ['openai/gpt-oss-120b:free', 'qwen/qwen3-coder:free', 'z-ai/glm-4.5-air:free'];
   const pool = needsVision
     ? visionModels
     : (models && models.length ? models : textModels);
@@ -266,8 +268,8 @@ export default async function handler(req, res) {
     result = await tryGemini(messages, temperature, max_tokens, failures);
     if (!result) result = await tryOpenRouter(messages, temperature, max_tokens, models, failures, true);
   } else {
-    result = await tryGroq(messages, temperature, max_tokens, failures);
-    if (!result) result = await tryCerebras(messages, temperature, max_tokens, failures);
+    result = await tryCerebras(messages, temperature, max_tokens, failures);
+    if (!result) result = await tryGroq(messages, temperature, max_tokens, failures);
     if (!result) result = await tryGemini(messages, temperature, max_tokens, failures);
     if (!result) result = await tryOpenRouter(messages, temperature, max_tokens, models, failures, false);
   }
