@@ -50,14 +50,20 @@ function zedithLoadCDNTailwind(){
 <script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
 :root{
-  --zed:#7c3aed; --zed-600:#6d28d9; --zed-light:#a78bfa; --zed-lighter:#c4b5fd;
+  --zed:#7c3aed; --zed-600:#6d28d9; --zed-light:#8b5cf6; --zed-lighter:#a78bfa;
   --zed-tint-bg:#f3eefe; --zed-tint-bg2:#ede4fd;
-  --zed-solid:#7c3aed; --zed-solid-600:#6d28d9;
+  --zed-solid:#3f3f46; --zed-solid-600:#27272a;
+  --zed-surface:#ffffff; --zed-surface2:#f7f7f8; --zed-page:#fbfaf7;
+  --zed-border:#e4e4e7; --zed-active:#f0f0f1;
+  --zed-gold:#d4a24c; --zed-gold-bg:#fdf6ea;
 }
 .dark{
   --zed:#a78bfa; --zed-600:#c4b5fd; --zed-light:#8b5cf6; --zed-lighter:#7c3aed;
   --zed-tint-bg:#2c2440; --zed-tint-bg2:#3a2f57;
-  --zed-solid:#7c3aed; --zed-solid-600:#8b5cf6;
+  --zed-solid:#3f3f46; --zed-solid-600:#52525b;
+  --zed-surface:#1e1f20; --zed-surface2:#212223; --zed-page:#161719;
+  --zed-border:#2a2b2d; --zed-active:#323336;
+  --zed-gold:#d4a24c; --zed-gold-bg:#2a2416;
 }
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
@@ -156,7 +162,7 @@ function stripInlineSourcesList(t){
 function toast(msg,type='ok'){
   const root=document.getElementById('toast-root');
   const el=document.createElement('div');
-  el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[var(--zed)]/25 text-white'}`;
+  el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[var(--zed-surface)]/95 border-[var(--zed)]/25 text-white'}`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
   dot.className=`w-[6px] h-[6px] rounded-full shrink-0 ${type==='err'?'bg-white':'bg-[#5dc3cf]'}`;
@@ -173,7 +179,7 @@ function toast(msg,type='ok'){
 function toastUndo(msg,onUndo,onExpire){
   const root=document.getElementById('toast-root');
   const el=document.createElement('div');
-  el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[#2c2c2c]/95 border-[var(--zed)]/25 text-white`;
+  el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[var(--zed-surface)]/95 border-[var(--zed)]/25 text-white`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
   dot.className='w-[6px] h-[6px] rounded-full shrink-0 bg-[#5dc3cf]';
@@ -285,7 +291,7 @@ function CustomSelect({value, onChange, options, className='', panelClassName=''
         <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform duration-200 ${open?'rotate-180 text-[var(--zed)] opacity-100':''}`}/>
       </button>
       ${open ? html`
-        <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[#404040] bg-white/95 dark:bg-[#2a2a2a]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
+        <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white/95 dark:bg-[var(--zed-surface2)]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
           ${opts.map(o=>html`
             <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[var(--zed)] font-[650] bg-[var(--zed-solid)]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#343434]'}`}>
               <span className="truncate">${o.label}</span>
@@ -1630,7 +1636,7 @@ function App(){
   if(loadingUser || !user) return html`<div className="w-screen h-screen flex items-center justify-center text-zinc-500">Loading…</div>`;
 
   return html`
-  <div className="w-full h-[100dvh] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-100 flex overflow-hidden">
+  <div className="w-full h-[100dvh] bg-white dark:bg-[var(--zed-page)] text-zinc-900 dark:text-zinc-100 flex overflow-hidden">
     <!-- Mobile backdrop + slide-over drawer -->
     ${mobileSidebarOpen ? html`
       <div className="md:hidden fixed inset-0 z-[70] bg-black/50" onClick=${()=>setMobileSidebarOpen(false)}></div>
@@ -1658,7 +1664,7 @@ function App(){
     <div className="flex-1 flex flex-col min-w-0 h-full">
       <!-- Global mobile header: shown on every module so nav is always reachable on mobile -->
       ${module!=='chat' ? html`
-      <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#1e1e1e]/90 backdrop-blur shrink-0 relative">
+      <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-page)]/90 backdrop-blur shrink-0 relative">
         <button onClick=${()=>setMobileSidebarOpen(true)} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
           <${ZedithMark} size=${24} color="currentColor"/>
         </button>
@@ -1682,11 +1688,11 @@ function App(){
 
 // ---------- LeftSidebar ----------
 function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications, openFeatureComingSoon}){
-  const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
+  const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-active)] text-zinc-900 dark:text-white font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#232324]'}`;
   const unread = 0;
   return html`
-  <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[#1c1c1c] border-zinc-200 dark:border-[#2e2e2e] flex flex-col shadow-2xl md:shadow-none transition-all duration-200 overflow-hidden`}>
-    <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[#2a2a2a]">
+  <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[var(--zed-surface)] border-zinc-200 dark:border-[var(--zed-border)] flex flex-col shadow-2xl md:shadow-none transition-all duration-200 overflow-hidden`}>
+    <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[var(--zed-border)]">
       <button onClick=${toggleCollapsed} className=${`hidden md:flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
         <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
         ${!collapsed ? html`<span className="display font-[800] text-[18px] tracking-tight">Zedith</span>` : null}
@@ -1761,10 +1767,10 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
 
     <div className="mt-auto px-[10px] pb-[10px] shrink-0">
       ${!collapsed ? html`
-        <div className="rounded-[16px] border border-zinc-200 dark:border-[#373737] bg-gradient-to-b from-[#f7f5ef] to-white dark:from-[#161a2b] dark:to-[#131727] p-[14px] text-center">
+        <div className="rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-gradient-to-b from-[#f7f5ef] to-white dark:from-[var(--zed-surface2)] dark:to-[var(--zed-page)] p-[14px] text-center">
           <div className="flex justify-center text-amber-500"><${I} name="Crown" size=${20}/></div>
           <div className="display font-[700] text-[13.5px] mt-1">Zedith ${((profile?.plan||'free')==='infinity'?'ELITE':(profile?.plan||'free').toUpperCase())}</div>
-          <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[11px] font-[650] flex items-center justify-center gap-1">
+          <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-zinc-100 dark:bg-[var(--zed-active)] text-zinc-700 dark:text-zinc-200 text-[11px] font-[650] flex items-center justify-center gap-1">
             ✨ ${isAdminUser ? 'Unlimited Credits' : `${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits`}
           </button>
           <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12px] font-[650] transition-colors">Upgrade Now →</button>
@@ -1798,8 +1804,8 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
 // ---------- Right Rail ----------
 function RightRail({chats, growth, openTool, setModule, onOpenChat}){
   return html`
-  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[#fbfaf7] dark:bg-[#1e1e1e] border-l border-zinc-200 dark:border-[#303030] p-[16px] space-y-[14px]">
-      <div className="bg-white dark:bg-[#2a2a2a] rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] p-[14px]">
+  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[var(--zed-page)] dark:bg-[var(--zed-page)] border-l border-zinc-200 dark:border-[#303030] p-[16px] space-y-[14px]">
+      <div className="bg-white dark:bg-[var(--zed-surface2)] rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] p-[14px]">
       <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
         Growth Overview 
         <button onClick=${()=>toast('Date range selector – coming soon')} className="text-[11px] text-zinc-400 flex items-center gap-1">This Week <${I} name="ChevronDown" size=${12}/></button>
@@ -1809,7 +1815,7 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       <div className="h-[56px] mt-2 flex items-center justify-center text-zinc-400 text-[11px]">No data yet – connect channel</div>
     </div>
 
-      <div className="bg-white dark:bg-[#2a2a2a] rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] p-[14px]">
+      <div className="bg-white dark:bg-[var(--zed-surface2)] rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] p-[14px]">
       <div className="flex justify-between items-center mb-2">
         <div className="font-[650] text-[12.5px]">Top Performing Content</div>
         <button onClick=${()=>setModule('analytics')} className="text-[11px] text-[var(--zed)]">View all ›</button>
@@ -1817,7 +1823,7 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       <div className="text-[11.5px] text-zinc-500">No content yet. Connect your YouTube channel in Analytics.</div>
     </div>
 
-      <div className="bg-white dark:bg-[#2a2a2a] rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] p-[14px]">
+      <div className="bg-white dark:bg-[var(--zed-surface2)] rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] p-[14px]">
       <div className="flex justify-between items-center mb-[10px]">
         <div className="font-[650] text-[12.5px]">Quick Tools</div>
         <button onClick=${()=>openTool('Idea Generator')} className="text-[11px] text-zinc-500">View all ›</button>
@@ -1840,7 +1846,7 @@ function RightRail({chats, growth, openTool, setModule, onOpenChat}){
       </div>
     </div>
 
-    <div className="bg-white dark:bg-[#2a2a2a] rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] p-[14px]">
+    <div className="bg-white dark:bg-[var(--zed-surface2)] rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] p-[14px]">
       <div className="flex justify-between items-center mb-[10px]">
         <div className="font-[650] text-[12.5px]">Recent Chats</div>
         <button onClick=${()=>setModule('history')} className="text-[11px] text-zinc-500">View all ›</button>
@@ -2016,9 +2022,9 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   const hasMessages = messages.length>0;
 
   return html`
-  <div className="flex-1 flex flex-col h-full bg-[#fbfaf7] dark:bg-[#232323]">
+  <div className="flex-1 flex flex-col h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)]">
     <!-- Mobile header: hamburger, centered title, credits pill -->
-    <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur relative">
+    <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur relative">
       <button onClick=${openSidebar} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
         <${ZedithMark} size=${24} color="currentColor"/>
       </button>
@@ -2031,7 +2037,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
       </button>
     </div>
     <!-- Desktop header -->
-    <div className="hidden md:flex h-[54px] px-4 items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur">
+    <div className="hidden md:flex h-[54px] px-4 items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur">
       <div className="flex items-center gap-2 text-[13.5px] font-[600]">
         Chat
         <${I} name="ChevronDown" size=${13} className="text-zinc-400"/>
@@ -2077,7 +2083,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
               ['Generate a hook for my video','Wand2'],
               ['Analyze my latest video','BarChart3'],
             ].map(([l,ic])=> html`
-              <button key=${l} onClick=${()=>doSend(l)} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-[14px] hover:border-[var(--zed)] transition text-left">
+              <button key=${l} onClick=${()=>doSend(l)} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-[14px] hover:border-[var(--zed)] transition text-left">
                 <${I} name=${ic} size=${17} className="text-[var(--zed)] mb-[8px]"/>
                 <div className="text-[12.5px] font-[550]">${l}</div>
               </button>
@@ -2106,7 +2112,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
               ` : html`
                 <div className="pr-6">
                   ${m.type==='image_generating' ? html`
-                    <div className="border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 bg-white dark:bg-[#2a2a2a] max-w-[520px]">
+                    <div className="border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 bg-white dark:bg-[var(--zed-surface2)] max-w-[520px]">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="w-8 h-8 rounded-full border-2 border-[var(--zed)] border-t-transparent animate-spin"></div>
                         <div>
@@ -2296,8 +2302,8 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
   const tabs=['Files','Tasks','Notes','Analytics','Settings'];
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] overflow-y-auto">
-    <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#353535] flex items-center justify-between">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] overflow-y-auto">
+    <div className="px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[var(--zed-border)] flex items-center justify-between">
       <div className="flex items-center gap-3">
         <button onClick=${onBack} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ArrowLeft" size=${18}/></button>
         <div className="w-10 h-10 rounded-[10px] flex items-center justify-center" style=${{background:project.color+'22', color:project.color}}>
@@ -2334,13 +2340,13 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
             <input type="file" ref=${fileRef} onChange=${uploadFile} className="hidden"/>
           </div>
           ${files.length===0 ? html`
-            <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-10 text-center text-zinc-500">
+            <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-10 text-center text-zinc-500">
               <${I} name="FileText" size=${28} className="mx-auto mb-2"/><div className="font-[600]">No files yet</div><div className="text-[12px]">Upload scripts, thumbnails, research, or assets.</div>
             </div>
           ` : html`
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               ${files.map(f=> html`
-                <div key=${f.id} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[13px] p-3 flex gap-3">
+                <div key=${f.id} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[13px] p-3 flex gap-3">
                   <div className="w-10 h-10 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center"><${I} name=${f.type?.startsWith('image/')?'Image':'FileText'} size=${16} className="text-[var(--zed)]"/></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-[600] truncate">${f.name}</div>
@@ -2358,7 +2364,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
             <div className="text-[13px] font-[650]">Tasks</div>
             <button onClick=${addTask} className="px-3 py-[8px] rounded-xl bg-[var(--zed-solid)] text-white text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> Add Task</button>
           </div>
-          <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 space-y-2">
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 space-y-2">
             ${tasks.length===0 ? html`<div className="text-zinc-500 text-[12px] text-center py-4">No tasks yet. Add your first project task.</div>` : tasks.map(t=> html`
               <div key=${t.id} className="flex items-center gap-3 group">
                 <button onClick=${()=>toggleTask(t.id)} className=${`w-5 h-5 rounded-md border flex items-center justify-center ${t.done?'bg-emerald-500 border-emerald-500 text-white':'border-zinc-300 dark:border-zinc-600'}`}><${I} name="Check" size=${12}/></button>
@@ -2371,14 +2377,14 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
       ` : tab==='Notes' ? html`
         <div className="max-w-[800px]">
           <div className="text-[13px] font-[650] mb-3">Project Notes</div>
-          <textarea value=${notes} onChange=${e=>updateNotes(e.target.value)} placeholder="Write ideas, scripts, research notes…" className="w-full h-[420px] bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 text-[13px] outline-none resize-none"></textarea>
+          <textarea value=${notes} onChange=${e=>updateNotes(e.target.value)} placeholder="Write ideas, scripts, research notes…" className="w-full h-[420px] bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 text-[13px] outline-none resize-none"></textarea>
         </div>
       ` : tab==='Analytics' ? html`
         <div className="max-w-[900px]">
           <div className="text-[13px] font-[650] mb-4">Project Analytics</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             ${[['Tasks Done', tasks.filter(t=>t.done).length+'/'+tasks.length],['Files', files.length],['Members', members.length]].map(([l,v])=> html`
-              <div key=${l} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[13px] p-4">
+              <div key=${l} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[13px] p-4">
                 <div className="text-[11px] text-zinc-500">${l}</div><div className="text-[22px] font-[800] display mt-1">${v}</div>
               </div>
             `)}
@@ -2387,7 +2393,7 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
       ` : html`
         <div className="max-w-[600px]">
           <div className="text-[13px] font-[650] mb-3">Project Settings</div>
-          <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 space-y-3 text-[12px]">
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 space-y-3 text-[12px]">
             <div><div className="text-zinc-500 mb-1">Project Name</div>
               <input value=${project.title} onChange=${e=>updateProject(project.id,{title:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none"/>
             </div>
@@ -2416,8 +2422,8 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
   const [deleting,setDeleting]=useState(null);
   const sorted = [...projects].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] overflow-y-auto">
-    <div className="px-4 sm:px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[#353535] flex items-center justify-between">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] overflow-y-auto">
+    <div className="px-4 sm:px-6 pt-5 pb-4 border-b border-zinc-200 dark:border-[var(--zed-border)] flex items-center justify-between">
       <div><div className="text-[19px] font-[800] display">My Projects</div><div className="text-[11px] text-zinc-500">${projects.length} Projects</div></div>
       <button onClick=${()=>setShowCreate(true)} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[14px] py-[8px] rounded-[11px] text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Project</button>
     </div>
@@ -2437,7 +2443,7 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
           ${sorted.map(p=> html`
-            <div key=${p.id} className=${`relative text-left bg-white dark:bg-[#2c2c2c] rounded-[15px] border p-[15px] hover:border-[var(--zed)] transition ${p.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[#404040]'}`}>
+            <div key=${p.id} className=${`relative text-left bg-white dark:bg-[var(--zed-surface)] rounded-[15px] border p-[15px] hover:border-[var(--zed)] transition ${p.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[var(--zed-border)]'}`}>
               <button onClick=${()=>onOpenProject(p.id)} className="text-left w-full">
                 <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-3" style=${{background:p.color+'22', color:p.color}}>
                   <${I} name=${p.icon||'FolderKanban'} size=${18}/>
@@ -2528,7 +2534,7 @@ function PlannerView({items, createPlannerItem}){
   const toggleCheck=(id)=> setChecks(cs=>cs.map(c=>c.id===id?{...c,done:!c.done}:c));
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] p-4 sm:p-6 overflow-y-auto flex flex-col lg:flex-row gap-5">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] p-4 sm:p-6 overflow-y-auto flex flex-col lg:flex-row gap-5">
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -2544,7 +2550,7 @@ function PlannerView({items, createPlannerItem}){
       </div>
 
       ${view==='Month' ? html`
-        <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
           <div className="flex items-center justify-between mb-3">
             <button onClick=${()=>{ const d=new Date(year,month-1,1); setYear(d.getFullYear()); setMonth(d.getMonth()); }} className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="ChevronLeft" size=${16}/></button>
             <div className="font-[700] text-[14px]">${new Date(year,month).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
@@ -2569,13 +2575,13 @@ function PlannerView({items, createPlannerItem}){
           </div>
         </div>
       ` : view==='Week' ? html`
-        <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-8 text-center text-zinc-500">
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-8 text-center text-zinc-500">
           <${I} name="CalendarDays" size=${32} className="mx-auto mb-3"/>
           <div className="font-[600]">Week view</div>
           <div className="text-[12px]">Weekly timeline view coming soon with drag-and-drop scheduling.</div>
         </div>
       ` : html`
-        <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
           <div className="text-[13px] font-[650] mb-3">Scheduled Content</div>
           ${items.length===0 ? html`<div className="text-zinc-500 text-[12px] text-center py-8">No content scheduled yet.</div>` : html`
             <div className="space-y-2">
@@ -2598,7 +2604,7 @@ function PlannerView({items, createPlannerItem}){
     </div>
 
     <aside className="w-full lg:w-[280px] shrink-0 space-y-4">
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="font-[650] text-[13px] mb-3">Publishing Checklist</div>
         <div className="space-y-2">
           ${checks.map(c=>html`
@@ -2609,7 +2615,7 @@ function PlannerView({items, createPlannerItem}){
           `)}
         </div>
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="font-[650] text-[13px] mb-2">Up Next</div>
         ${items.filter(it=>new Date(it.date)>=today).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,3).length===0 ? html`<div className="text-[11px] text-zinc-500">Nothing scheduled yet.</div>` : html`
           <div className="space-y-2">
@@ -2692,16 +2698,16 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
   };
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] p-4 sm:p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] p-4 sm:p-6 overflow-y-auto">
     <div className="text-[19px] font-[800] display mb-1">${initialFilter==='saved'?'Saved':'History'}</div>
     <div className="text-[12px] text-zinc-500 mb-4">${initialFilter==='saved'?'Your saved conversations and content.':'All your past conversations in one place.'}</div>
 
     <div className="flex flex-wrap items-center gap-3 mb-4">
       <div className="relative flex-1 min-w-[200px]">
         <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search history…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] text-[12.5px] outline-none"/>
+        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search history…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] text-[12.5px] outline-none"/>
       </div>
-      <${CustomSelect} value=${sort} onChange=${setSort} options=${['Newest','Oldest','Name']} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] text-[12px]"/>
+      <${CustomSelect} value=${sort} onChange=${setSort} options=${['Newest','Oldest','Name']} className="px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] text-[12px]"/>
       <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden text-[12px]">
         <button onClick=${()=>setLayout('list')} className=${`px-3 py-[8px] ${layout==='list'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="List" size=${14}/></button>
         <button onClick=${()=>setLayout('grid')} className=${`px-3 py-[8px] ${layout==='grid'?'bg-zinc-100 dark:bg-zinc-800':''}`}><${I} name="LayoutGrid" size=${14}/></button>
@@ -2715,14 +2721,14 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
     </div>
 
     ${items.length===0 ? html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-10 text-center text-zinc-500">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-10 text-center text-zinc-500">
         <${I} name="Clock" size=${28} className="mx-auto mb-2"/>
         ${initialFilter==='saved'?'No saved chats yet.':'No conversations yet. Start a new chat.'}
       </div>
     ` : html`
       <div className=${layout==='grid'?'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-[10px] max-w-[900px]'}>
         ${items.map(it=> html`
-          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[#2c2c2c] border rounded-[13px] p-[14px] flex gap-3 ${it.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[#404040]'} ${it.type==='chat'?'cursor-pointer hover:border-[var(--zed)] transition':''}`}>
+          <div key=${it.id} onClick=${()=>{ if(it.type==='chat') onOpenChat(it.id); }} className=${`bg-white dark:bg-[var(--zed-surface)] border rounded-[13px] p-[14px] flex gap-3 ${it.pinned?'border-[var(--zed)]/50':'border-zinc-200 dark:border-[var(--zed-border)]'} ${it.type==='chat'?'cursor-pointer hover:border-[var(--zed)] transition':''}`}>
             <div className="w-[34px] h-[34px] rounded-[9px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center shrink-0">
               <${I} name=${it.type==='voice'?'Mic':'MessageSquare'} size=${15} className="text-[var(--zed)]"/>
             </div>
@@ -2759,6 +2765,8 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   const [audioOn,setAudioOn]=useState(true);
   const [busy,setBusy]=useState(false);
   const [previewingVoice,setPreviewingVoice]=useState(null); // name of voice currently loading/playing preview
+  const [genderFilter,setGenderFilter]=useState('All');
+  const [langFilter,setLangFilter]=useState('All');
   const [tab,setTab]=useState('Voice Generator');
   const [cloneName,setCloneName]=useState('');
   const [cloneFile,setCloneFile]=useState(null);
@@ -2842,7 +2850,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
   };
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] p-6 overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] p-6 overflow-y-auto">
     <div className="flex items-center gap-2 text-[19px] font-[800] display"><${I} name="Mic" size=${20}/> AI Voice Studio</div>
     <div className="text-[12px] text-zinc-500 mb-4">Create, clone, and customize realistic AI voices for your content.</div>
     <div className="flex gap-5 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-4">
@@ -2852,16 +2860,28 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
     </div>
 
     ${tab==='Voice Generator' ? html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[880px] space-y-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 max-w-[880px] space-y-4">
         <div className="flex items-center justify-between">
           <div className="font-[600] text-[13px]">1. Choose a Voice</div>
           <div className="text-[10.5px] text-zinc-400">${myVoices.length} voices · tap play to preview</div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[280px] overflow-y-auto pr-1">
-          ${myVoices.map(v=> html`
-            <div key=${v.id} onClick=${()=>setVoice(v.name)} className=${`px-3 py-[10px] rounded-[12px] border text-[12px] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors ${voice===v.name?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'}`}>
-              <div className="min-w-0">
-                <div className="font-[600] truncate">${v.name}</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          ${['All','Male','Female'].map(f=>html`
+            <button key=${f} onClick=${()=>setGenderFilter(f)} className=${`px-3 py-[6px] rounded-full border text-[11.5px] font-[600] transition-colors ${genderFilter===f?'border-[var(--zed)] text-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700 text-zinc-500'}`}>${f}</button>
+          `)}
+          <select value=${langFilter} onChange=${e=>setLangFilter(e.target.value)} className="px-3 py-[6px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] font-[600] bg-transparent text-zinc-500 outline-none">
+            <option value="All">All Languages</option>
+            ${[...new Set(myVoices.map(v=>v.accent))].map(a=>html`<option key=${a} value=${a}>${a}</option>`)}
+          </select>
+        </div>
+        <div className="space-y-1 max-h-[280px] overflow-y-auto pr-1">
+          ${myVoices.filter(v=> (genderFilter==='All'||v.gender===genderFilter) && (langFilter==='All'||v.accent===langFilter)).map(v=> html`
+            <div key=${v.id} onClick=${()=>setVoice(v.name)} className=${`px-3 py-[9px] rounded-[12px] text-[12px] text-left flex items-center gap-3 cursor-pointer transition-colors ${voice===v.name?'bg-[var(--zed-active)]':'hover:bg-zinc-50 dark:hover:bg-[#232324]'}`}>
+              <div className=${`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[12px] font-[700] ${v.gender==='Female'?'bg-[var(--zed-tint-bg)] text-[var(--zed)] dark:bg-[var(--zed-tint-bg2)]':'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'}`}>
+                ${v.name.replace(/^[a-z]{2}-[A-Z]{2}-/,'').charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-[600] truncate">${v.name.replace(/^[a-z]{2}-[A-Z]{2}-/,'').replace(/Neural$/,'')}</div>
                 <div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div>
               </div>
               <button onClick=${(e)=>{ e.stopPropagation(); previewVoice(v.name); }} className="w-7 h-7 rounded-full border border-zinc-300 dark:border-zinc-600 flex items-center justify-center shrink-0 hover:border-[var(--zed)] transition-colors" aria-label=${previewingVoice===v.name?'Stop preview':'Preview voice'}>
@@ -2897,7 +2917,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
         `:null}
       </div>
     ` : tab==='Voice Cloning' ? html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[700px] space-y-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 max-w-[700px] space-y-4">
         <div className="font-[650] text-[13px]">Clone Your Voice</div>
         <div className="text-[12px] text-zinc-500">Upload a clear 30-60 second sample of your voice.</div>
         <div><div className="text-[11px] text-zinc-500 mb-1">Voice Name</div><input value=${cloneName} onChange=${e=>setCloneName(e.target.value)} placeholder="e.g. My Studio Voice" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12px]"/></div>
@@ -2915,7 +2935,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
       <div className="max-w-[900px]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           ${myVoices.map(v=> html`
-            <div key=${v.id} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+            <div key=${v.id} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center"><${I} name="Mic" size=${16} className="text-[var(--zed)]"/></div>
                 <div><div className="font-[600] text-[13px]">${v.name}</div><div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div></div>
@@ -2928,11 +2948,11 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
     ` : html`
       <div className="max-w-[900px]">
         ${voiceHistory.length===0 ? html`
-          <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-10 text-center text-zinc-500"><${I} name="Clock" size=${28} className="mx-auto mb-2"/>No voice generations yet.</div>
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-10 text-center text-zinc-500"><${I} name="Clock" size=${28} className="mx-auto mb-2"/>No voice generations yet.</div>
         ` : html`
           <div className="space-y-2">
             ${voiceHistory.map(h=> html`
-              <div key=${h.id} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[13px] p-3 flex items-center justify-between">
+              <div key=${h.id} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[13px] p-3 flex items-center justify-between">
                 <div><div className="font-[600] text-[13px]">${h.voice}</div><div className="text-[11px] text-zinc-500 truncate max-w-[500px]">${h.text}</div><div className="text-[10px] text-zinc-400">${formatDate(h.created_at)}</div></div>
                 <audio controls src=${h.url} className="w-[220px] h-[34px]"></audio>
               </div>
@@ -3102,7 +3122,7 @@ ${top||'No video data yet.'}`;
 
   const panelBody = html`
     <div className="flex flex-col h-full">
-      <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] shrink-0">
+      <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] shrink-0">
         <div className="flex items-center gap-2">
           <${ZedithMark} size=${16} color="var(--zed)"/>
           <span className="font-[700] text-[13px] display">Ask Zedith</span>
@@ -3116,7 +3136,7 @@ ${top||'No video data yet.'}`;
             <div className="text-[15px] font-[700] text-[var(--zed)]">How can I help you?</div>
           </div>
         ` : msgs.map((m,i)=>html`
-          <div key=${i} className=${`text-[12.5px] rounded-xl px-3 py-2 max-w-[88%] ${m.role==='user'?'bg-[var(--zed-solid)] text-white ml-auto':'bg-zinc-100 dark:bg-[#2e2e2e] mr-auto'}`}>${m.text}</div>
+          <div key=${i} className=${`text-[12.5px] rounded-xl px-3 py-2 max-w-[88%] ${m.role==='user'?'bg-[var(--zed-solid)] text-white ml-auto':'bg-zinc-100 dark:bg-[var(--zed-surface2)] mr-auto'}`}>${m.text}</div>
         `)}
         ${busy ? html`<div className="text-[12px] text-zinc-400 flex items-center gap-2"><${ZedithThinkingLoader} size=${13} color="var(--zed)"/> Thinking…</div>` : null}
         <div ref=${endRef}></div>
@@ -3126,8 +3146,8 @@ ${top||'No video data yet.'}`;
           ${suggestions.map(s=>html`<button key=${s} onClick=${()=>ask(s)} className="px-3 py-[7px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] hover:border-[var(--zed)] transition">${s}</button>`)}
         </div>
       `:null}
-      <div className="p-3 border-t border-zinc-200 dark:border-[#353535] shrink-0">
-        <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#2e2e2e] rounded-xl px-3 py-2">
+      <div className="p-3 border-t border-zinc-200 dark:border-[var(--zed-border)] shrink-0">
+        <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[var(--zed-surface2)] rounded-xl px-3 py-2">
           <input key="ask-zedith-composer" value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') ask(input); }} placeholder="Ask something" className="flex-1 bg-transparent outline-none text-[12.5px]"/>
           <button onClick=${()=>ask(input)} disabled=${busy||!input.trim()} className="w-7 h-7 rounded-lg bg-[var(--zed-solid)] text-white flex items-center justify-center disabled:opacity-40"><${I} name="ArrowUp" size=${14}/></button>
         </div>
@@ -3143,7 +3163,7 @@ ${top||'No video data yet.'}`;
 
     <!-- Desktop: resizable side panel -->
     ${open ? html`
-      <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[#232323] border-l border-zinc-200 dark:border-[#353535] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px', animation:`${closing?'panelSlideOut':'panelSlideIn'} .18s ease both`}}>
+      <div className="hidden md:flex fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-white dark:bg-[var(--zed-surface)] border-l border-zinc-200 dark:border-[var(--zed-border)] shadow-2xl z-[600] flex-col resize-x overflow-auto" style=${{minWidth:'300px', animation:`${closing?'panelSlideOut':'panelSlideIn'} .18s ease both`}}>
         ${panelBody}
       </div>
     `:null}
@@ -3151,7 +3171,7 @@ ${top||'No video data yet.'}`;
     <!-- Mobile: bottom sheet -->
     ${mobileSheet ? html`
       <div className="md:hidden fixed inset-0 z-[600] bg-black/50" style=${{animation:`${closing?'overlayIn .18s ease reverse both':'overlayIn .18s ease both'}`}} onClick=${closePanel}>
-        <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[#232323] rounded-t-[20px] overflow-hidden flex flex-col" style=${{animation:`${closing?'sheetSlideOut':'sheetSlideIn'} .18s ease both`}} onClick=${e=>e.stopPropagation()}>
+        <div className="absolute bottom-0 left-0 right-0 h-[78vh] bg-white dark:bg-[var(--zed-surface)] rounded-t-[20px] overflow-hidden flex flex-col" style=${{animation:`${closing?'sheetSlideOut':'sheetSlideIn'} .18s ease both`}} onClick=${e=>e.stopPropagation()}>
           ${panelBody}
         </div>
       </div>
@@ -3238,7 +3258,7 @@ function GoalsCard({currentValues}){
   const currentFor=(metric)=> Number(currentValues?.[metric] ?? 0);
 
   return html`
-  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
     <div className="flex items-center justify-between mb-1">
       <div className="font-[750] text-[14px] display">Goals</div>
       <button onClick=${()=>setAdding(a=>!a)} className="text-[11.5px] font-[650] text-[var(--zed)] flex items-center gap-1 hover:opacity-70 transition-opacity">
@@ -3248,11 +3268,11 @@ function GoalsCard({currentValues}){
     <div className="text-[11px] text-zinc-500 mb-4">Set a target and track real progress from your connected account.</div>
 
     ${adding ? html`
-      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700">
-        <select value=${newMetric} onChange=${e=>setNewMetric(e.target.value)} className="text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-2 py-[7px] outline-none">
+      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700">
+        <select value=${newMetric} onChange=${e=>setNewMetric(e.target.value)} className="text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-2 py-[7px] outline-none">
           ${Object.entries(metricLabels).filter(([k])=>k!=='revenue').map(([k,l])=>html`<option key=${k} value=${k}>${l}</option>`)}
         </select>
-        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[#333] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-3 py-[7px] outline-none"/>
+        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-3 py-[7px] outline-none"/>
         <button onClick=${addGoal} disabled=${saving} className="text-[12px] font-[650] bg-[var(--zed-solid)] text-white rounded-[10px] px-3 py-[7px] disabled:opacity-50">${saving?'Saving…':'Save'}</button>
       </div>
     ` : null}
@@ -3413,9 +3433,9 @@ function WeeklyInsightsView({data, goalRows, onClose}){
 
   return html`
   <div className="fixed inset-0 z-[700] bg-black/50 backdrop-blur-sm flex items-start md:items-center justify-center p-0 md:p-6 overflow-y-auto" onClick=${onClose}>
-    <div className="bg-white dark:bg-[#1e1e1e] w-full md:max-w-[720px] md:rounded-[22px] min-h-full md:min-h-0 md:max-h-[88vh] overflow-y-auto shadow-2xl" onClick=${e=>e.stopPropagation()} ref=${reportRef}>
+    <div className="bg-white dark:bg-[var(--zed-page)] w-full md:max-w-[720px] md:rounded-[22px] min-h-full md:min-h-0 md:max-h-[88vh] overflow-y-auto shadow-2xl" onClick=${e=>e.stopPropagation()} ref=${reportRef}>
 
-      <div className="sticky top-0 z-10 bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur border-b border-zinc-200 dark:border-[#333] px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-white/90 dark:bg-[var(--zed-page)]/90 backdrop-blur border-b border-zinc-200 dark:border-[#333] px-6 py-4 flex items-center justify-between">
         <div>
           <div className="font-[800] text-[16px] display">Weekly Insights Report</div>
           <div className="text-[11px] text-zinc-500">${data.channel?.title || 'Your Channel'} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
@@ -3511,7 +3531,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
           <div className="font-[700] text-[13px] mb-3">AI Tips &amp; What To Change</div>
           <div className="space-y-2">
             ${tips.map((t,i)=>html`
-              <div key=${i} className="flex items-start gap-2 rounded-[12px] bg-zinc-50 dark:bg-[#262626] p-3 text-[12px] leading-relaxed">
+              <div key=${i} className="flex items-start gap-2 rounded-[12px] bg-zinc-50 dark:bg-[var(--zed-surface)] p-3 text-[12px] leading-relaxed">
                 <${I} name="Lightbulb" size=${14} className="text-[var(--zed)] mt-[1px] shrink-0"/>
                 <span>${t}</span>
               </div>
@@ -3542,7 +3562,7 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
   ];
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1e1e1e] overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-page)] overflow-y-auto">
     <div className="px-5 md:px-9 py-7 max-w-[1100px] mx-auto">
       <div className="text-[22px] md:text-[26px] font-[800] display">${greeting}, ${name}! 👋</div>
       <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-7">Plan. Create. Analyze. Grow. All in one workspace.</div>
@@ -3550,7 +3570,7 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Quick Actions</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         ${quickActions.map(a=>html`
-          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
             <div className="w-9 h-9 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-3"><${I} name=${a.icon} size=${16}/></div>
             <div className="font-[650] text-[13px]">${a.label}</div>
             <div className="text-[11px] text-zinc-500 mt-[2px]">${a.desc}</div>
@@ -3565,14 +3585,14 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           ${recentChats.map(c=>html`
-            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 transition-all">
+            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
               <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="MessageCircle" size=${13}/></div>
               <div className="font-[600] text-[12px] truncate">${c.title||'Untitled chat'}</div>
               <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(c.updated_at||c.created_at)}</div>
             </button>
           `)}
           ${recentProjects.map(p=>html`
-            <button key=${p.id} onClick=${()=>setModule('projects')} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 transition-all">
+            <button key=${p.id} onClick=${()=>setModule('projects')} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
               <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="FolderKanban" size=${13}/></div>
               <div className="font-[600] text-[12px] truncate">${p.name||'Untitled project'}</div>
               <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(p.updated_at||p.created_at)}</div>
@@ -3583,15 +3603,15 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
 
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Today's Overview</div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
           <div className="text-[10px] text-zinc-500 font-[600]">Total Chats</div>
           <div className="text-[20px] font-[800] display mt-1">${chats.length}</div>
         </div>
-        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
           <div className="text-[10px] text-zinc-500 font-[600]">Active Projects</div>
           <div className="text-[20px] font-[800] display mt-1">${projects.length}</div>
         </div>
-        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
           <div className="text-[10px] text-zinc-500 font-[600]">Credits Left</div>
           <div className="text-[20px] font-[800] display mt-1">${isAdminUser?'∞':`${credits.toLocaleString('en-IN')}`}</div>
           ${!isAdminUser?html`<div className="text-[9.5px] text-zinc-400">of ${monthlyCredits.toLocaleString('en-IN')}</div>`:null}
@@ -3641,7 +3661,7 @@ function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
     </button>`;
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1e1e1e] overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-page)] overflow-y-auto">
     <div className="px-5 md:px-9 py-7 max-w-[900px] mx-auto">
       <div className="flex items-center justify-between mb-1">
         <div className="text-[22px] font-[800] display">All Chats</div>
@@ -3653,7 +3673,7 @@ function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
 
       <div className="relative mb-5">
         <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search chats..." className="w-full pl-9 pr-3 py-[10px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#242424] outline-none text-[13px] focus:border-[var(--zed)]"/>
+        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search chats..." className="w-full pl-9 pr-3 py-[10px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] outline-none text-[13px] focus:border-[var(--zed)]"/>
       </div>
 
       ${chats.length===0 ? html`
@@ -3677,7 +3697,7 @@ function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
 // ---------- Channel Analytics 2.0 ----------
 function ComingSoonCard({icon, title, note, className=''}){
   return html`
-  <div className=${`relative overflow-hidden rounded-[20px] border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-[#232323]/60 p-6 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
+  <div className=${`relative overflow-hidden rounded-[20px] border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-[var(--zed-surface)]/60 p-6 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
     <div className="w-9 h-9 rounded-full bg-zinc-200/70 dark:bg-zinc-700/50 flex items-center justify-center text-zinc-500">
       <${I} name=${icon} size=${16}/>
     </div>
@@ -3687,7 +3707,7 @@ function ComingSoonCard({icon, title, note, className=''}){
 }
 
 function SkeletonBlock({className=''}){
-  return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[#262626] ${className}`}></div>`;
+  return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[var(--zed-surface)] ${className}`}></div>`;
 }
 
 function AnalyticsView({addNotification}){
@@ -3898,7 +3918,7 @@ function AnalyticsView({addNotification}){
   const platformTabs = ['All','YouTube','Instagram','X'];
 
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1a1a1a] overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[#1a1a1a] overflow-y-auto">
     <div className="px-5 md:px-9 py-7 max-w-[1320px] mx-auto">
 
       <!-- Hero -->
@@ -3908,18 +3928,18 @@ function AnalyticsView({addNotification}){
           <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Understand your growth. Improve every upload.</div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
+          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur disabled:opacity-50">
             <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
           </button>
-          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[#242424]/70 backdrop-blur disabled:opacity-50">
+          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur disabled:opacity-50">
             <${I} name="FileDown" size=${13}/> Export PDF
           </button>
-          <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+          <div className="flex items-center bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
             ${['Daily','Monthly'].map(p=>html`
               <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${period===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
             `)}
           </div>
-          <div className="flex items-center bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+          <div className="flex items-center bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
             ${platformTabs.map(p=>html`
               <button key=${p} onClick=${()=>setPlatformFilter(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${platformFilter===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
             `)}
@@ -3934,7 +3954,7 @@ function AnalyticsView({addNotification}){
         <${SkeletonBlock} className="h-[160px] mb-5"/>
         <${SkeletonBlock} className="h-[320px] mb-5"/>
       ` : !connected ? html`
-        <div className="bg-white/70 dark:bg-[#242424]/70 backdrop-blur border border-zinc-200 dark:border-[#3a3a3a] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+        <div className="bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
           <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
           <div className="font-[700] text-[15px]">No Social Accounts Connected</div>
           <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
@@ -3953,7 +3973,7 @@ function AnalyticsView({addNotification}){
           <!-- Growth Overview cards -->
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             ${metricCards.map(m=>html`
-              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
+              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
                 <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-[0.10] group-hover:opacity-[0.16] transition-opacity" style=${{background:m.color}}></div>
                 <div className="flex items-center justify-between relative">
                   <div className="text-[10.5px] text-zinc-500 font-[600] uppercase tracking-wide">${m.label}</div>
@@ -3971,7 +3991,7 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- AI Summary -->
-          <div className="relative overflow-hidden rounded-[22px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <div className="relative overflow-hidden rounded-[22px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[var(--zed-surface)]/80 dark:to-[var(--zed-page)]/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
             <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full opacity-[0.06]" style=${{background:'var(--zed)'}}></div>
             <div className="flex items-center gap-2 mb-3 relative">
               <div className="w-8 h-8 rounded-[10px] bg-[var(--zed-solid)] text-white flex items-center justify-center"><${ZedithMark} size=${15} color="white"/></div>
@@ -3990,13 +4010,13 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Growth Chart -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
               <div>
                 <div className="font-[750] text-[14px] display">Growth Chart</div>
                 <div className="text-[11px] text-zinc-500">${period==='Daily'?'Daily':'Monthly'} trend for the last 28 days</div>
               </div>
-              <div className="flex items-center bg-zinc-100 dark:bg-[#2e2e2e] rounded-[11px] p-[3px] text-[11px]">
+              <div className="flex items-center bg-zinc-100 dark:bg-[var(--zed-surface2)] rounded-[11px] p-[3px] text-[11px]">
                 ${['Views','Subscribers','Watch Time','Engagement'].map(m=>html`
                   <button key=${m} onClick=${()=>setChartMetric(m)} className=${`px-[10px] py-[6px] rounded-[8px] font-[650] transition-all ${chartMetric===m?'bg-white dark:bg-[#404040] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${m}</button>
                 `)}
@@ -4011,7 +4031,7 @@ function AnalyticsView({addNotification}){
           <div>
             <div className="font-[750] text-[14px] display mb-3">Platform Comparison</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 font-[700] text-[13px]"><${I} name="Youtube" size=${15} className="text-red-500"/> YouTube</div>
                   <${TrendPill} value=${pctChange(viewsSeries)}/>
@@ -4029,7 +4049,7 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Best Performing Content -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="font-[750] text-[14px] display mb-3">Best Performing Content</div>
             ${topVideos.length ? html`
               <div className="overflow-x-auto -mx-1">
@@ -4073,7 +4093,7 @@ function AnalyticsView({addNotification}){
             <div className="font-[750] text-[14px] display mb-3">AI Recommendations</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               ${recommendations.map((r,i)=>html`
-                <div key=${i} className="rounded-[18px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-4 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+                <div key=${i} className="rounded-[18px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-4 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 rounded-[10px] bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0"><${I} name=${r.icon} size=${14}/></div>
@@ -4094,7 +4114,7 @@ function AnalyticsView({addNotification}){
           <div>
             <div className="font-[750] text-[14px] display mb-3">Audience</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
                 <div className="font-[700] text-[13px] mb-3">Age &amp; Gender</div>
                 ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`
                   <div key=${i} className="flex items-center gap-3 mb-2 text-[12px]">
@@ -4104,7 +4124,7 @@ function AnalyticsView({addNotification}){
                   </div>
                 `) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
               </div>
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
                 <div className="font-[700] text-[13px] mb-3">Top Countries</div>
                 ${(data?.topCountries ?? []).length ? html`
                   <div className="flex items-center gap-4">
@@ -4121,7 +4141,7 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Upload Performance Timeline -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-white/70 dark:bg-[#242424]/70 backdrop-blur-md p-5">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
             <div className="font-[750] text-[14px] display mb-3">Upload Performance Timeline</div>
             ${topVideos.length ? html`
               <div className="space-y-2">
@@ -4152,7 +4172,7 @@ function AnalyticsView({addNotification}){
           }}/>
 
           <!-- Weekly Report -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[#3a3a3a] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
             <div>
               <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
               <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
@@ -4187,8 +4207,8 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
       <div className=${`absolute top-[2px] w-[18px] h-[18px] bg-white rounded-full shadow transition-all ${on?'right-[2px]':'left-[2px]'}`}></div>
     </button>`;
   return html`
-  <div className="flex-1 h-full bg-[#faf9f5] dark:bg-[#1e1e1e] overflow-y-auto">
-    <div className="px-4 sm:px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#242424]">
+  <div className="flex-1 h-full bg-[#faf9f5] dark:bg-[var(--zed-page)] overflow-y-auto">
+    <div className="px-4 sm:px-7 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--zed-surface)]">
       <div className="text-[22px] font-[800] display">Settings</div>
       <div className="text-[12px] text-zinc-500">Manage your account, preferences and everything about your Zedith experience.</div>
     </div>
@@ -4297,7 +4317,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
   ];
 
   return html`
-  <div className="flex-1 h-full overflow-y-auto bg-[#fbfaf7] dark:bg-[#1a1a1a] text-zinc-900 dark:text-white transition-colors">
+  <div className="flex-1 h-full overflow-y-auto bg-[var(--zed-page)] dark:bg-[#1a1a1a] text-zinc-900 dark:text-white transition-colors">
     <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-10 max-w-[1180px]">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
@@ -4317,7 +4337,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
         ${plans.map(p=> {
           const {display, sub} = getPrice(p.k);
           return html`
-          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[#242424] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[#242424]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#212121]' : ''}`}>
+          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[var(--zed-surface)] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[var(--zed-surface)]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#212121]' : ''}`}>
             ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#5dc3cf] text-white'}`}>${p.badge}</div>`:null}
             <div className="text-zinc-400 mb-2 mt-2">
               ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#5dc3cf]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
@@ -4343,7 +4363,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
 // ---------- Notifications ----------
 function NotificationsView({notifications,markRead}){
   return html`
-  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#232323] overflow-y-auto p-6">
+  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)] overflow-y-auto p-6">
     <div className="flex items-center justify-between max-w-[820px]">
       <div>
         <div className="text-[20px] font-[800] display flex items-center gap-2"><${I} name="Bell" size=${20}/> Notifications</div>
@@ -4353,7 +4373,7 @@ function NotificationsView({notifications,markRead}){
     </div>
     <div className="max-w-[820px] mt-5 space-y-[10px]">
       ${notifications.length===0 ? html`<div className="text-zinc-500 text-[13px]">No notifications yet.</div>` : notifications.map(n=> html`
-        <div key=${n.id} className=${`bg-white dark:bg-[#2c2c2c] border ${n.read?'border-zinc-200 dark:border-[#404040]':'border-[var(--zed)]/40'} rounded-[13px] p-[14px] flex gap-3`}>
+        <div key=${n.id} className=${`bg-white dark:bg-[var(--zed-surface)] border ${n.read?'border-zinc-200 dark:border-[var(--zed-border)]':'border-[var(--zed)]/40'} rounded-[13px] p-[14px] flex gap-3`}>
           <div className=${`w-8 h-8 rounded-full flex items-center justify-center ${n.read?'bg-zinc-100 dark:bg-zinc-800':'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]'}`}>
             <${I} name="Bell" size=${14} className=${n.read?'text-zinc-400':'text-[var(--zed)]'} />
           </div>
@@ -4749,16 +4769,16 @@ function AdminUsers(){
     <div className="flex gap-3 mb-4">
       <div className="relative flex-1 max-w-[400px]">
         <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-        <input value=${search} onChange=${e=>{ setSearch(e.target.value); setPage(0); }} placeholder="Search by name, email, username…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] text-[12.5px] outline-none"/>
+        <input value=${search} onChange=${e=>{ setSearch(e.target.value); setPage(0); }} placeholder="Search by name, email, username…" className="w-full pl-9 pr-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] text-[12.5px] outline-none"/>
       </div>
       <div className="text-[12px] text-zinc-500 flex items-center">${filtered.length} results</div>
     </div>
 
     ${loading ? html`<div className="text-zinc-500 text-[12px]">Loading users…</div>` : html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden mb-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] overflow-hidden mb-4">
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
+            <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[var(--zed-surface)]">
               <tr>
                 <th className="text-left px-4 py-3 text-zinc-500 font-[600]">User</th>
                 <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Plan</th>
@@ -4815,7 +4835,7 @@ function AdminUsers(){
             <div className="font-[700] text-[16px]">Manage User</div>
             <button onClick=${()=>setSelectedUser(null)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${18}/></button>
           </div>
-          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#242424] rounded-xl mb-4">
+          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[var(--zed-surface)] rounded-xl mb-4">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--zed-light)] to-[var(--zed-600)] flex items-center justify-center text-white font-[700]">${(selectedUser.display_name||selectedUser.email||'?')[0].toUpperCase()}</div>
             <div>
               <div className="font-[700] text-[14px]">${selectedUser.display_name||'—'}</div>
@@ -4948,7 +4968,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
       </div>
 
       <!-- Identity -->
-      <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[#242424] rounded-xl mb-4">
+      <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-[var(--zed-surface)] rounded-xl mb-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--zed-light)] to-[var(--zed-600)] flex items-center justify-center text-white font-[700] text-[16px]">${(user.display_name||user.email||'?')[0].toUpperCase()}</div>
         <div className="flex-1 min-w-0">
           <div className="font-[700] text-[15px] truncate">${user.display_name||user.username||'—'}</div>
@@ -4964,19 +4984,19 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
 
       <!-- Details grid -->
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 text-[12px]">
-        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
           <div className="text-zinc-500 mb-1">Plan</div>
           <div className="font-[700]">${(user.plan||'free').toUpperCase()}</div>
         </div>
-        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
           <div className="text-zinc-500 mb-1">Credits</div>
           <div className="font-[700]">${(user.credits||0).toLocaleString('en-IN')}</div>
         </div>
-        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
           <div className="text-zinc-500 mb-1">Joined</div>
           <div className="font-[700]">${formatDate(user.created_at)}</div>
         </div>
-        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
           <div className="text-zinc-500 mb-1">Username</div>
           <div className="font-[700] truncate">${user.username||'—'}</div>
         </div>
@@ -5002,15 +5022,15 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <div className="text-zinc-400 text-[12px] p-4 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">No credit usage recorded yet</div>
         ` : html`
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3 text-[12px]">
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
               <div className="text-zinc-500 mb-1">Total spent (all time)</div>
               <div className="font-[700]">${totalSpent.toLocaleString('en-IN')}</div>
             </div>
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
               <div className="text-zinc-500 mb-1">Spent (last 30 days)</div>
               <div className="font-[700]">${spent30.toLocaleString('en-IN')}</div>
             </div>
-            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+            <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
               <div className="text-zinc-500 mb-1">Avg per request</div>
               <div className="font-[700]">${creditTx.length ? Math.round(totalSpent/creditTx.length).toLocaleString('en-IN') : 0}</div>
             </div>
@@ -5021,7 +5041,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
               const meta = FEATURE_META[feature] || {label: feature.replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()), icon:'Zap', color:'#a3a3a3'};
               const pct = totalSpent>0 ? Math.round((stat.spent/totalSpent)*100) : 0;
               return html`
-                <div key=${feature} className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424]">
+                <div key=${feature} className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)]">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 text-[12.5px] font-[650]">
                       <span className="w-6 h-6 rounded-lg flex items-center justify-center" style=${{background: meta.color+'22', color: meta.color}}><${I} name=${meta.icon} size=${13}/></span>
@@ -5064,7 +5084,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
         </div>
 
         ${!isBanned ? html`
-          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[#242424] space-y-3">
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)] space-y-3">
             <div>
               <div className="text-[11px] text-zinc-500 mb-1">Ban reason (optional, shown to user)</div>
               <input value=${banReason} onChange=${e=>setBanReason(e.target.value)} placeholder="e.g. Spam / abuse / ToS violation" className="w-full px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#252525] outline-none text-[12.5px]"/>
@@ -5169,7 +5189,7 @@ function AdminSubscriptions({planConfig, setPlanConfig}){
         {k:'pro',label:'Pro',color:'#e8b04b'},
         {k:'elite',label:'Elite',color:'#f59e0b'},
       ].map(({k,label,color})=>html`
-        <div key=${k} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+        <div key=${k} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style=${{background:color+'20'}}>
               <${I} name=${k==='free'?'Send':k==='pro'?'Zap':'Crown'} size=${16} style=${{color}}/>
@@ -5222,26 +5242,26 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
     <div className="text-[12px] text-zinc-500 mb-5">Configure credit costs and view analytics.</div>
 
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="text-[11px] text-zinc-500">Total Credits Used</div>
         <div className="text-[20px] font-[800] display">${totalAll.toLocaleString()}</div>
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="text-[11px] text-zinc-500">Credits Today</div>
         <div className="text-[20px] font-[800] display">${totalToday.toLocaleString()}</div>
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="text-[11px] text-zinc-500">Transactions</div>
         <div className="text-[20px] font-[800] display">${transactions.length}</div>
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
         <div className="text-[11px] text-zinc-500">Avg Per Request</div>
         <div className="text-[20px] font-[800] display">${transactions.length ? Math.round(totalAll/transactions.length) : 0}</div>
       </div>
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-3">Credit Cost Configuration</div>
         ${Object.entries(costs).map(([k,v])=>html`
           <div key=${k} className="flex items-center justify-between mb-3">
@@ -5251,7 +5271,7 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
         `)}
         <button onClick=${save} disabled=${saving} className="w-full mt-2 py-[9px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Costs'}</button>
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-3">Credits by Feature</div>
         ${Object.entries(byFeature).sort((a,b)=>b[1]-a[1]).map(([k,v])=>html`
           <div key=${k} className="flex items-center gap-3 mb-2">
@@ -5294,10 +5314,10 @@ function AdminAIModels(){
       <${I} name="Lock" size=${14}/> API keys are stored securely on the server and never exposed to the frontend.
     </div>
 
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
-          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
+          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[var(--zed-surface)]">
             <tr>
               <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Model</th>
               <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
@@ -5349,7 +5369,7 @@ function AdminAnalytics(){
     <div className="flex gap-4 text-[12.5px] border-b border-zinc-200 dark:border-zinc-800 mb-5">
       ${tabs.map(t=>html`<button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] ${tab===t?'text-[#e8b04b] border-b-2 border-[#e8b04b] font-[600]':'text-zinc-500'}`}>${t}</button>`)}
     </div>
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-8 text-center">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-8 text-center">
       <${I} name="TrendingUp" size=${32} className="mx-auto text-[#e8b04b] mb-3"/>
       <div className="font-[700] text-[15px] mb-1">${tab} Analytics</div>
       <div className="text-[12px] text-zinc-500">Analytics data will populate as users interact with the platform. Connect your analytics provider to see detailed reports.</div>
@@ -5370,7 +5390,7 @@ function AdminSecurity(){
 
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
       ${[['Active Sessions','—','Wifi','#10b981'],['Failed Logins','0','AlertTriangle','#ef4444'],['Audit Events',logs.length.toString(),'Activity','#e8b04b'],['API Calls',logs.length.toString(),'Plug','#f59e0b']].map(([l,v,ic,col])=>html`
-        <div key=${l} className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+        <div key=${l} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[11px] text-zinc-500">${l}</div>
             <${I} name=${ic} size=${14} style=${{color:col}}/>
@@ -5380,7 +5400,7 @@ function AdminSecurity(){
       `)}
     </div>
 
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
       <div className="font-[650] text-[13px] mb-3">Activity Audit Log</div>
       ${logs.length===0 ? html`<div className="text-[12px] text-zinc-500">No events yet.</div>` : html`
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -5418,10 +5438,10 @@ function AdminAPI(){
     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5 text-[12px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
       <${I} name="Lock" size=${14}/> API keys are stored in environment variables on your server. They are never exposed to this frontend.
     </div>
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
-          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
+          <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[var(--zed-surface)]">
             <tr>
               <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Provider</th>
               <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Status</th>
@@ -5477,7 +5497,7 @@ function AdminNotifications(){
     <div className="text-[19px] font-[800] display flex items-center gap-2 mb-1"><${I} name="BellRing" size=${20}/> Notifications</div>
     <div className="text-[12px] text-zinc-500 mb-5">Send announcements and alerts to all users.</div>
 
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[640px] mb-5">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 max-w-[640px] mb-5">
       <div className="font-[650] text-[13px] mb-3">Send Announcement</div>
       <div className="space-y-3">
         <div>
@@ -5493,7 +5513,7 @@ function AdminNotifications(){
     </div>
 
     ${sent.length>0 ? html`
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[640px]">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 max-w-[640px]">
         <div className="font-[650] text-[13px] mb-3">Sent Announcements (This Session)</div>
         <div className="space-y-2">
           ${sent.map(s=>html`
@@ -5531,7 +5551,7 @@ function AdminSettings(){
     <div className="text-[12px] text-zinc-500 mb-5">Platform-wide configuration and feature flags.</div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-[900px]">
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-4">Branding</div>
         <div className="space-y-3">
           <div>
@@ -5541,7 +5561,7 @@ function AdminSettings(){
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-4">Feature Flags</div>
         <div className="space-y-3">
           ${Object.entries(features).map(([k,v])=>html`
@@ -5555,7 +5575,7 @@ function AdminSettings(){
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-4">Maintenance Mode</div>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -5569,7 +5589,7 @@ function AdminSettings(){
         ${maintenance ? html`<div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl text-[11.5px] text-red-600 dark:text-red-300">⚠️ Maintenance mode is ON. Users cannot access the app.</div>` : null}
       </div>
 
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-4">Database & Storage</div>
         <div className="space-y-2 text-[12px]">
           <div className="flex justify-between p-2 border border-zinc-100 dark:border-zinc-800 rounded-lg">
@@ -5704,7 +5724,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
   };
 
   const CardShell = ({label, icon, children})=> html`
-    <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[16px] p-[18px] backdrop-blur-sm">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px] backdrop-blur-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide"><${I} name=${icon} size=${13}/> ${label}</div>
         <div className="flex items-center gap-1">
@@ -5776,18 +5796,18 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Search" size=${20}/> SEO Studio</div>
       <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Generate platform-optimized content in one click.</div>
 
-      <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[18px] p-[20px]">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
         <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic</label>
-        <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
+        <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
           </div>
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
           </div>
         </div>
 
@@ -5866,19 +5886,19 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
       <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="TrendingUp" size=${20}/> Trend Explorer</div>
       <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Live trending opportunities, pulled from real-time web search.</div>
 
-      <div className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[18px] p-[20px]">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${TREND_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${TREND_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
           </div>
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
           </div>
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Country <span className="normal-case text-zinc-400">(optional)</span></label>
-            <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[#3a3a3a] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
           </div>
         </div>
 
@@ -5891,14 +5911,14 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
 
       ${loading ? html`
         <div className="mt-8 space-y-4">
-          ${[1,2,3].map(i=>html`<div key=${i} className="h-[110px] rounded-[16px] bg-zinc-100 dark:bg-[#2a2a2a] animate-pulse"></div>`)}
+          ${[1,2,3].map(i=>html`<div key=${i} className="h-[110px] rounded-[16px] bg-zinc-100 dark:bg-[var(--zed-surface2)] animate-pulse"></div>`)}
         </div>
       `:null}
 
       ${trends ? html`
         <div className="mt-8 space-y-4">
           ${trends.map((t,i)=>html`
-            <div key=${i} className="bg-white dark:bg-[#242424] border border-zinc-200 dark:border-[#3a3a3a] rounded-[16px] p-[20px] transition hover:shadow-zed-soft">
+            <div key=${i} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[20px] transition hover:shadow-zed-soft">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[12px] font-[800] text-white shrink-0" style=${{background:OPP_COLORS[Math.min(i,4)]}}>${i+1}</span>
@@ -5999,9 +6019,9 @@ function ZedithPicksView(){
   const badge = (text,color) => html`<span className="text-[9.5px] px-[7px] py-[2px] rounded-full font-[700] uppercase tracking-wide" style=${{background:color+'20',color}}>${text}</span>`;
 
   const ProductCard = ({p}) => html`
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4 hover:border-[var(--zed)] transition flex flex-col fade-in">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 hover:border-[var(--zed)] transition flex flex-col fade-in">
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-11 h-11 rounded-[11px] bg-zinc-100 dark:bg-[#242424] flex items-center justify-center overflow-hidden shrink-0">
+        <div className="w-11 h-11 rounded-[11px] bg-zinc-100 dark:bg-[var(--zed-surface)] flex items-center justify-center overflow-hidden shrink-0">
           ${p.logo_url ? html`<img src=${p.logo_url} alt=${p.name} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/>`}
         </div>
         <div className="min-w-0 flex-1">
@@ -6031,7 +6051,7 @@ function ZedithPicksView(){
     </div>`;
 
   const Skeleton = () => html`
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
       <div className="flex items-center gap-3 mb-3">
         <div className="w-11 h-11 rounded-[11px] shimmer"></div>
         <div className="flex-1 space-y-2"><div className="h-3 w-2/3 rounded shimmer"></div><div className="h-2 w-1/3 rounded shimmer"></div></div>
@@ -6042,7 +6062,7 @@ function ZedithPicksView(){
     </div>`;
 
   const AdPanel = ({ad}) => html`
-    <div className="bg-white dark:bg-[#2a2a2a] border border-zinc-200 dark:border-[#3a3a3a] rounded-[14px] p-3 overflow-hidden">
+    <div className="bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-3 overflow-hidden">
       <div className="text-[9px] text-zinc-400 uppercase tracking-wide mb-2 font-[700]">Sponsored</div>
       ${ad.type==='custom_html' || ad.type==='adsense' ? html`<div dangerouslySetInnerHTML=${{__html: ad.content||''}}/>` : html`
         <button onClick=${()=>clickAd(ad)} className="block w-full text-left">
@@ -6053,9 +6073,9 @@ function ZedithPicksView(){
     </div>`;
 
   return html`
-  <div className="flex-1 h-full flex overflow-hidden bg-[#fbfaf7] dark:bg-[#232323]">
+  <div className="flex-1 h-full flex overflow-hidden bg-[var(--zed-page)] dark:bg-[var(--zed-surface)]">
     <div className="flex-1 overflow-y-auto">
-      <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[#353535] bg-white/85 dark:bg-[#232323]/90 backdrop-blur sticky top-0 z-10">
+      <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <${I} name="Compass" size=${18} className="text-[var(--zed)]"/>
           <span className="font-[700] text-[14px] display">Zedith Picks</span>
@@ -6072,9 +6092,9 @@ function ZedithPicksView(){
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <div className="relative flex-1">
             <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-            <input value=${search} onChange=${e=>setSearch(e.target.value)} placeholder="Search tools, categories, tags…" className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] text-[12.5px] outline-none"/>
+            <input value=${search} onChange=${e=>setSearch(e.target.value)} placeholder="Search tools, categories, tags…" className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] text-[12.5px] outline-none"/>
           </div>
-          <${CustomSelect} value=${sortBy} onChange=${setSortBy} options=${[{label:'Featured',value:'featured'},{label:'Newest',value:'new'},{label:'Most Popular',value:'popular'}]} className="px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#2c2c2c] text-[12.5px] outline-none"/>
+          <${CustomSelect} value=${sortBy} onChange=${setSortBy} options=${[{label:'Featured',value:'featured'},{label:'Newest',value:'new'},{label:'Most Popular',value:'popular'}]} className="px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] text-[12.5px] outline-none"/>
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">
@@ -6099,7 +6119,7 @@ function ZedithPicksView(){
             ${[1,2,3,4,5,6].map(i=>html`<${Skeleton} key=${i}/>`)}
           </div>
         ` : sorted.length===0 ? html`
-          <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-12 text-center">
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-12 text-center">
             <${I} name="SearchX" size=${32} className="mx-auto text-zinc-400 mb-3"/>
             <div className="font-[700] text-[15px] mb-1">No tools found</div>
             <div className="text-[12px] text-zinc-500">Try a different search term or category.</div>
@@ -6123,7 +6143,7 @@ function ZedithPicksView(){
         <div className="modal-panel modal-in w-full max-w-[620px] rounded-[22px] p-6 max-h-[88vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-[12px] bg-zinc-100 dark:bg-[#242424] flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-12 h-12 rounded-[12px] bg-zinc-100 dark:bg-[var(--zed-surface)] flex items-center justify-center overflow-hidden shrink-0">
                 ${selected.logo_url ? html`<img src=${selected.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${20} className="text-[var(--zed)]"/>`}
               </div>
               <div>
@@ -6235,10 +6255,10 @@ function AdminPicks(){
       </div>
 
       ${loading ? html`<div className="text-zinc-500 text-[12px]">Loading…</div>` : html`
-        <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden">
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
-              <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
+              <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[var(--zed-surface)]">
                 <tr>
                   <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Product</th>
                   <th className="text-left px-4 py-3 text-zinc-500 font-[600]">Category</th>
@@ -6253,7 +6273,7 @@ function AdminPicks(){
                   <tr key=${p.id} className="border-b border-zinc-50 dark:border-zinc-900 hover:bg-zinc-50 dark:hover:bg-[#303030]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-[#242424] flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-[var(--zed-surface)] flex items-center justify-center overflow-hidden shrink-0">
                           ${p.logo_url ? html`<img src=${p.logo_url} className="w-full h-full object-cover"/>` : html`<${I} name="Sparkles" size=${12} className="text-[#e8b04b]"/>`}
                         </div>
                         <div className="font-[600] truncate max-w-[160px]">${p.name}</div>
@@ -6309,7 +6329,7 @@ function AdminPicksCategories({categories,setCategories}){
 
   return html`
   <div>
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 mb-5">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 mb-5">
       <div className="font-[650] text-[13px] mb-3">Add Category</div>
       <div className="flex flex-col sm:flex-row gap-2">
         <input value=${newName} onChange=${e=>setNewName(e.target.value)} placeholder="Category name" className="flex-1 px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#252525] outline-none text-[12.5px]"/>
@@ -6317,10 +6337,10 @@ function AdminPicksCategories({categories,setCategories}){
         <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] shrink-0">Add</button>
       </div>
     </div>
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] overflow-hidden">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] overflow-hidden">
       <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
-        <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#242424]">
+        <thead className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[var(--zed-surface)]">
           <tr><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Name</th><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Icon</th><th className="text-left px-4 py-3 text-zinc-500 font-[600]">Actions</th></tr>
         </thead>
         <tbody>
@@ -6347,7 +6367,7 @@ function AdminPicksAnalytics({products,catName}){
   const mostClicked = [...products].sort((a,b)=>((b.website_clicks||0)+(b.affiliate_clicks||0))-((a.website_clicks||0)+(a.affiliate_clicks||0))).slice(0,5);
 
   const card = (title,value,icon,color) => html`
-    <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-4">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[11px] text-zinc-500 font-[600] uppercase tracking-wide">${title}</div>
         <div className="w-8 h-8 rounded-[9px] flex items-center justify-center" style=${{background:color+'20'}}><${I} name=${icon} size=${15} style=${{color}}/></div>
@@ -6364,7 +6384,7 @@ function AdminPicksAnalytics({products,catName}){
       ${card('Conversion Rate',conversionRate+'%','TrendingUp','#3b82f6')}
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-3">Top Viewed Products</div>
         ${topProducts.length===0 ? html`<div className="text-[12px] text-zinc-500">No data yet.</div>` : topProducts.map(p=>html`
           <div key=${p.id} className="flex items-center justify-between text-[12px] mb-2">
@@ -6372,7 +6392,7 @@ function AdminPicksAnalytics({products,catName}){
           </div>
         `)}
       </div>
-      <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5">
         <div className="font-[650] text-[13px] mb-3">Most Clicked Products</div>
         ${mostClicked.length===0 ? html`<div className="text-[12px] text-zinc-500">No data yet.</div>` : mostClicked.map(p=>html`
           <div key=${p.id} className="flex items-center justify-between text-[12px] mb-2">
