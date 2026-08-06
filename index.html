@@ -50,14 +50,14 @@ function zedithLoadCDNTailwind(){
 <script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
 :root{
-  --zed:#18181b; --zed-600:#000000; --zed-light:#52525b; --zed-lighter:#71717a;
-  --zed-tint-bg:#f4f4f5; --zed-tint-bg2:#e4e4e7;
-  --zed-solid:#27272a; --zed-solid-600:#000000;
+  --zed:#7c3aed; --zed-600:#6d28d9; --zed-light:#a78bfa; --zed-lighter:#c4b5fd;
+  --zed-tint-bg:#f3eefe; --zed-tint-bg2:#ede4fd;
+  --zed-solid:#7c3aed; --zed-solid-600:#6d28d9;
 }
 .dark{
-  --zed:#f4f4f5; --zed-600:#ffffff; --zed-light:#d4d4d8; --zed-lighter:#a1a1aa;
-  --zed-tint-bg:#27272a; --zed-tint-bg2:#3f3f46;
-  --zed-solid:#3f3f46; --zed-solid-600:#52525b;
+  --zed:#a78bfa; --zed-600:#c4b5fd; --zed-light:#8b5cf6; --zed-lighter:#7c3aed;
+  --zed-tint-bg:#2c2440; --zed-tint-bg2:#3a2f57;
+  --zed-solid:#7c3aed; --zed-solid-600:#8b5cf6;
 }
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
@@ -364,6 +364,21 @@ const LOW_CREDIT_WARNING_RATIO = 0.10; // warn under 10% of the plan's monthly a
 // Heuristically detect which feature multiplier applies to a message, since the
 // user doesn't explicitly tag "this is an analytics question" — we infer it from
 // content so YouTube/channel analytics questions get charged at the right tier.
+function detectImageGenIntent(text=''){
+  const t = (text||'').trim();
+  if(!t) return null;
+  // Matches: "make an image of X", "generate a picture of X", "draw X",
+  // "create a thumbnail of X", "image of X", etc. Extracts X as the prompt.
+  const re = /^(?:please\s+)?(?:can you\s+)?(?:make|generate|create|draw|design)\s+(?:me\s+)?(?:an?\s+)?(image|picture|photo|illustration|drawing|thumbnail|artwork|art|logo|icon|graphic)\s+(?:of|showing|depicting|for|about)\s+(.+)/i;
+  const m = t.match(re);
+  if(m && m[2]) return m[2].trim().replace(/[.!?]+$/,'');
+  // Also matches a shorter form: "image of X" / "picture of X" with no leading verb.
+  const re2 = /^(image|picture|photo|illustration|drawing|thumbnail|artwork)\s+of\s+(.+)/i;
+  const m2 = t.match(re2);
+  if(m2 && m2[2]) return m2[2].trim().replace(/[.!?]+$/,'');
+  return null;
+}
+
 function detectCreditFeature({text='', attachment=null, webSearch=false}={}){
   const t = text.toLowerCase();
   if(attachment?.type==='image') return 'image_analysis';
@@ -580,7 +595,7 @@ function looksLikeHardReasoning(text){
   return !isTrivialChat;
 }
 
-async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText='',_isRetry=false}={}){
+async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage=false,userText='',maxTokens=1300,_isRetry=false}={}){
   const wantsSmart = smart || looksLikeHardReasoning(userText);
   const poolBase = vision
     ? [...FREE_VISION_MODELS, ...NORMAL_TEXT_MODELS]
@@ -591,7 +606,7 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: 1300 })
+      body: JSON.stringify({ messages, models: pool, temperature: smart ? 0.32 : 0.78, max_tokens: maxTokens })
     });
     const d = await r.json().catch(()=>null);
     if (r.ok && d?.text) return { text: d.text.trim(), model: d.model, tried: d.tried || 1, usedSmart: wantsSmart };
@@ -605,7 +620,7 @@ async function callOR(messages,{vision=false,smart=false,modelPref=null,hasImage
   // multimodal model in the pool) — give it exactly one automatic silent retry
   // before showing the user a "couldn't see your image" message.
   if(vision && !_isRetry){
-    return callOR(messages, {vision, smart, modelPref, hasImage, userText, _isRetry:true});
+    return callOR(messages, {vision, smart, modelPref, hasImage, userText, maxTokens, _isRetry:true});
   }
 
   // Honest fallback: never pretend to have analyzed an image or fabricate unrelated
@@ -705,18 +720,55 @@ async function composeThumbnail(bgPrompt, titleText){
 
   return canvas.toDataURL('image/png');
 }
-async function ttsFetch(text, voiceName='Brian'){
-  // StreamElements' TTS endpoint proxies Amazon Polly voices. These four are
-  // confirmed distinct Polly voices (2 male, 2 female) — using the exact
-  // Polly voice IDs here (not close-sounding aliases) so each preset card
-  // actually sounds different, not just named differently.
-  const map={Brian:'Brian', Joey:'Joey', Amy:'Amy', Emma:'Emma'};
-  const v=map[voiceName]||'Brian';
-  const url=`https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(v)}&text=${encodeURIComponent(text.slice(0,900))}`;
-  const res=await fetch(url); if(!res.ok) throw new Error('tts '+res.status);
-  const blob=await res.blob();
-  if(blob.size < 200) throw new Error('tts returned empty audio'); // StreamElements sometimes 200s with a near-empty file on bad voice names
-  return URL.createObjectURL(blob);
+// 15 female + 15 male Edge TTS voices — real Microsoft neural voice
+// short-names, matching myVoices in the App component below. Free, no
+// API key, no daily cap, unlike Gemini's paid-tier-gated TTS.
+const EDGE_VOICES = [
+  'en-US-JennyNeural','en-US-AriaNeural','en-US-AmberNeural','en-US-MichelleNeural',
+  'en-GB-SoniaNeural','en-GB-LibbyNeural','en-AU-NatashaNeural','en-IN-NeerjaNeural',
+  'en-CA-ClaraNeural','hi-IN-SwaraNeural','es-ES-ElviraNeural','fr-FR-DeniseNeural',
+  'de-DE-KatjaNeural','pt-BR-FranciscaNeural','ja-JP-NanamiNeural',
+  'en-US-GuyNeural','en-US-DavisNeural','en-US-BrandonNeural','en-US-ChristopherNeural',
+  'en-GB-RyanNeural','en-GB-ThomasNeural','en-AU-WilliamNeural','en-IN-PrabhatNeural',
+  'en-CA-LiamNeural','hi-IN-MadhurNeural','es-MX-JorgeNeural','fr-FR-HenriNeural',
+  'de-DE-ConradNeural','ar-EG-ShakirNeural','ko-KR-InJoonNeural',
+];
+
+async function ttsFetch(text, voiceName='en-US-JennyNeural'){
+  const v = EDGE_VOICES.includes(voiceName) ? voiceName : 'en-US-JennyNeural';
+  try{
+    const res = await fetch('/api/edge-tts', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text: text.slice(0,5000), voice: v })
+    });
+    const json = await res.json();
+    if(!res.ok || !json.audioUrl) throw new Error(json.error || 'edge-tts failed');
+    return json.audioUrl;
+  }catch(edgeErr){
+    // Edge TTS is unofficial and could go down without notice — automatically
+    // fall back to Gemini TTS so voice generation still works. Gemini's own
+    // voice names don't map 1:1 to Edge voice names, so this uses a
+    // reasonable default matched loosely by gender in the display name.
+    console.warn('[ttsFetch] Edge TTS failed, falling back to Gemini:', edgeErr.message);
+    try{
+      const isFemale = /jenny|aria|amber|michelle|sonia|libby|natasha|neerja|clara|swara|elvira|denise|katja|francisca|nanami/i.test(v);
+      const fallbackVoice = isFemale ? 'Kore' : 'Puck';
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res2 = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
+        body: JSON.stringify({ text: text.slice(0,2000), voice: fallbackVoice })
+      });
+      const json2 = await res2.json();
+      if(!res2.ok || !json2.audioUrl) throw new Error(json2.error || 'gemini fallback failed');
+      return json2.audioUrl;
+    }catch(geminiErr){
+      console.error('[ttsFetch] Both Edge TTS and Gemini fallback failed:', geminiErr.message);
+      throw new Error('Voice generation is temporarily unavailable. Please try again shortly.');
+    }
+  }
 }
 
 
@@ -885,7 +937,7 @@ function App(){
   const [theme,setTheme]=useState('dark');
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const [mobileSidebarOpen,setMobileSidebarOpen]=useState(false);
-  const [module,setModule]=useState('chat');
+  const [module,setModule]=useState('dashboard');
   const [chats,setChats]=useState([]);
   const [activeChatId,setActiveChatId]=useState(null);
   // Incognito mode: when on, chat lives ONLY in this piece of state — it is
@@ -900,10 +952,38 @@ function App(){
   const [plannerItems,setPlannerItems]=useState([]);
   const [voiceHistory,setVoiceHistory]=useState([]);
   const [myVoices,setMyVoices]=useState([
-    {id:'v1', name:'Brian', gender:'Male', accent:'US', cloned:false},
-    {id:'v2', name:'Amy', gender:'Female', accent:'US', cloned:false},
-    {id:'v3', name:'Emma', gender:'Female', accent:'US', cloned:false},
-    {id:'v4', name:'Joey', gender:'Male', accent:'US', cloned:false},
+    // Female (15)
+    {id:'v1', name:'en-US-JennyNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v2', name:'en-US-AriaNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v3', name:'en-US-AmberNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v4', name:'en-US-MichelleNeural', gender:'Female', accent:'US English', cloned:false},
+    {id:'v5', name:'en-GB-SoniaNeural', gender:'Female', accent:'British English', cloned:false},
+    {id:'v6', name:'en-GB-LibbyNeural', gender:'Female', accent:'British English', cloned:false},
+    {id:'v7', name:'en-AU-NatashaNeural', gender:'Female', accent:'Australian English', cloned:false},
+    {id:'v8', name:'en-IN-NeerjaNeural', gender:'Female', accent:'Indian English', cloned:false},
+    {id:'v9', name:'en-CA-ClaraNeural', gender:'Female', accent:'Canadian English', cloned:false},
+    {id:'v10', name:'hi-IN-SwaraNeural', gender:'Female', accent:'Hindi', cloned:false},
+    {id:'v11', name:'es-ES-ElviraNeural', gender:'Female', accent:'Spanish (Spain)', cloned:false},
+    {id:'v12', name:'fr-FR-DeniseNeural', gender:'Female', accent:'French', cloned:false},
+    {id:'v13', name:'de-DE-KatjaNeural', gender:'Female', accent:'German', cloned:false},
+    {id:'v14', name:'pt-BR-FranciscaNeural', gender:'Female', accent:'Portuguese (Brazil)', cloned:false},
+    {id:'v15', name:'ja-JP-NanamiNeural', gender:'Female', accent:'Japanese', cloned:false},
+    // Male (15)
+    {id:'v16', name:'en-US-GuyNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v17', name:'en-US-DavisNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v18', name:'en-US-BrandonNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v19', name:'en-US-ChristopherNeural', gender:'Male', accent:'US English', cloned:false},
+    {id:'v20', name:'en-GB-RyanNeural', gender:'Male', accent:'British English', cloned:false},
+    {id:'v21', name:'en-GB-ThomasNeural', gender:'Male', accent:'British English', cloned:false},
+    {id:'v22', name:'en-AU-WilliamNeural', gender:'Male', accent:'Australian English', cloned:false},
+    {id:'v23', name:'en-IN-PrabhatNeural', gender:'Male', accent:'Indian English', cloned:false},
+    {id:'v24', name:'en-CA-LiamNeural', gender:'Male', accent:'Canadian English', cloned:false},
+    {id:'v25', name:'hi-IN-MadhurNeural', gender:'Male', accent:'Hindi', cloned:false},
+    {id:'v26', name:'es-MX-JorgeNeural', gender:'Male', accent:'Spanish (Mexico)', cloned:false},
+    {id:'v27', name:'fr-FR-HenriNeural', gender:'Male', accent:'French', cloned:false},
+    {id:'v28', name:'de-DE-ConradNeural', gender:'Male', accent:'German', cloned:false},
+    {id:'v29', name:'ar-EG-ShakirNeural', gender:'Male', accent:'Arabic (Egypt)', cloned:false},
+    {id:'v30', name:'ko-KR-InJoonNeural', gender:'Male', accent:'Korean', cloned:false},
   ]);
   const [notifications,setNotifications]=useState([]);
   const [settings,setSettings]=useState({
@@ -916,6 +996,7 @@ function App(){
   const [transactions,setTransactions]=useState([]);
   const [toolModal,setToolModal]=useState(null);
   const [comingSoon,setComingSoon]=useState(null);
+  const [featureComingSoon,setFeatureComingSoon]=useState(null);
 
   useEffect(()=>{ document.documentElement.classList.toggle('dark', theme==='dark'); },[theme]);
 
@@ -1152,12 +1233,66 @@ function App(){
       if(saveErr){ console.error('chat save error:', saveErr); toast('Chat not saved: '+saveErr.message,'err'); }
     }
 
-    // NOTE: Direct image generation is temporarily disabled. Requests that ask
-    // for an image now fall through to the normal AI chat path below — the
-    // system prompt instructs the model to hand back a detailed prompt the
-    // user can paste into another AI image tool, and to politely decline
-    // (as a normal chat reply, not an error) if the user insists on an
-    // actual generated image.
+    // Detect an image-generation request ("make an image of...", "generate a
+    // picture of...", "draw...", etc.) and route it to Gemini's image model
+    // via our backend, instead of the normal text chat path.
+    const imagePrompt = detectImageGenIntent(text);
+    if(imagePrompt && !attachment){
+      const IMAGE_COST = DEFAULT_CREDIT_COSTS.image_gen;
+      if(!(await hasEnoughCredits(IMAGE_COST))){
+        toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err');
+        return;
+      }
+
+      const genMsgId = uid('m');
+      const genMsg = {id:genMsgId, role:'assistant', type:'image_generating', prompt:imagePrompt, ts:Date.now()};
+      let messagesWithGen = [...updatedMessages, genMsg];
+      const nowGen = new Date().toISOString();
+      if(incognito){
+        setIncognitoChat({...chat, messages:messagesWithGen, updated_at:nowGen});
+      } else {
+        setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:messagesWithGen, updated_at:nowGen}:c));
+      }
+
+      try{
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const res = await fetch('/api/generate-image', {
+          method:'POST',
+          headers:{'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})},
+          body: JSON.stringify({prompt:imagePrompt})
+        });
+        const json = await res.json();
+        if(!res.ok || !json.imageUrl) throw new Error(json.error || 'Image generation failed');
+
+        const finalMsg = {id:genMsgId, role:'assistant', type:'image', imageUrl:json.imageUrl, text:`Here's your image for: "${imagePrompt}"`, ts:Date.now()};
+        const finalMessages = messagesWithGen.map(m=>m.id===genMsgId?finalMsg:m);
+        const nowFinal = new Date().toISOString();
+        if(incognito){
+          setIncognitoChat({...chat, messages:finalMessages, updated_at:nowFinal});
+        } else {
+          setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:finalMessages, updated_at:nowFinal}:c));
+          await supabase.from('chats').update({messages:finalMessages, updated_at:nowFinal}).eq('id',chatId);
+        }
+        if(!isAdmin(user)){
+          await deductCredits(IMAGE_COST, 'image_gen', {prompt:imagePrompt.slice(0,150)});
+        }
+      }catch(e){
+        console.error('[ImageGen] failed:', e);
+        const friendly = "Sorry, I couldn't generate that image right now. Please try again in a moment.";
+        const errText = isAdmin(user) ? `${friendly}\n\n[Admin debug] ${e.message}` : friendly;
+        const errMsg = {id:genMsgId, role:'assistant', type:'text', text:errText, ts:Date.now()};
+        const errMessages = messagesWithGen.map(m=>m.id===genMsgId?errMsg:m);
+        const nowErr = new Date().toISOString();
+        if(incognito){
+          setIncognitoChat({...chat, messages:errMessages, updated_at:nowErr});
+        } else {
+          setChats(cs=>cs.map(c=>c.id===chatId?{...c, messages:errMessages, updated_at:nowErr}:c));
+          await supabase.from('chats').update({messages:errMessages, updated_at:nowErr}).eq('id',chatId);
+        }
+      }
+      return;
+    }
 
     const creditFeature = detectCreditFeature({text, attachment, webSearch});
     const preEstimate = estimateCreditCostV3({userText:text, aiText:'', feature:creditFeature, smart});
@@ -1471,13 +1606,15 @@ function App(){
 
   const renderModule=()=>{
     switch(module){
+      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} />`;
+      case 'allchats': return html`<${AllChatsView} chats=${chats} onOpenChat=${openChat} onNewChat=${startNewChat} deleteChat=${deleteChat} updateChat=${updateChat} />`;
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
       case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} updateProject=${updateProject} deleteProject=${deleteProject} onOpenProject=${openProject} />`;
       case 'planner': return html`<${PlannerView} items=${plannerItems} createPlannerItem=${createPlannerItem} />`;
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
-      case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} />`;
+      case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
       case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
@@ -1486,7 +1623,7 @@ function App(){
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
       case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${{...planConfig, elite:planConfig.elite||planConfig.infinity||1000000}} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
-      default: return html`<${ChatView} ...${commonChatProps} />`;
+      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} />`;
     }
   };
 
@@ -1515,6 +1652,7 @@ function App(){
         signOut=${signOut}
         openTool=${t=>setToolModal(t)}
         openNotifications=${openNotifications}
+        openFeatureComingSoon=${f=>setFeatureComingSoon(f)}
       />
     </div>
     <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -1538,11 +1676,12 @@ function App(){
     </div>
     ${toolModal ? html`<${ToolModal} tool=${toolModal} onClose=${()=>setToolModal(null)} onSend=${sendMessage} />` : null}
     ${comingSoon ? html`<${ComingSoonModal} plan=${comingSoon} onClose=${()=>setComingSoon(null)} />` : null}
+    ${featureComingSoon ? html`<${FeatureComingSoonModal} feature=${featureComingSoon} onClose=${()=>setFeatureComingSoon(null)} />` : null}
   </div>`;
 }
 
 // ---------- LeftSidebar ----------
-function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
+function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications, openFeatureComingSoon}){
   const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
   const unread = 0;
   return html`
@@ -1570,7 +1709,21 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
 
     <nav className="px-[10px] mt-[16px] space-y-[3px] flex-1 min-h-0 overflow-y-auto">
       ${[
-        ['chat','House','Home'],
+        ['dashboard','House','Home'],
+        ['allchats','MessageCircle','Chat'],
+      ].map(([id,icon,label])=> html`
+        <button key=${id} onClick=${()=>setModule(id)} className=${itemCls(module===id || (id==='allchats' && module==='chat'))} title=${label}>
+          <${I} name=${icon} size=${17}/>
+          ${!collapsed ? label : null}
+        </button>
+      `)}
+      <button onClick=${()=>openFeatureComingSoon({label:'AI Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."})} className=${itemCls(false)} title="AI Canvas">
+        <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'AI Canvas' : ''}
+      </button>
+      <button onClick=${()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})} className=${itemCls(false)} title="Ideas">
+        <${I} name="Lightbulb" size=${17}/> ${!collapsed ? 'Ideas' : ''}
+      </button>
+      ${[
         ['projects','FolderKanban','My Projects'],
         ['planner','CalendarDays','Content Planner'],
         ['history','Clock','History'],
@@ -1614,7 +1767,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
           <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[11px] font-[650] flex items-center justify-center gap-1">
             ✨ ${isAdminUser ? 'Unlimited Credits' : `${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits`}
           </button>
-          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-gradient-to-r from-[#27272a] to-[#000000] text-white text-[12px] font-[650]">Upgrade Now →</button>
+          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12px] font-[650] transition-colors">Upgrade Now →</button>
         </div>
       ` : html`
         <button onClick=${()=>setModule('upgrade')} className="w-full py-[9px] rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" title="Upgrade">
@@ -1716,6 +1869,21 @@ function ComingSoonModal({plan,onClose}){
       </div>
       <div className="font-[750] text-[18px] display">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
       <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
+      <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
+    </div>
+  </div>`;
+}
+
+// ---------- Feature Coming Soon Modal (for nav items not built yet) ----------
+function FeatureComingSoonModal({feature,onClose}){
+  return html`
+  <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[420px] max-w-[96vw] rounded-[22px] p-6 text-center" onClick=${e=>e.stopPropagation()}>
+      <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-[var(--zed)]/18 to-[var(--zed-lighter)]/10 border border-[var(--zed)]/25 flex items-center justify-center mx-auto mb-4">
+        <${I} name=${feature?.icon||'Sparkles'} size=${24} className="text-[var(--zed)]"/>
+      </div>
+      <div className="font-[750] text-[18px] display">${feature?.label||'This feature'} — Coming Soon</div>
+      <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">${feature?.description||"We're actively building this. Check back soon."}</div>
       <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
     </div>
   </div>`;
@@ -2584,29 +2752,81 @@ function HistoryView({chats, updateChat, deleteChat, projects, voiceHistory, fil
 }
 
 // ---------- Voice Studio ----------
-function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits}){
+function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createVoiceEntry, voiceHistory, myVoices, setMyVoices, deductCredits, hasEnoughCredits}){
   const [text,setText]=useState('Welcome to Zedith AI Voice Studio. Create realistic AI voices for your YouTube content.');
-  const [voice,setVoice]=useState('Brian');
+  const [voice,setVoice]=useState('Kore');
   const [audioUrl,setAudioUrl]=useState(null);
+  const [audioOn,setAudioOn]=useState(true);
   const [busy,setBusy]=useState(false);
+  const [previewingVoice,setPreviewingVoice]=useState(null); // name of voice currently loading/playing preview
   const [tab,setTab]=useState('Voice Generator');
   const [cloneName,setCloneName]=useState('');
   const [cloneFile,setCloneFile]=useState(null);
+  const previewAudioRef=useRef(null);
+  const previewCacheRef=useRef({}); // voiceName -> audioUrl, so re-previewing doesn't re-call the API
+
+  // 700 credits per 1,000 characters of input, rounded UP to the next 1,000-char block.
+  const voiceCreditCost=(t)=>{
+    const len = (t||'').length;
+    if(len===0) return 0;
+    const blocks = Math.ceil(len/1000);
+    return blocks*700;
+  };
+  const estCost = voiceCreditCost(text);
+
+  const stopPreview=()=>{
+    if(previewAudioRef.current){
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+    setPreviewingVoice(null);
+  };
+
+  const previewVoice=async(voiceName)=>{
+    // Tapping the currently-playing preview again just stops it.
+    if(previewingVoice===voiceName){ stopPreview(); return; }
+    stopPreview();
+    setPreviewingVoice(voiceName);
+    try{
+      let url = previewCacheRef.current[voiceName];
+      if(!url){
+        url = await ttsFetch(`Hi, I'm ${voiceName}. This is how I sound in Zedith Voice Studio.`, voiceName);
+        previewCacheRef.current[voiceName] = url;
+      }
+      const audio = new Audio(url);
+      previewAudioRef.current = audio;
+      audio.onended = ()=>setPreviewingVoice(null);
+      audio.play();
+    }catch(e){
+      console.error('[VoicePreview] failed for', voiceName, e);
+      const msg = isAdmin(user) ? `Could not preview "${voiceName}": ${e.message}` : `Could not preview "${voiceName}". Try again.`;
+      toast(msg, 'err');
+      setPreviewingVoice(null);
+    }
+  };
 
   const gen = async ()=>{
-    if(!isAdminUser && plan==='free'){ openUpgrade(); return; }
-    const cost = estimateCreditCost({text, feature:'voice', creditCosts:DEFAULT_CREDIT_COSTS});
-    const {ok} = await deductCredits(cost, 'voice', {text:text.slice(0,100)});
-    if(!ok && !isAdminUser){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.",'err'); return; }
+    if(!text.trim()) return;
+    const cost = voiceCreditCost(text);
 
-    setBusy(true); setAudioUrl(null);
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(cost);
+      if(!enough){ toast('Not enough credits. You need '+cost+' credits for this voice generation.', 'err'); return; }
+    }
+
+    setBusy(true); setAudioUrl(null); setAudioOn(true);
     try{
       const url = await ttsFetch(text, voice);
       setAudioUrl(url);
       await createVoiceEntry({text, voice, url});
+      // Only deduct credits after generation has actually succeeded.
+      if(!isAdminUser){
+        await deductCredits(cost, 'voice', {text:text.slice(0,100), chars:text.length});
+      }
       toast('Voice ready');
     }catch(e){
-      try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); toast('Played via browser TTS (fallback)'); }catch{ toast('Voice failed','err'); }
+      console.error('[VoiceStudio] generation failed:', e);
+      toast('Voice generation failed. Please try again.', 'err');
     }finally{ setBusy(false); }
   };
 
@@ -2633,31 +2853,45 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
 
     ${tab==='Voice Generator' ? html`
       <div className="bg-white dark:bg-[#2c2c2c] border border-zinc-200 dark:border-[#404040] rounded-[14px] p-5 max-w-[880px] space-y-4">
-        <div className="font-[600] text-[13px]">1. Choose a Voice</div>
-        <div className="flex gap-3 flex-wrap">
-          ${[...new Set(myVoices.map(v=>v.name))].map(n=> html`
-            <button key=${n} onClick=${()=>setVoice(n)} className=${`px-4 py-[10px] rounded-[12px] border text-[12px] text-left ${voice===n?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700'}`}>
-              <div className="font-[600]">${n}</div><div className="text-[10.5px] text-zinc-500">${myVoices.find(v=>v.name===n)?.gender||'Voice'} • ${myVoices.find(v=>v.name===n)?.accent||'US'}</div>
-            </button>
+        <div className="flex items-center justify-between">
+          <div className="font-[600] text-[13px]">1. Choose a Voice</div>
+          <div className="text-[10.5px] text-zinc-400">${myVoices.length} voices · tap play to preview</div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[280px] overflow-y-auto pr-1">
+          ${myVoices.map(v=> html`
+            <div key=${v.id} onClick=${()=>setVoice(v.name)} className=${`px-3 py-[10px] rounded-[12px] border text-[12px] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors ${voice===v.name?'border-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'}`}>
+              <div className="min-w-0">
+                <div className="font-[600] truncate">${v.name}</div>
+                <div className="text-[10.5px] text-zinc-500">${v.gender} • ${v.accent}</div>
+              </div>
+              <button onClick=${(e)=>{ e.stopPropagation(); previewVoice(v.name); }} className="w-7 h-7 rounded-full border border-zinc-300 dark:border-zinc-600 flex items-center justify-center shrink-0 hover:border-[var(--zed)] transition-colors" aria-label=${previewingVoice===v.name?'Stop preview':'Preview voice'}>
+                <${I} name=${previewingVoice===v.name?'Square':'Play'} size=${11}/>
+              </button>
+            </div>
           `)}
         </div>
         <div className="font-[600] text-[13px]">2. Enter your text</div>
         <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#252525] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
-        <div className="flex gap-3 items-center">
-          <button onClick=${gen} disabled=${busy} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2">
+        <div className="flex gap-3 items-center flex-wrap">
+          <button onClick=${gen} disabled=${busy} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2 disabled:opacity-60">
             <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
           </button>
-          <button onClick=${()=>{ try{ const u=new SpeechSynthesisUtterance(text.slice(0,600)); speechSynthesis.speak(u); }catch{} }} className="px-[14px] py-[10px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-[12px]">Preview (10s)</button>
-          <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estimateCreditCost({text,feature:'voice',creditCosts:DEFAULT_CREDIT_COSTS})} Credits`}</div>
+          <div className="text-[11px] text-zinc-500">Selected voice: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
+          <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estCost} Credits (${text.length} chars)`}</div>
         </div>
         ${audioUrl ? html`
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#252525]">
-            <div className="text-[11px] text-zinc-500 mb-2">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
-            <audio controls src=${audioUrl} className="w-full"></audio>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] text-zinc-500">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
+              <button onClick=${()=>setAudioOn(o=>!o)} className="flex items-center gap-[6px] text-[11px] font-[600] px-[10px] py-[5px] rounded-full border border-zinc-300 dark:border-zinc-600">
+                <${I} name=${audioOn?'Volume2':'VolumeX'} size=${12}/> ${audioOn?'On':'Off'}
+              </button>
+            </div>
+            ${audioOn ? html`<audio controls autoPlay src=${audioUrl} className="w-full"></audio>` : html`<div className="text-[11px] text-zinc-400 py-[10px] text-center border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">Audio muted — tap "On" to play</div>`}
             <div className="flex gap-3 text-[11px] mt-2">
-              <a href=${audioUrl} download="zedith-voice.mp3" className="text-[var(--zed)] hover:underline">Download MP3</a>
-              <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline">Copy link</button>
-              ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline">Share</button>`:null}
+              <a href=${audioUrl} download="zedith-voice.wav" className="text-[var(--zed)] hover:underline flex items-center gap-1"><${I} name="Download" size=${12}/> Download</a>
+              <button onClick=${()=>copyText(audioUrl)} className="text-zinc-500 hover:underline flex items-center gap-1"><${I} name="Copy" size=${12}/> Copy link</button>
+              ${canNativeShare ? html`<button onClick=${()=>shareText(audioUrl, 'Zedith voice')} className="text-zinc-500 hover:underline flex items-center gap-1"><${I} name="Share2" size=${12}/> Share</button>`:null}
             </div>
           </div>
         `:null}
@@ -3287,6 +3521,155 @@ function WeeklyInsightsView({data, goalRows, onClose}){
 
         <div className="text-[10px] text-zinc-400 text-center pt-2">Generated by Zedith AI · based on your connected YouTube data</div>
       </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Dashboard (Home) ----------
+function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits}){
+  const hour = new Date().getHours();
+  const greeting = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
+  const name = profile?.display_name || (isAdminUser ? 'Owner' : 'Creator');
+
+  const recentChats = [...chats].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,4);
+  const recentProjects = [...projects].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,3);
+
+  const quickActions = [
+    {label:'AI Chat', desc:'Get AI answers and advice', icon:'MessageCircle', action:()=>onNewChat()},
+    {label:'SEO Studio', desc:'Optimize content for any platform', icon:'Search', action:()=>setModule('seo')},
+    {label:'Voice Studio', desc:'Generate realistic AI voices', icon:'Mic', action:()=>setModule('voice')},
+    {label:'New Project', desc:'Start a new creative project', icon:'FolderPlus', action:()=>setModule('projects')},
+  ];
+
+  return html`
+  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1e1e1e] overflow-y-auto">
+    <div className="px-5 md:px-9 py-7 max-w-[1100px] mx-auto">
+      <div className="text-[22px] md:text-[26px] font-[800] display">${greeting}, ${name}! 👋</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-7">Plan. Create. Analyze. Grow. All in one workspace.</div>
+
+      <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Quick Actions</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        ${quickActions.map(a=>html`
+          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+            <div className="w-9 h-9 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-3"><${I} name=${a.icon} size=${16}/></div>
+            <div className="font-[650] text-[13px]">${a.label}</div>
+            <div className="text-[11px] text-zinc-500 mt-[2px]">${a.desc}</div>
+          </button>
+        `)}
+      </div>
+
+      ${(recentChats.length>0 || recentProjects.length>0) ? html`
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400">Continue Where You Left Off</div>
+          <button onClick=${()=>setModule('allchats')} className="text-[11px] font-[600] text-[var(--zed)] hover:underline">View all</button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          ${recentChats.map(c=>html`
+            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 transition-all">
+              <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="MessageCircle" size=${13}/></div>
+              <div className="font-[600] text-[12px] truncate">${c.title||'Untitled chat'}</div>
+              <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(c.updated_at||c.created_at)}</div>
+            </button>
+          `)}
+          ${recentProjects.map(p=>html`
+            <button key=${p.id} onClick=${()=>setModule('projects')} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424] hover:border-[var(--zed)]/40 transition-all">
+              <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="FolderKanban" size=${13}/></div>
+              <div className="font-[600] text-[12px] truncate">${p.name||'Untitled project'}</div>
+              <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(p.updated_at||p.created_at)}</div>
+            </button>
+          `)}
+        </div>
+      `:null}
+
+      <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Today's Overview</div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+          <div className="text-[10px] text-zinc-500 font-[600]">Total Chats</div>
+          <div className="text-[20px] font-[800] display mt-1">${chats.length}</div>
+        </div>
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+          <div className="text-[10px] text-zinc-500 font-[600]">Active Projects</div>
+          <div className="text-[20px] font-[800] display mt-1">${projects.length}</div>
+        </div>
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[#3a3a3a] bg-white dark:bg-[#242424]">
+          <div className="text-[10px] text-zinc-500 font-[600]">Credits Left</div>
+          <div className="text-[20px] font-[800] display mt-1">${isAdminUser?'∞':`${credits.toLocaleString('en-IN')}`}</div>
+          ${!isAdminUser?html`<div className="text-[9.5px] text-zinc-400">of ${monthlyCredits.toLocaleString('en-IN')}</div>`:null}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- All Chats (browsing list, separate from an open conversation) ----------
+function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
+  const [query,setQuery]=useState('');
+  const filtered = chats.filter(c=> (c.title||'Untitled chat').toLowerCase().includes(query.toLowerCase()));
+  const pinned = filtered.filter(c=>c.pinned);
+  const rest = filtered.filter(c=>!c.pinned).sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at));
+
+  const groupByDate=(list)=>{
+    const today = new Date(); today.setHours(0,0,0,0);
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
+    const groups = {Today:[], Yesterday:[], 'Previous 7 Days':[], Older:[]};
+    list.forEach(c=>{
+      const d = new Date(c.updated_at||c.created_at); d.setHours(0,0,0,0);
+      if(d.getTime()===today.getTime()) groups.Today.push(c);
+      else if(d.getTime()===yesterday.getTime()) groups.Yesterday.push(c);
+      else if((today-d)/86400000 <= 7) groups['Previous 7 Days'].push(c);
+      else groups.Older.push(c);
+    });
+    return groups;
+  };
+  const groups = groupByDate(rest);
+
+  const Row=(c)=>html`
+    <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="w-full text-left px-4 py-[10px] rounded-[12px] hover:bg-zinc-50 dark:hover:bg-[#262626] flex items-start justify-between gap-3 group transition-colors">
+      <div className="min-w-0">
+        <div className="font-[600] text-[13px] truncate">${c.title||'Untitled chat'}</div>
+        <div className="text-[11.5px] text-zinc-500 truncate mt-[2px]">${(c.messages?.[c.messages.length-1]?.text||'').slice(0,90)}</div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[10.5px] text-zinc-400">${formatDate(c.updated_at||c.created_at)}</span>
+        <button onClick=${e=>{e.stopPropagation(); updateChat(c.id,{pinned:!c.pinned});}} className="opacity-0 group-hover:opacity-100 p-[4px] rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-opacity" title=${c.pinned?'Unpin':'Pin'}>
+          <${I} name="Pin" size=${12} className=${c.pinned?'text-[var(--zed)]':''}/>
+        </button>
+        <button onClick=${e=>{e.stopPropagation(); deleteChat(c.id);}} className="opacity-0 group-hover:opacity-100 p-[4px] rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-opacity" title="Delete">
+          <${I} name="Trash2" size=${12} className="text-red-500"/>
+        </button>
+      </div>
+    </button>`;
+
+  return html`
+  <div className="flex-1 h-full bg-[#fbfaf7] dark:bg-[#1e1e1e] overflow-y-auto">
+    <div className="px-5 md:px-9 py-7 max-w-[900px] mx-auto">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[22px] font-[800] display">All Chats</div>
+        <button onClick=${onNewChat} className="flex items-center gap-[6px] text-[12px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-3 py-[9px] rounded-[12px] transition-colors">
+          <${I} name="Plus" size=${13}/> New Chat
+        </button>
+      </div>
+      <div className="text-[13px] text-zinc-500 mb-5">All your conversations in one place.</div>
+
+      <div className="relative mb-5">
+        <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+        <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search chats..." className="w-full pl-9 pr-3 py-[10px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#242424] outline-none text-[13px] focus:border-[var(--zed)]"/>
+      </div>
+
+      ${chats.length===0 ? html`
+        <div className="text-center py-16 text-zinc-400 text-[13px]">No chats yet. Start a new conversation.</div>
+      ` : html`
+        ${pinned.length>0 ? html`
+          <div className="text-[10.5px] uppercase tracking-wide font-[700] text-zinc-400 mb-1 px-1 flex items-center gap-1"><${I} name="Pin" size=${10}/> Pinned</div>
+          <div className="mb-4">${pinned.map(Row)}</div>
+        `:null}
+        ${Object.entries(groups).filter(([,list])=>list.length>0).map(([label,list])=>html`
+          <div key=${label}>
+            <div className="text-[10.5px] uppercase tracking-wide font-[700] text-zinc-400 mb-1 px-1 mt-3">${label}</div>
+            <div>${list.map(Row)}</div>
+          </div>
+        `)}
+      `}
     </div>
   </div>`;
 }
@@ -5215,18 +5598,48 @@ const SEO_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','
 const SEO_NICHES = ['Gaming','AI','Technology','Finance','Education','Business','Lifestyle','Music','Sports','Other'];
 
 function seoPromptFor(platform, topic, niche){
-  const base = `You are Zedith's SEO Studio, an expert social growth strategist for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
-Respond with STRICT JSON only, no markdown fences, no commentary — matching exactly this shape for the platform:`;
-  const shapes = {
-    YouTube: `{"title":"...", "description":"...", "hashtags":["#...","..."], "tags":["tag1","tag2","..."]}`,
-    Instagram: `{"caption":"...", "hashtags":["#...","..."]}`,
-    TikTok: `{"caption":"...", "hashtags":["#...","..."]}`,
-    X: `{"post":"..."}`,
-    Threads: `{"thread":["post 1 text","post 2 text","post 3 text"]}`,
-    LinkedIn: `{"post":"..."}`,
-    Bluesky: `{"post":"..."}`,
+  const base = `You are Zedith's SEO Studio, an expert social growth strategist and copywriter for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
+
+CRITICAL: Respond with STRICT JSON only. No markdown code fences, no commentary before or after, no extra keys beyond what's specified below. The JSON value for the main text field must be a single clean string — never nested JSON, never additional metadata fields like "image", "cta_link", "engagement_rate", "timestamp", or similar. Only return the exact keys listed.`;
+
+  const specs = {
+    YouTube: {
+      shape: `{"title":"...", "description":"...", "hashtags":["#...","..."], "tags":["tag1","tag2","..."]}`,
+      depth: `- title: 60-70 characters, curiosity-driven, includes the main keyword naturally, no clickbait that misleads.
+- description: 200-350 words, fully SEO-optimized for YouTube search — open with a strong 2-3 sentence hook that also works as the preview text, naturally include the primary keyword and 3-5 related keywords/phrases throughout, add a short paragraph on what the viewer will learn/gain, include a soft call-to-action to subscribe/comment, and end with a line of relevant keywords for search. Write in complete paragraphs, not bullet fragments.
+- hashtags: 8-12 relevant hashtags mixing broad and niche-specific.
+- tags: 15-20 real YouTube search tags (keywords/phrases viewers would actually search, not hashtags).`,
+    },
+    Instagram: {
+      shape: `{"caption":"...", "hashtags":["#...","..."]}`,
+      depth: `- caption: 150-250 words. Strong scroll-stopping first line (this is what shows before "more"), then genuinely valuable content in the body — a story, a tip breakdown, or a mini-lesson tied to the topic — written in short punchy lines with line breaks for readability, ending with a clear engagement question or call-to-action.
+- hashtags: 15-20 hashtags mixing high-volume, medium, and niche-specific tags for real discoverability.`,
+    },
+    TikTok: {
+      shape: `{"caption":"...", "hashtags":["#...","..."]}`,
+      depth: `- caption: 80-150 words. Punchy hook in the first line, then a tight value-packed caption that complements a short-form video, ending with a call-to-action (follow/comment/save).
+- hashtags: 8-12 hashtags mixing trending and niche-specific tags.`,
+    },
+    X: {
+      shape: `{"post":"..."}`,
+      depth: `- post: a genuinely well-crafted X/Twitter post, 200-280 characters, that hooks in the first line, delivers a specific insight or angle on the topic (not generic filler), and ends with either a question or a clear next step. No hashtag spam — at most 1-2 relevant hashtags woven in naturally, if any.`,
+    },
+    Threads: {
+      shape: `{"thread":["post 1 text","post 2 text","post 3 text","post 4 text","post 5 text"]}`,
+      depth: `- thread: a 5-7 post thread. Post 1 is a strong hook establishing the topic and promising value. Posts 2-5 each deliver one specific, concrete point, tip, or insight (not vague generalities) — genuinely useful standalone content, each under 500 characters. Final post is a clear call-to-action (follow, reply, share). Write like a real creator explaining something they know well, not like ad copy.`,
+    },
+    LinkedIn: {
+      shape: `{"post":"..."}`,
+      depth: `- post: 250-400 words, professional but genuinely engaging (not corporate-stiff). Open with a strong hook line (this determines if people click "see more"), develop a real insight or story about the topic with specific, concrete detail, use short paragraphs and line breaks for readability, and end with a discussion-provoking question. Include 3-5 relevant hashtags at the very end.`,
+    },
+    Bluesky: {
+      shape: `{"post":"..."}`,
+      depth: `- post: 200-300 characters, conversational and specific (Bluesky's culture rewards genuine voice over polished marketing tone), delivers one clear insight about the topic, no hashtag spam.`,
+    },
   };
-  return `${base}\n${shapes[platform]||shapes.X}\nMake it genuinely optimized for ${platform}'s algorithm and audience behavior, specific to the topic — not generic filler.`;
+
+  const spec = specs[platform] || specs.X;
+  return `${base}\n\nRequired JSON shape:\n${spec.shape}\n\nContent requirements:\n${spec.depth}\n\nMake it genuinely specific to the topic "${topic}" and the "${niche}" niche — real, usable content a creator could post immediately, not generic template filler.`;
 }
 
 function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
@@ -5248,13 +5661,39 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
 
     setLoading(true); setError(null); setResult(null);
     try{
-      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic});
+      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic, maxTokens:2200});
       if(r.error) throw new Error(r.text);
+      const cleaned = r.text.replace(/```json|```/g,'').trim();
       let parsed=null;
-      try{
-        const cleaned = r.text.replace(/```json|```/g,'').trim();
-        parsed = JSON.parse(cleaned);
-      }catch(e){ parsed = {post:r.text}; }
+      try{ parsed = JSON.parse(cleaned); }catch(e){ parsed = null; }
+
+      // The free model pool sometimes ignores the requested JSON shape and
+      // either returns extra unrequested fields or wraps everything as one
+      // long string. Validate the shape we actually need is present and
+      // usable before trusting it — otherwise fall back to a clean-text
+      // extraction so the raw/bloated JSON never leaks into the UI.
+      const shapeOk = (()=>{
+        if(!parsed || typeof parsed!=='object') return false;
+        if(platform==='YouTube') return typeof parsed.title==='string' && typeof parsed.description==='string';
+        if(platform==='Instagram' || platform==='TikTok') return typeof parsed.caption==='string';
+        if(platform==='Threads') return Array.isArray(parsed.thread) && parsed.thread.length>0;
+        return typeof parsed.post==='string' && parsed.post.length>0;
+      })();
+
+      if(!shapeOk){
+        // Strip any stray JSON punctuation/keys and keep just readable text
+        // as a safe fallback, instead of showing the malformed object.
+        const fallbackText = cleaned
+          .replace(/^\{|\}$/g,'')
+          .replace(/"[a-z_]+"\s*:\s*/gi,'')
+          .replace(/[",{}[\]]/g,'')
+          .replace(/\\n/g,'\n')
+          .trim();
+        if(platform==='YouTube') parsed = {title:topic, description:fallbackText, hashtags:[], tags:[]};
+        else if(platform==='Instagram' || platform==='TikTok') parsed = {caption:fallbackText, hashtags:[]};
+        else if(platform==='Threads') parsed = {thread:[fallbackText]};
+        else parsed = {post:fallbackText};
+      }
       setResult(parsed);
 
       await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform, niche});
