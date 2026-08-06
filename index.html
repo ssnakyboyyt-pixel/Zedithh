@@ -50,14 +50,14 @@ function zedithLoadCDNTailwind(){
 <script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
 :root{
-  --zed:#18181b; --zed-600:#000000; --zed-light:#52525b; --zed-lighter:#71717a;
-  --zed-tint-bg:#f4f4f5; --zed-tint-bg2:#e4e4e7;
-  --zed-solid:#27272a; --zed-solid-600:#000000;
+  --zed:#7c3aed; --zed-600:#6d28d9; --zed-light:#a78bfa; --zed-lighter:#c4b5fd;
+  --zed-tint-bg:#f3eefe; --zed-tint-bg2:#ede4fd;
+  --zed-solid:#7c3aed; --zed-solid-600:#6d28d9;
 }
 .dark{
-  --zed:#f4f4f5; --zed-600:#ffffff; --zed-light:#d4d4d8; --zed-lighter:#a1a1aa;
-  --zed-tint-bg:#27272a; --zed-tint-bg2:#3f3f46;
-  --zed-solid:#3f3f46; --zed-solid-600:#52525b;
+  --zed:#a78bfa; --zed-600:#c4b5fd; --zed-light:#8b5cf6; --zed-lighter:#7c3aed;
+  --zed-tint-bg:#2c2440; --zed-tint-bg2:#3a2f57;
+  --zed-solid:#7c3aed; --zed-solid-600:#8b5cf6;
 }
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
@@ -996,6 +996,7 @@ function App(){
   const [transactions,setTransactions]=useState([]);
   const [toolModal,setToolModal]=useState(null);
   const [comingSoon,setComingSoon]=useState(null);
+  const [featureComingSoon,setFeatureComingSoon]=useState(null);
 
   useEffect(()=>{ document.documentElement.classList.toggle('dark', theme==='dark'); },[theme]);
 
@@ -1649,6 +1650,7 @@ function App(){
         signOut=${signOut}
         openTool=${t=>setToolModal(t)}
         openNotifications=${openNotifications}
+        openFeatureComingSoon=${f=>setFeatureComingSoon(f)}
       />
     </div>
     <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -1672,11 +1674,12 @@ function App(){
     </div>
     ${toolModal ? html`<${ToolModal} tool=${toolModal} onClose=${()=>setToolModal(null)} onSend=${sendMessage} />` : null}
     ${comingSoon ? html`<${ComingSoonModal} plan=${comingSoon} onClose=${()=>setComingSoon(null)} />` : null}
+    ${featureComingSoon ? html`<${FeatureComingSoonModal} feature=${featureComingSoon} onClose=${()=>setFeatureComingSoon(null)} />` : null}
   </div>`;
 }
 
 // ---------- LeftSidebar ----------
-function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications}){
+function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModule, onNewChat, theme, toggleTheme, profile, isAdminUser, credits, monthlyCredits, signOut, openTool, openNotifications, openFeatureComingSoon}){
   const itemCls = (active)=> `w-full flex items-center ${collapsed?'md:justify-center md:px-0':''} gap-3 px-3 py-[9px] rounded-[10px] text-[13.2px] transition ${active ? 'bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed-600)] dark:text-[var(--zed-lighter)] font-[600]':'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#262626]'}`;
   const unread = 0;
   return html`
@@ -1705,6 +1708,19 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
     <nav className="px-[10px] mt-[16px] space-y-[3px] flex-1 min-h-0 overflow-y-auto">
       ${[
         ['chat','House','Home'],
+      ].map(([id,icon,label])=> html`
+        <button key=${id} onClick=${()=>setModule(id)} className=${itemCls(module===id)} title=${label}>
+          <${I} name=${icon} size=${17}/>
+          ${!collapsed ? label : null}
+        </button>
+      `)}
+      <button onClick=${()=>openFeatureComingSoon({label:'AI Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."})} className=${itemCls(false)} title="AI Canvas">
+        <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'AI Canvas' : ''}
+      </button>
+      <button onClick=${()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})} className=${itemCls(false)} title="Ideas">
+        <${I} name="Lightbulb" size=${17}/> ${!collapsed ? 'Ideas' : ''}
+      </button>
+      ${[
         ['projects','FolderKanban','My Projects'],
         ['planner','CalendarDays','Content Planner'],
         ['history','Clock','History'],
@@ -1748,7 +1764,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
           <button onClick=${openNotifications} className="mt-2 w-full py-[6px] rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[11px] font-[650] flex items-center justify-center gap-1">
             ✨ ${isAdminUser ? 'Unlimited Credits' : `${credits.toLocaleString('en-IN')} / ${monthlyCredits.toLocaleString('en-IN')} Credits`}
           </button>
-          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-gradient-to-r from-[#27272a] to-[#000000] text-white text-[12px] font-[650]">Upgrade Now →</button>
+          <button onClick=${()=>setModule('upgrade')} className="mt-[10px] w-full py-[9px] rounded-[11px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12px] font-[650] transition-colors">Upgrade Now →</button>
         </div>
       ` : html`
         <button onClick=${()=>setModule('upgrade')} className="w-full py-[9px] rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" title="Upgrade">
@@ -1850,6 +1866,21 @@ function ComingSoonModal({plan,onClose}){
       </div>
       <div className="font-[750] text-[18px] display">${plan==='pro'?'Zedith Pro':'Zedith Elite'} — Coming Soon</div>
       <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">Checkout integration is under development. For now, ${plan==='pro'?'Pro':'Elite'} upgrades are not yet available.</div>
+      <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
+    </div>
+  </div>`;
+}
+
+// ---------- Feature Coming Soon Modal (for nav items not built yet) ----------
+function FeatureComingSoonModal({feature,onClose}){
+  return html`
+  <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
+    <div className="modal-panel modal-in w-[420px] max-w-[96vw] rounded-[22px] p-6 text-center" onClick=${e=>e.stopPropagation()}>
+      <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-[var(--zed)]/18 to-[var(--zed-lighter)]/10 border border-[var(--zed)]/25 flex items-center justify-center mx-auto mb-4">
+        <${I} name=${feature?.icon||'Sparkles'} size=${24} className="text-[var(--zed)]"/>
+      </div>
+      <div className="font-[750] text-[18px] display">${feature?.label||'This feature'} — Coming Soon</div>
+      <div className="text-[13px] text-zinc-500 mt-2 leading-relaxed">${feature?.description||"We're actively building this. Check back soon."}</div>
       <button onClick=${onClose} className="mt-5 px-6 py-[10px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-sm font-[600] shadow-sm transition-colors">Got it</button>
     </div>
   </div>`;
