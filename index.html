@@ -52,17 +52,17 @@ function zedithLoadCDNTailwind(){
 :root{
   --zed:#7c3aed; --zed-600:#6d28d9; --zed-light:#8b5cf6; --zed-lighter:#a78bfa;
   --zed-tint-bg:#f3eefe; --zed-tint-bg2:#ede4fd;
-  --zed-solid:#3f3f46; --zed-solid-600:#27272a;
+  --zed-solid:#7c3aed; --zed-solid-600:#6d28d9;
   --zed-surface:#ffffff; --zed-surface2:#f7f7f8; --zed-page:#fbfaf7;
   --zed-border:#e4e4e7; --zed-active:#f0f0f1;
   --zed-gold:#d4a24c; --zed-gold-bg:#fdf6ea;
 }
 .dark{
-  --zed:#a78bfa; --zed-600:#c4b5fd; --zed-light:#8b5cf6; --zed-lighter:#7c3aed;
-  --zed-tint-bg:#2c2440; --zed-tint-bg2:#3a2f57;
-  --zed-solid:#3f3f46; --zed-solid-600:#52525b;
-  --zed-surface:#1e1f20; --zed-surface2:#212223; --zed-page:#161719;
-  --zed-border:#2a2b2d; --zed-active:#323336;
+  --zed:#9253f7; --zed-600:#a78bfa; --zed-light:#8b5cf6; --zed-lighter:#c4b5fd;
+  --zed-tint-bg:#1b0d39; --zed-tint-bg2:#241246;
+  --zed-solid:#7c3aed; --zed-solid-600:#8b5cf6;
+  --zed-surface:#0a0c13; --zed-surface2:#0e111a; --zed-page:#050609;
+  --zed-border:#171a23; --zed-active:#150e23;
   --zed-gold:#d4a24c; --zed-gold-bg:#2a2416;
 }
 *{font-family:Inter,system-ui,sans-serif}
@@ -1612,7 +1612,7 @@ function App(){
 
   const renderModule=()=>{
     switch(module){
-      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} />`;
+      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
       case 'allchats': return html`<${AllChatsView} chats=${chats} onOpenChat=${openChat} onNewChat=${startNewChat} deleteChat=${deleteChat} updateChat=${updateChat} />`;
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
@@ -1629,7 +1629,7 @@ function App(){
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
       case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${{...planConfig, elite:planConfig.elite||planConfig.infinity||1000000}} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
-      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} />`;
+      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
     }
   };
 
@@ -1723,8 +1723,8 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
           ${!collapsed ? label : null}
         </button>
       `)}
-      <button onClick=${()=>openFeatureComingSoon({label:'AI Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."})} className=${itemCls(false)} title="AI Canvas">
-        <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'AI Canvas' : ''}
+      <button onClick=${()=>openFeatureComingSoon({label:'Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."})} className=${itemCls(false)} title="Canvas">
+        <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'Canvas' : ''}
       </button>
       <button onClick=${()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})} className=${itemCls(false)} title="Ideas">
         <${I} name="Lightbulb" size=${17}/> ${!collapsed ? 'Ideas' : ''}
@@ -3258,7 +3258,7 @@ function GoalsCard({currentValues}){
   const currentFor=(metric)=> Number(currentValues?.[metric] ?? 0);
 
   return html`
-  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
+  <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5">
     <div className="flex items-center justify-between mb-1">
       <div className="font-[750] text-[14px] display">Goals</div>
       <button onClick=${()=>setAdding(a=>!a)} className="text-[11.5px] font-[650] text-[var(--zed)] flex items-center gap-1 hover:opacity-70 transition-opacity">
@@ -3546,7 +3546,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
 }
 
 // ---------- Dashboard (Home) ----------
-function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits}){
+function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits, openNotifications, openFeatureComingSoon}){
   const hour = new Date().getHours();
   const greeting = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
   const name = profile?.display_name || (isAdminUser ? 'Owner' : 'Creator');
@@ -3554,26 +3554,46 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
   const recentChats = [...chats].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,4);
   const recentProjects = [...projects].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,3);
 
+  const openCanvas = ()=>openFeatureComingSoon({label:'Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."});
+
   const quickActions = [
     {label:'AI Chat', desc:'Get AI answers and advice', icon:'MessageCircle', action:()=>onNewChat()},
-    {label:'SEO Studio', desc:'Optimize content for any platform', icon:'Search', action:()=>setModule('seo')},
-    {label:'Voice Studio', desc:'Generate realistic AI voices', icon:'Mic', action:()=>setModule('voice')},
+    {label:'Canvas', desc:'Bring your ideas to life visually', icon:'LayoutDashboard', action:openCanvas},
+    {label:'Ideas', desc:'Capture and expand ideas', icon:'Lightbulb', action:()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})},
     {label:'New Project', desc:'Start a new creative project', icon:'FolderPlus', action:()=>setModule('projects')},
   ];
 
   return html`
-  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[var(--zed-page)] overflow-y-auto">
-    <div className="px-5 md:px-9 py-7 max-w-[1100px] mx-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] overflow-y-auto">
+    <!-- Header row: search + notifications + credits badge -->
+    <div className="hidden md:flex items-center justify-between px-9 pt-6 pb-2 gap-4">
+      <div></div>
+      <div className="flex items-center gap-3">
+        <button className="flex items-center gap-2 px-3 py-[8px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] text-[12.5px] text-zinc-400 w-[220px]">
+          <${I} name="Search" size=${14}/> Search anything...
+          <span className="ml-auto text-[10px] border border-zinc-300 dark:border-zinc-700 rounded px-[5px] py-[1px]">⌘K</span>
+        </button>
+        <button onClick=${openNotifications} className="p-[9px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-colors" title="Notifications">
+          <${I} name="Bell" size=${15}/>
+        </button>
+        <div className="flex items-center gap-[6px] px-3 py-[9px] rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[12px] font-[650]">
+          <${I} name="Zap" size=${13}/> ${isAdminUser ? 'Unlimited' : `${credits.toLocaleString('en-IN')} Credits`}
+        </div>
+      </div>
+    </div>
+
+    <div className="px-5 md:px-9 py-4 md:py-3 max-w-[1100px] mx-auto">
       <div className="text-[22px] md:text-[26px] font-[800] display">${greeting}, ${name}! 👋</div>
       <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-7">Plan. Create. Analyze. Grow. All in one workspace.</div>
 
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Quick Actions</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         ${quickActions.map(a=>html`
-          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all group">
             <div className="w-9 h-9 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-3"><${I} name=${a.icon} size=${16}/></div>
             <div className="font-[650] text-[13px]">${a.label}</div>
             <div className="text-[11px] text-zinc-500 mt-[2px]">${a.desc}</div>
+            <${I} name="ArrowRight" size=${13} className="mt-2 text-[var(--zed)] opacity-0 group-hover:opacity-100 transition-opacity"/>
           </button>
         `)}
       </div>
@@ -3602,21 +3622,39 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
       `:null}
 
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Today's Overview</div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600]">Total Chats</div>
-          <div className="text-[20px] font-[800] display mt-1">${chats.length}</div>
+          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="Lightbulb" size=${11}/> Ideas Captured</div>
+          <div className="text-[20px] font-[800] display mt-1">0</div>
+          <div className="text-[9.5px] text-zinc-400 mt-[2px]">Coming soon</div>
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600]">Active Projects</div>
+          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="FolderKanban" size=${11}/> Projects in Progress</div>
           <div className="text-[20px] font-[800] display mt-1">${projects.length}</div>
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600]">Credits Left</div>
+          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="MessageCircle" size=${11}/> Total Chats</div>
+          <div className="text-[20px] font-[800] display mt-1">${chats.length}</div>
+        </div>
+        <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
+          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="Star" size=${11}/> Credits Left</div>
           <div className="text-[20px] font-[800] display mt-1">${isAdminUser?'∞':`${credits.toLocaleString('en-IN')}`}</div>
           ${!isAdminUser?html`<div className="text-[9.5px] text-zinc-400">of ${monthlyCredits.toLocaleString('en-IN')}</div>`:null}
         </div>
       </div>
+
+      <!-- AI Canvas promo -->
+      <button onClick=${openCanvas} className="w-full text-left p-6 rounded-[18px] border border-[var(--zed)]/25 bg-gradient-to-br from-[var(--zed-tint-bg)] to-[var(--zed-surface)] dark:from-[var(--zed-tint-bg2)] dark:to-[var(--zed-surface)] hover:border-[var(--zed)]/50 transition-all group">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-9 h-9 rounded-[10px] bg-[var(--zed)]/15 text-[var(--zed)] flex items-center justify-center"><${I} name="LayoutDashboard" size=${16}/></div>
+          <div className="font-[700] text-[14.5px]">New: Canvas</div>
+          <span className="text-[9.5px] font-[700] px-[8px] py-[2px] rounded-full bg-[var(--zed)] text-white">NEW</span>
+        </div>
+        <div className="text-[12.5px] text-zinc-500 dark:text-zinc-400 max-w-[420px] mb-4">Visualize your ideas, create mind maps, flowcharts, and more with AI.</div>
+        <div className="inline-flex items-center gap-2 px-4 py-[9px] rounded-[12px] bg-[var(--zed-solid)] group-hover:bg-[var(--zed-solid-600)] text-white text-[12.5px] font-[650] transition-colors">
+          Try Canvas <${I} name="ArrowRight" size=${13}/>
+        </div>
+      </button>
     </div>
   </div>`;
 }
@@ -3928,18 +3966,18 @@ function AnalyticsView({addNotification}){
           <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Understand your growth. Improve every upload.</div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur disabled:opacity-50">
+          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] backdrop-blur disabled:opacity-50">
             <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
           </button>
-          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur disabled:opacity-50">
+          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] backdrop-blur disabled:opacity-50">
             <${I} name="FileDown" size=${13}/> Export PDF
           </button>
-          <div className="flex items-center bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+          <div className="flex items-center bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
             ${['Daily','Monthly'].map(p=>html`
               <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${period===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
             `)}
           </div>
-          <div className="flex items-center bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+          <div className="flex items-center bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
             ${platformTabs.map(p=>html`
               <button key=${p} onClick=${()=>setPlatformFilter(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${platformFilter===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
             `)}
@@ -3954,7 +3992,7 @@ function AnalyticsView({addNotification}){
         <${SkeletonBlock} className="h-[160px] mb-5"/>
         <${SkeletonBlock} className="h-[320px] mb-5"/>
       ` : !connected ? html`
-        <div className="bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+        <div className="bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
           <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
           <div className="font-[700] text-[15px]">No Social Accounts Connected</div>
           <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
@@ -3973,7 +4011,7 @@ function AnalyticsView({addNotification}){
           <!-- Growth Overview cards -->
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             ${metricCards.map(m=>html`
-              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
+              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
                 <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-[0.10] group-hover:opacity-[0.16] transition-opacity" style=${{background:m.color}}></div>
                 <div className="flex items-center justify-between relative">
                   <div className="text-[10.5px] text-zinc-500 font-[600] uppercase tracking-wide">${m.label}</div>
@@ -4010,7 +4048,7 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Growth Chart -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
               <div>
                 <div className="font-[750] text-[14px] display">Growth Chart</div>
@@ -4018,7 +4056,7 @@ function AnalyticsView({addNotification}){
               </div>
               <div className="flex items-center bg-zinc-100 dark:bg-[var(--zed-surface2)] rounded-[11px] p-[3px] text-[11px]">
                 ${['Views','Subscribers','Watch Time','Engagement'].map(m=>html`
-                  <button key=${m} onClick=${()=>setChartMetric(m)} className=${`px-[10px] py-[6px] rounded-[8px] font-[650] transition-all ${chartMetric===m?'bg-white dark:bg-[#404040] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${m}</button>
+                  <button key=${m} onClick=${()=>setChartMetric(m)} className=${`px-[10px] py-[6px] rounded-[8px] font-[650] transition-all ${chartMetric===m?'bg-white dark:bg-[var(--zed-surface2)] text-[var(--zed)] shadow-sm':'text-zinc-500'}`}>${m}</button>
                 `)}
               </div>
             </div>
@@ -4031,7 +4069,7 @@ function AnalyticsView({addNotification}){
           <div>
             <div className="font-[750] text-[14px] display mb-3">Platform Comparison</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 font-[700] text-[13px]"><${I} name="Youtube" size=${15} className="text-red-500"/> YouTube</div>
                   <${TrendPill} value=${pctChange(viewsSeries)}/>
@@ -4049,7 +4087,7 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Best Performing Content -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="font-[750] text-[14px] display mb-3">Best Performing Content</div>
             ${topVideos.length ? html`
               <div className="overflow-x-auto -mx-1">
@@ -4068,7 +4106,7 @@ function AnalyticsView({addNotification}){
                     ${topVideos.map((v,i)=>{
                       const score = Math.min(100, Math.round(((v.views||0)/(Math.max(...topVideos.map(x=>x.views||1))))*100));
                       return html`
-                      <tr key=${v.id||i} className="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-[#2d2d2d] transition-colors cursor-pointer">
+                      <tr key=${v.id||i} className="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-[var(--zed-active)] transition-colors cursor-pointer">
                         <td className="py-[10px] px-1">
                           <div className="flex items-center gap-3 min-w-0">
                             ${v.thumbnail?html`<img src=${v.thumbnail} className="w-14 h-9 rounded-[8px] object-cover flex-shrink-0"/>`:html`<div className="w-14 h-9 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 flex-shrink-0 text-[10px]">${i+1}</div>`}
@@ -4093,7 +4131,7 @@ function AnalyticsView({addNotification}){
             <div className="font-[750] text-[14px] display mb-3">AI Recommendations</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               ${recommendations.map((r,i)=>html`
-                <div key=${i} className="rounded-[18px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-4 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
+                <div key=${i} className="rounded-[18px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-4 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 rounded-[10px] bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0"><${I} name=${r.icon} size=${14}/></div>
@@ -4114,7 +4152,7 @@ function AnalyticsView({addNotification}){
           <div>
             <div className="font-[750] text-[14px] display mb-3">Audience</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5">
                 <div className="font-[700] text-[13px] mb-3">Age &amp; Gender</div>
                 ${(data?.demographics ?? []).length ? data.demographics.map((row,i)=>html`
                   <div key=${i} className="flex items-center gap-3 mb-2 text-[12px]">
@@ -4124,7 +4162,7 @@ function AnalyticsView({addNotification}){
                   </div>
                 `) : html`<div className="text-[12px] text-zinc-400 text-center py-4">No demographic data yet.</div>`}
               </div>
-              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
+              <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5">
                 <div className="font-[700] text-[13px] mb-3">Top Countries</div>
                 ${(data?.topCountries ?? []).length ? html`
                   <div className="flex items-center gap-4">
@@ -4141,14 +4179,14 @@ function AnalyticsView({addNotification}){
           </div>
 
           <!-- Upload Performance Timeline -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white/70 dark:bg-[var(--zed-surface)]/70 backdrop-blur-md p-5">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5">
             <div className="font-[750] text-[14px] display mb-3">Upload Performance Timeline</div>
             ${topVideos.length ? html`
               <div className="space-y-2">
                 ${topVideos.map((v,i)=>{
                   const perf = performanceLabel(v.views);
                   return html`
-                  <div key=${v.id||i} className="flex items-center gap-3 p-3 rounded-[14px] hover:bg-zinc-50 dark:hover:bg-[#2d2d2d] transition-colors">
+                  <div key=${v.id||i} className="flex items-center gap-3 p-3 rounded-[14px] hover:bg-zinc-50 dark:hover:bg-[var(--zed-active)] transition-colors">
                     ${v.thumbnail?html`<img src=${v.thumbnail} className="w-16 h-10 rounded-[8px] object-cover flex-shrink-0"/>`:html`<div className="w-16 h-10 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 flex-shrink-0"></div>`}
                     <div className="min-w-0 flex-1">
                       <div className="font-[600] text-[12.5px] truncate">${v.title}</div>
@@ -4172,7 +4210,7 @@ function AnalyticsView({addNotification}){
           }}/>
 
           <!-- Weekly Report -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[#242424]/80 dark:to-[#1e1e1e]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[var(--zed-surface)]/80 dark:to-[var(--zed-page)]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
             <div>
               <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
               <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
@@ -5724,14 +5762,19 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
   };
 
   const CardShell = ({label, icon, children})=> html`
-    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px] backdrop-blur-sm">
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide"><${I} name=${icon} size=${13}/> ${label}</div>
         <div className="flex items-center gap-1">
-          <button onClick=${generate} disabled=${loading} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"><${I} name="RefreshCw" size=${13} className=${loading?'animate-spin':''}/></button>
+          <button onClick=${generate} disabled=${loading} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] disabled:opacity-40"><${I} name="RefreshCw" size=${13} className=${loading?'animate-spin':''}/></button>
         </div>
       </div>
       ${children}
+    </div>`;
+
+  const TagPills = (items)=> html`
+    <div className="flex flex-wrap gap-[6px]">
+      ${(items||[]).map((t,i)=>html`<span key=${i} className="px-[10px] py-[4px] rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] text-[11.5px] font-[600]">${t.startsWith('#')?t:'#'+t.replace(/\s+/g,'')}</span>`)}
     </div>`;
 
   const CopyRow=(text)=> html`
@@ -5752,11 +5795,11 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
           ${CopyRow(result.description||'')}
         </${CardShell}>
         <${CardShell} label="Hashtags" icon="Hash">
-          <p className="text-[13px] select-text text-[var(--zed)]">${(result.hashtags||[]).join(' ')}</p>
+          ${TagPills(result.hashtags||[])}
           ${CopyRow((result.hashtags||[]).join(' '))}
         </${CardShell}>
         <${CardShell} label="Tags" icon="Tag">
-          <p className="text-[13px] select-text text-zinc-700 dark:text-zinc-300">${(result.tags||[]).join(', ')}</p>
+          ${TagPills(result.tags||[])}
           ${CopyRow((result.tags||[]).join(', '))}
         </${CardShell}>
       </div>`;
@@ -5767,7 +5810,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
           ${CopyRow(result.caption||'')}
         </${CardShell}>
         <${CardShell} label="Hashtags" icon="Hash">
-          <p className="text-[13px] select-text text-[var(--zed)]">${(result.hashtags||[]).join(' ')}</p>
+          ${TagPills(result.hashtags||[])}
           ${CopyRow((result.hashtags||[]).join(' '))}
         </${CardShell}>
       </div>`;
@@ -5791,33 +5834,43 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
   };
 
   return html`
-  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8">
+  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8 bg-[var(--zed-page)]">
     <div className="max-w-[880px] mx-auto">
-      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Search" size=${20}/> SEO Studio</div>
-      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Generate platform-optimized content in one click.</div>
+      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/> SEO Studio</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Generate SEO-optimized content for any platform.</div>
 
       <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
-        <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic</label>
-        <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">1</div>
+          <div className="text-[13px] font-[700]">Enter Your Topic or Title</div>
+        </div>
+        <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic or Video Title</label>
+        <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
         </div>
 
         <button onClick=${generate} disabled=${loading || !topic.trim()} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
           ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Sparkles" size=${15}/>`}
-          ${loading ? 'Generating…' : 'Generate'}
+          ${loading ? 'Generating…' : 'Generate SEO'}
         </button>
         ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
       </div>
 
+      ${result ? html`
+        <div className="flex items-center gap-2 mt-8 mb-4">
+          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">2</div>
+          <div className="text-[13px] font-[700]">Your SEO Results</div>
+        </div>
+      `:null}
       ${renderResult()}
     </div>
   </div>`;
@@ -5881,30 +5934,34 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
   };
 
   return html`
-  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8">
+  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8 bg-[var(--zed-page)]">
     <div className="max-w-[960px] mx-auto">
-      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="TrendingUp" size=${20}/> Trend Explorer</div>
-      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Live trending opportunities, pulled from real-time web search.</div>
+      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="TrendingUp" size=${18} className="text-[var(--zed)]"/> Trend Explorer</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Discover trending ideas and content opportunities in real-time.</div>
 
       <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">1</div>
+          <div className="text-[13px] font-[700]">Enter Your Preferences</div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${TREND_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche / Industry</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
           <div>
-            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${TREND_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Country <span className="normal-case text-zinc-400">(optional)</span></label>
-            <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[#1c1c1c] text-[13.5px]"/></div>
+            <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
         </div>
 
         <button onClick=${findTrends} disabled=${loading} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
-          ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Search" size=${15}/>`}
-          ${loading ? 'Searching live web…' : 'Find Trends'}
+          ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Sparkles" size=${15}/>`}
+          ${loading ? 'Searching live web…' : 'Find Trending Ideas'}
         </button>
         ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
       </div>
@@ -5916,7 +5973,12 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
       `:null}
 
       ${trends ? html`
-        <div className="mt-8 space-y-4">
+        <div className="flex items-center gap-2 mt-8 mb-4">
+          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">2</div>
+          <div className="text-[13px] font-[700]">Trending Ideas for You</div>
+          <span className="flex items-center gap-1 text-[10.5px] text-emerald-500 font-[600]"><span className="w-[6px] h-[6px] rounded-full bg-emerald-500"></span> Live data</span>
+        </div>
+        <div className="space-y-4">
           ${trends.map((t,i)=>html`
             <div key=${i} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[20px] transition hover:shadow-zed-soft">
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -6133,7 +6195,7 @@ function ZedithPicksView(){
     </div>
 
     <!-- Right sidebar: ads, only on this page -->
-    <aside className="w-[260px] shrink-0 h-full border-l border-zinc-200 dark:border-[#2e2e2e] bg-white dark:bg-[#1c1c1c] p-4 space-y-4 overflow-y-auto hidden lg:block">
+    <aside className="w-[260px] shrink-0 h-full border-l border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] p-4 space-y-4 overflow-y-auto hidden lg:block">
       <div className="text-[11px] uppercase tracking-wider text-zinc-400 font-[700] mb-1">Advertisements</div>
       ${ads.length===0 ? html`<div className="text-[11.5px] text-zinc-400">No ads configured.</div>` : ads.slice(0,3).map(ad=>html`<${AdPanel} key=${ad.id} ad=${ad}/>`)}
     </aside>
