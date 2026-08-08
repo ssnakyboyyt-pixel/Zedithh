@@ -1664,7 +1664,7 @@ function App(){
     <div className="flex-1 flex flex-col min-w-0 h-full">
       <!-- Global mobile header: shown on every module so nav is always reachable on mobile -->
       ${module!=='chat' ? html`
-      <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-page)]/90 backdrop-blur shrink-0 relative">
+      <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-page)] shrink-0 relative">
         <button onClick=${()=>setMobileSidebarOpen(true)} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
           <${ZedithMark} size=${24} color="currentColor"/>
         </button>
@@ -2024,7 +2024,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
   return html`
   <div className="flex-1 flex flex-col h-full bg-[var(--zed-page)] dark:bg-[var(--zed-surface)]">
     <!-- Mobile header: hamburger, centered title, credits pill -->
-    <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur relative">
+    <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] relative">
       <button onClick=${openSidebar} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
         <${ZedithMark} size=${24} color="currentColor"/>
       </button>
@@ -2037,7 +2037,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
       </button>
     </div>
     <!-- Desktop header -->
-    <div className="hidden md:flex h-[54px] px-4 items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur">
+    <div className="hidden md:flex h-[54px] px-4 items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
       <div className="flex items-center gap-2 text-[13.5px] font-[600]">
         Chat
         <${I} name="ChevronDown" size=${13} className="text-zinc-400"/>
@@ -2869,10 +2869,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
           ${['All','Male','Female'].map(f=>html`
             <button key=${f} onClick=${()=>setGenderFilter(f)} className=${`px-3 py-[6px] rounded-full border text-[11.5px] font-[600] transition-colors ${genderFilter===f?'border-[var(--zed)] text-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-zinc-700 text-zinc-500'}`}>${f}</button>
           `)}
-          <select value=${langFilter} onChange=${e=>setLangFilter(e.target.value)} className="px-3 py-[6px] rounded-full border border-zinc-200 dark:border-zinc-700 text-[11.5px] font-[600] bg-transparent text-zinc-500 outline-none">
-            <option value="All">All Languages</option>
-            ${[...new Set(myVoices.map(v=>v.accent))].map(a=>html`<option key=${a} value=${a}>${a}</option>`)}
-          </select>
+          <${CustomSelect} value=${langFilter} onChange=${setLangFilter} options=${[{value:'All',label:'All Languages'}, ...[...new Set(myVoices.map(v=>v.accent))].map(a=>({value:a,label:a}))]} align="left" className="px-3 py-[6px] rounded-full border border-zinc-200 dark:border-[var(--zed-border)] text-[11.5px] font-[600] bg-transparent text-zinc-500"/>
         </div>
         <div className="space-y-1 max-h-[280px] overflow-y-auto pr-1">
           ${myVoices.filter(v=> (genderFilter==='All'||v.gender===genderFilter) && (langFilter==='All'||v.accent===langFilter)).map(v=> html`
@@ -3268,11 +3265,9 @@ function GoalsCard({currentValues}){
     <div className="text-[11px] text-zinc-500 mb-4">Set a target and track real progress from your connected account.</div>
 
     ${adding ? html`
-      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700">
-        <select value=${newMetric} onChange=${e=>setNewMetric(e.target.value)} className="text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-2 py-[7px] outline-none">
-          ${Object.entries(metricLabels).filter(([k])=>k!=='revenue').map(([k,l])=>html`<option key=${k} value=${k}>${l}</option>`)}
-        </select>
-        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-zinc-700 rounded-[10px] px-3 py-[7px] outline-none"/>
+      <div className="flex items-center gap-2 mb-4 flex-wrap p-3 rounded-[14px] bg-zinc-50 dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-[var(--zed-border)]">
+        <${CustomSelect} value=${newMetric} onChange=${setNewMetric} options=${Object.entries(metricLabels).filter(([k])=>k!=='revenue').map(([k,l])=>({value:k,label:l}))} align="left" className="text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[10px] px-2 py-[7px]"/>
+        <input type="number" min="1" value=${newTarget} onChange=${e=>setNewTarget(e.target.value)} placeholder="Target value" className="flex-1 min-w-[100px] text-[12px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[10px] px-3 py-[7px] outline-none"/>
         <button onClick=${addGoal} disabled=${saving} className="text-[12px] font-[650] bg-[var(--zed-solid)] text-white rounded-[10px] px-3 py-[7px] disabled:opacity-50">${saving?'Saving…':'Save'}</button>
       </div>
     ` : null}
@@ -3435,7 +3430,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
   <div className="fixed inset-0 z-[700] bg-black/50 backdrop-blur-sm flex items-start md:items-center justify-center p-0 md:p-6 overflow-y-auto" onClick=${onClose}>
     <div className="bg-white dark:bg-[var(--zed-page)] w-full md:max-w-[720px] md:rounded-[22px] min-h-full md:min-h-0 md:max-h-[88vh] overflow-y-auto shadow-2xl" onClick=${e=>e.stopPropagation()} ref=${reportRef}>
 
-      <div className="sticky top-0 z-10 bg-white/90 dark:bg-[var(--zed-page)]/90 backdrop-blur border-b border-zinc-200 dark:border-[#333] px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-white dark:bg-[var(--zed-page)] border-b border-zinc-200 dark:border-[var(--zed-border)] px-6 py-4 flex items-center justify-between">
         <div>
           <div className="font-[800] text-[16px] display">Weekly Insights Report</div>
           <div className="text-[11px] text-zinc-500">${data.channel?.title || 'Your Channel'} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
@@ -6303,7 +6298,7 @@ function ZedithPicksView(){
   return html`
   <div className="flex-1 h-full flex overflow-hidden bg-[var(--zed-page)] dark:bg-[var(--zed-surface)]">
     <div className="flex-1 overflow-y-auto">
-      <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white/85 dark:bg-[var(--zed-surface)]/90 backdrop-blur sticky top-0 z-10">
+      <div className="h-[54px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <${I} name="Compass" size=${18} className="text-[var(--zed)]"/>
           <span className="font-[700] text-[14px] display">Zedith Picks</span>
