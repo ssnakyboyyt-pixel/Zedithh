@@ -291,9 +291,9 @@ function CustomSelect({value, onChange, options, className='', panelClassName=''
         <${I} name="ChevronDown" size=${13} className=${`opacity-60 shrink-0 transition-transform duration-200 ${open?'rotate-180 text-[var(--zed)] opacity-100':''}`}/>
       </button>
       ${open ? html`
-        <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white/95 dark:bg-[var(--zed-surface2)]/95 backdrop-blur-md shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
+        <div className=${`absolute ${align==='right'?'right-0':'left-0'} z-50 mt-[6px] min-w-full w-max max-h-[260px] overflow-y-auto rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface2)] shadow-[0_10px_30px_rgba(20,10,60,0.12)] dark:shadow-[0_10px_34px_rgba(0,0,0,0.55)] py-[6px] fade-in ${panelClassName}`}>
           ${opts.map(o=>html`
-            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[var(--zed)] font-[650] bg-[var(--zed-solid)]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#343434]'}`}>
+            <button key=${o.value} type="button" onClick=${()=>{ onChange(o.value); setOpen(false); }} className=${`w-full flex items-center justify-between gap-3 text-left px-[13px] py-[9px] text-[12.5px] whitespace-nowrap rounded-[9px] mx-[4px] w-[calc(100%-8px)] transition-colors ${o.value===value?'text-[var(--zed)] font-[650] bg-[var(--zed-solid)]/10':'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)]'}`}>
               <span className="truncate">${o.label}</span>
               ${o.value===value ? html`<${I} name="Check" size=${13} className="shrink-0 text-[var(--zed)]"/>` : null}
             </button>
