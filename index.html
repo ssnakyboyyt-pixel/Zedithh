@@ -1694,11 +1694,11 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
   <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[var(--zed-surface)] border-zinc-200 dark:border-[var(--zed-border)] flex flex-col shadow-2xl md:shadow-none transition-all duration-200 overflow-hidden`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[var(--zed-border)]">
       <button onClick=${toggleCollapsed} className=${`hidden md:flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
-        <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
+        <div className="w-[36px] h-[36px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${30} color="currentColor" strokeWidth=${2.2}/></div>
         ${!collapsed ? html`<span className="display font-[800] text-[18px] tracking-tight">Zedith</span>` : null}
       </button>
       <div className="md:hidden flex items-center gap-2 flex-1">
-        <div className="w-[32px] h-[32px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${26} color="currentColor" strokeWidth=${2.2}/></div>
+        <div className="w-[36px] h-[36px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${30} color="currentColor" strokeWidth=${2.2}/></div>
         <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
       </div>
       <button onClick=${onCloseMobile} className="md:hidden p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto" aria-label="Close sidebar">
@@ -4066,7 +4066,7 @@ function AnalyticsView({addNotification, transactions}){
           </div>
 
           <!-- AI Summary -->
-          <div className="relative overflow-hidden rounded-[22px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[var(--zed-surface)]/80 dark:to-[var(--zed-page)]/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <div className="relative overflow-hidden rounded-[22px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
             <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full opacity-[0.06]" style=${{background:'var(--zed)'}}></div>
             <div className="flex items-center gap-2 mb-3 relative">
               <div className="w-8 h-8 rounded-[10px] bg-[var(--zed-solid)] text-white flex items-center justify-center"><${ZedithMark} size=${15} color="white"/></div>
@@ -4256,7 +4256,7 @@ function AnalyticsView({addNotification, transactions}){
           }}/>
 
           <!-- Weekly Report -->
-          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-gradient-to-br from-white/80 to-zinc-50/60 dark:from-[var(--zed-surface)]/80 dark:to-[var(--zed-page)]/60 backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-6 flex items-center justify-between flex-wrap gap-4">
             <div>
               <div className="font-[750] text-[14px] display mb-1">Weekly Report</div>
               <div className="text-[12px] text-zinc-500 max-w-[420px]">A full AI-generated summary of this week's performance, ready to download.</div>
@@ -4468,15 +4468,15 @@ function UpgradeView({plan, planConfig, onPlan}) {
   ];
 
   return html`
-  <div className="flex-1 h-full overflow-y-auto bg-[var(--zed-page)] dark:bg-[#1a1a1a] text-zinc-900 dark:text-white transition-colors">
+  <div className="flex-1 h-full overflow-y-auto bg-[var(--zed-page)] text-zinc-900 dark:text-white transition-colors">
     <div className="px-4 sm:px-10 pt-6 sm:pt-10 pb-10 max-w-[1180px]">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="text-[24px] sm:text-[32px] font-[800] display">Upgrade Your <span className="text-[var(--zed)]">Experience</span></div>
           <div className="text-zinc-500 dark:text-zinc-400 mt-1 text-[13.5px]">Choose the plan that fits your creative journey.</div>
-          <div className="mt-5 inline-flex bg-zinc-100 dark:bg-[#292929] rounded-full p-1 text-[12.5px] border border-zinc-200 dark:border-zinc-800">
-            <button onClick=${()=>setYearly(false)} className=${`px-4 py-[6px] rounded-full transition ${!yearly?'bg-white dark:bg-[#373737] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>Monthly</button>
-            <button onClick=${()=>setYearly(true)} className=${`px-4 py-[6px] rounded-full transition flex items-center gap-2 ${yearly?'bg-white dark:bg-[#373737] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>
+          <div className="mt-5 inline-flex bg-zinc-100 dark:bg-[var(--zed-surface2)] rounded-full p-1 text-[12.5px] border border-zinc-200 dark:border-[var(--zed-border)]">
+            <button onClick=${()=>setYearly(false)} className=${`px-4 py-[6px] rounded-full transition ${!yearly?'bg-white dark:bg-[var(--zed-active)] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>Monthly</button>
+            <button onClick=${()=>setYearly(true)} className=${`px-4 py-[6px] rounded-full transition flex items-center gap-2 ${yearly?'bg-white dark:bg-[var(--zed-active)] shadow-sm font-[650] text-zinc-900 dark:text-white':'text-zinc-500'}`}>
               Yearly <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-[2px] rounded-full">Save 20%</span>
             </button>
           </div>
@@ -4488,7 +4488,7 @@ function UpgradeView({plan, planConfig, onPlan}) {
         ${plans.map(p=> {
           const {display, sub} = getPrice(p.k);
           return html`
-          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[var(--zed-surface)] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[var(--zed-surface)]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#212121]' : ''}`}>
+          <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[var(--zed-surface)] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[var(--zed-surface)]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]' : ''}`}>
             ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#5dc3cf] text-white'}`}>${p.badge}</div>`:null}
             <div className="text-zinc-400 mb-2 mt-2">
               ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#5dc3cf]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
@@ -4498,10 +4498,10 @@ function UpgradeView({plan, planConfig, onPlan}) {
             <div className="mt-2 text-[14px] font-[600] text-[var(--zed)]">${p.credits.toLocaleString('en-IN')} Credits / month</div>
             <div className="mt-2 text-[30px] font-[800] tracking-tight">${display} <span className="text-[12px] text-zinc-500 font-[500]">${sub}</span></div>
             ${yearly && p.k!=='free' ? html`<div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-[600] mt-1">You save ₹${Math.round(MONTHLY_PRICES[p.k]*12*0.2).toLocaleString('en-IN')} / year</div>` : null}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-3 space-y-[9px] text-[12.5px] flex-1">
+            <div className="border-t border-zinc-200 dark:border-[var(--zed-border)] pt-4 mt-3 space-y-[9px] text-[12.5px] flex-1">
               ${p.features.map(([f,ok])=> html`<div className="flex items-start gap-2"><span className=${ok ? 'text-emerald-500' : 'text-zinc-300 dark:text-zinc-600'}>${ok ? '✓' : '✕'}</span><span className=${ok ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400'}>${f}</span></div>`)}
             </div>
-            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[#313131] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 cursor-default' : ''} ${p.k==='pro' ? 'bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white shadow-zed-soft' : ''} ${p.k==='elite' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
+            <button onClick=${()=>onPlan(p.k)} disabled=${p.k==='free'} className=${`mt-5 w-full py-[12px] rounded-[13px] font-[700] text-[13.5px] transition ${p.k==='free' ? 'bg-zinc-100 dark:bg-[var(--zed-active)] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-[var(--zed-border)] cursor-default' : ''} ${p.k==='pro' ? 'bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white shadow-zed-soft' : ''} ${p.k==='elite' ? 'bg-amber-300 hover:bg-amber-200 text-zinc-900' : ''}`}>
               ${p.btn}
             </button>
           </div>`;
@@ -5767,9 +5767,11 @@ function AdminSettings(){
 // =====================================================================
 const SEO_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','Bluesky'];
 const SEO_NICHES = ['Gaming','AI','Technology','Finance','Education','Business','Lifestyle','Music','Sports','Other'];
+const SEO_CONTENT_TYPES = ['Long-form Video','Short-form Video','Post','Carousel','Article','Podcast'];
+const SEO_LANGUAGES = ['English','Spanish','French','German','Portuguese','Hindi','Arabic','Japanese','Korean'];
 
-function seoPromptFor(platform, topic, niche){
-  const base = `You are Zedith's SEO Studio, an expert social growth strategist and copywriter for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}.
+function seoPromptFor(platform, topic, niche, contentType, language){
+  const base = `You are Zedith's SEO Studio, an expert social growth strategist and copywriter for creators in the "${niche}" niche. The topic is: "${topic}". Platform: ${platform}. Content type: ${contentType||'Long-form Video'}. Write everything in ${language||'English'}.
 
 CRITICAL: Respond with STRICT JSON only. No markdown code fences, no commentary before or after, no extra keys beyond what's specified below. The JSON value for the main text field must be a single clean string — never nested JSON, never additional metadata fields like "image", "cta_link", "engagement_rate", "timestamp", or similar. Only return the exact keys listed.`;
 
@@ -5817,14 +5819,18 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
   const [topic,setTopic]=useState('');
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
+  const [contentType,setContentType]=useState('Long-form Video');
+  const [language,setLanguage]=useState('English');
   const [loading,setLoading]=useState(false);
   const [result,setResult]=useState(null);
   const [error,setError]=useState(null);
+  const [showHowItWorks,setShowHowItWorks]=useState(false);
+  const SEO_COST = 100;
 
-  const generate=async()=>{
+  const generate=async(platformOverride)=>{
+    const genPlatform = platformOverride || platform;
     if(!topic.trim()) return;
 
-    const SEO_COST = 100;
     if(!isAdminUser){
       const enough = await hasEnoughCredits(SEO_COST);
       if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
@@ -5832,7 +5838,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
 
     setLoading(true); setError(null); setResult(null);
     try{
-      const r = await callOR([{role:'user', content: seoPromptFor(platform, topic.trim(), niche)}], {smart:true, userText:topic, maxTokens:2200});
+      const r = await callOR([{role:'user', content: seoPromptFor(genPlatform, topic.trim(), niche, contentType, language)}], {smart:true, userText:topic, maxTokens:2200});
       if(r.error) throw new Error(r.text);
       const cleaned = r.text.replace(/```json|```/g,'').trim();
       let parsed=null;
@@ -5845,9 +5851,9 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       // extraction so the raw/bloated JSON never leaks into the UI.
       const shapeOk = (()=>{
         if(!parsed || typeof parsed!=='object') return false;
-        if(platform==='YouTube') return typeof parsed.title==='string' && typeof parsed.description==='string';
-        if(platform==='Instagram' || platform==='TikTok') return typeof parsed.caption==='string';
-        if(platform==='Threads') return Array.isArray(parsed.thread) && parsed.thread.length>0;
+        if(genPlatform==='YouTube') return typeof parsed.title==='string' && typeof parsed.description==='string';
+        if(genPlatform==='Instagram' || genPlatform==='TikTok') return typeof parsed.caption==='string';
+        if(genPlatform==='Threads') return Array.isArray(parsed.thread) && parsed.thread.length>0;
         return typeof parsed.post==='string' && parsed.post.length>0;
       })();
 
@@ -5860,14 +5866,15 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
           .replace(/[",{}[\]]/g,'')
           .replace(/\\n/g,'\n')
           .trim();
-        if(platform==='YouTube') parsed = {title:topic, description:fallbackText, hashtags:[], tags:[]};
-        else if(platform==='Instagram' || platform==='TikTok') parsed = {caption:fallbackText, hashtags:[]};
-        else if(platform==='Threads') parsed = {thread:[fallbackText]};
+        if(genPlatform==='YouTube') parsed = {title:topic, description:fallbackText, hashtags:[], tags:[]};
+        else if(genPlatform==='Instagram' || genPlatform==='TikTok') parsed = {caption:fallbackText, hashtags:[]};
+        else if(genPlatform==='Threads') parsed = {thread:[fallbackText]};
         else parsed = {post:fallbackText};
       }
+      setPlatform(genPlatform);
       setResult(parsed);
 
-      await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform, niche});
+      await deductCredits(SEO_COST, 'seo', {topic:topic.slice(0,100), platform:genPlatform, niche});
     }catch(e){
       console.error('[SEOStudio] generation failed:', e);
       setError('Could not generate content right now. Please try again.');
@@ -5879,7 +5886,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide"><${I} name=${icon} size=${13}/> ${label}</div>
         <div className="flex items-center gap-1">
-          <button onClick=${generate} disabled=${loading} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] disabled:opacity-40"><${I} name="RefreshCw" size=${13} className=${loading?'animate-spin':''}/></button>
+          <button onClick=${()=>generate()} disabled=${loading} title="Regenerate" className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] disabled:opacity-40"><${I} name="RefreshCw" size=${13} className=${loading?'animate-spin':''}/></button>
         </div>
       </div>
       ${children}
@@ -5948,11 +5955,23 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
 
   return html`
   <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8 bg-[var(--zed-page)]">
-    <div className="max-w-[880px] mx-auto">
-      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/> SEO Studio</div>
-      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Generate SEO-optimized content for any platform.</div>
+    <div className="max-w-[1080px] mx-auto">
+      <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
+        <div>
+          <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/> SEO Studio</div>
+          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Generate SEO-optimized content for any platform.</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick=${()=>setShowHowItWorks(true)} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition">
+            <${I} name="HelpCircle" size=${13}/> How SEO Studio Works?
+          </button>
+          <button onClick=${()=>toast('History coming soon for SEO Studio')} className="flex items-center gap-[6px] text-[12px] font-[650] px-3 py-[9px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white transition">
+            <${I} name="History" size=${13}/> History
+          </button>
+        </div>
+      </div>
 
-      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px] mt-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">1</div>
           <div className="text-[13px] font-[700]">Enter Your Topic or Title</div>
@@ -5960,29 +5979,63 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
         <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic or Video Title</label>
         <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') generate(); }} placeholder="Enter your topic..." className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <div>
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
             <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${SEO_PLATFORMS.map(p=>({value:p,label:p}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
           <div>
-            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
-            <div className="mt-[6px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Content Type</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${contentType} onChange=${setContentType} options=${SEO_CONTENT_TYPES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Language</label>
+            <div className="mt-[6px]"><${CustomSelect} value=${language} onChange=${setLanguage} options=${SEO_LANGUAGES.map(l=>({value:l,label:l}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
         </div>
+        <div className="mt-4">
+          <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Niche</label>
+          <div className="mt-[6px] max-w-[260px]"><${CustomSelect} value=${niche} onChange=${setNiche} options=${SEO_NICHES.map(n=>({value:n,label:n}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
+        </div>
 
-        <button onClick=${generate} disabled=${loading || !topic.trim()} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
+        <button onClick=${()=>generate()} disabled=${loading || !topic.trim()} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
           ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Sparkles" size=${15}/>`}
           ${loading ? 'Generating…' : 'Generate SEO'}
         </button>
         ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
       </div>
 
-      ${result ? html`
-        <div className="flex items-center gap-2 mt-8 mb-4">
-          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">2</div>
-          <div className="text-[13px] font-[700]">Your SEO Results</div>
+      ${showHowItWorks ? html`
+      <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4" onClick=${()=>setShowHowItWorks(false)}>
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-6 max-w-[440px] w-full" onClick=${e=>e.stopPropagation()}>
+          <div className="font-[750] text-[15px] display mb-3">How SEO Studio Works</div>
+          <div className="space-y-2 text-[12.5px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
+            <div>1. Enter your topic and pick a platform, content type, and language.</div>
+            <div>2. Zedith's AI writes a full SEO-optimized package — title, description, hashtags, tags, captions — tailored to that platform's algorithm and audience behavior.</div>
+            <div>3. Copy any section individually, or regenerate just the piece you want to change.</div>
+          </div>
+          <button onClick=${()=>setShowHowItWorks(false)} className="mt-5 w-full py-[10px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13px] font-[650]">Got it</button>
         </div>
+      </div>
+      `:null}
+
+      ${result ? html`
+        <div className="flex items-center justify-between flex-wrap gap-3 mt-8 mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">2</div>
+            <div className="text-[13px] font-[700]">Your SEO Results</div>
+          </div>
+          <div className="text-[11.5px] text-zinc-400">${topic ? `for "${topic.slice(0,50)}${topic.length>50?'…':''}"` : ''}</div>
+        </div>
+        <div className="flex items-center gap-4 border-b border-zinc-200 dark:border-[var(--zed-border)] mb-5 text-[13px] overflow-x-auto no-scrollbar">
+          ${SEO_PLATFORMS.map(p=>html`
+            <button key=${p} onClick=${()=>{ if(p!==platform && !loading){ generate(p); } }} disabled=${loading} className=${`pb-[10px] shrink-0 font-[600] border-b-2 transition-colors flex items-center gap-[6px] disabled:opacity-50 ${platform===p?'border-[var(--zed)] text-zinc-900 dark:text-white':'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+              <${I} name=${p==='YouTube'?'Youtube':p==='Instagram'?'Instagram':p==='TikTok'?'Music2':p==='X'?'Twitter':p==='LinkedIn'?'Linkedin':'MessageSquare'} size=${13}/> ${p}
+            </button>
+          `)}
+          <button onClick=${()=>setShowHowItWorks(true)} className="ml-auto shrink-0 pb-[10px] text-[11.5px] text-zinc-400 hover:text-[var(--zed)] flex items-center gap-1"><${I} name="Settings2" size=${12}/> Edit Preferences</button>
+        </div>
+        <div className="text-[11px] text-zinc-400 -mt-3 mb-4">Switching platforms will regenerate content for that platform using ${SEO_COST} more credits.</div>
       `:null}
       ${renderResult()}
     </div>
