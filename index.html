@@ -1612,7 +1612,7 @@ function App(){
 
   const renderModule=()=>{
     switch(module){
-      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
+      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
       case 'allchats': return html`<${AllChatsView} chats=${chats} onOpenChat=${openChat} onNewChat=${startNewChat} deleteChat=${deleteChat} updateChat=${updateChat} />`;
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
@@ -1621,7 +1621,7 @@ function App(){
       case 'history': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} onOpenChat=${openChat} />`;
       case 'saved': return html`<${HistoryView} chats=${chats} updateChat=${updateChat} deleteChat=${deleteChat} projects=${projects} voiceHistory=${voiceHistory} filter="saved" onOpenChat=${openChat} />`;
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
-      case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} />`;
+      case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} transactions=${transactions} />`;
       case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
@@ -1629,7 +1629,7 @@ function App(){
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
       case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${{...planConfig, elite:planConfig.elite||planConfig.infinity||1000000}} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
-      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
+      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
     }
   };
 
@@ -3546,10 +3546,19 @@ function WeeklyInsightsView({data, goalRows, onClose}){
 }
 
 // ---------- Dashboard (Home) ----------
-function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits, openNotifications, openFeatureComingSoon}){
+function DashboardView({profile, chats, projects, transactions, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits, openNotifications, openFeatureComingSoon}){
   const hour = new Date().getHours();
   const greeting = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
   const name = profile?.display_name || (isAdminUser ? 'Owner' : 'Creator');
+
+  const isToday=(d)=>{
+    if(!d) return false;
+    const a = new Date(d), b = new Date();
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  };
+  const chatsToday = chats.filter(c=>isToday(c.created_at)).length;
+  const projectsToday = projects.filter(p=>isToday(p.created_at)).length;
+  const genToday = (transactions||[]).filter(t=>isToday(t.created_at)).length;
 
   const recentChats = [...chats].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,4);
   const recentProjects = [...projects].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,3);
@@ -3589,11 +3598,11 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Quick Actions</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         ${quickActions.map(a=>html`
-          <button key=${a.label} onClick=${a.action} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] transition-all group">
-            <div className="w-9 h-9 rounded-[10px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-3"><${I} name=${a.icon} size=${16}/></div>
-            <div className="font-[650] text-[13px]">${a.label}</div>
-            <div className="text-[11px] text-zinc-500 mt-[2px]">${a.desc}</div>
-            <${I} name="ArrowRight" size=${13} className="mt-2 text-[var(--zed)] opacity-0 group-hover:opacity-100 transition-opacity"/>
+          <button key=${a.label} onClick=${a.action} className="text-left p-5 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/50 hover:shadow-[0_8px_24px_rgba(124,58,237,0.08)] transition-all">
+            <${I} name=${a.icon} size=${26} className="text-[var(--zed)] mb-4" strokeWidth=${1.6}/>
+            <div className="font-[650] text-[14px]">${a.label}</div>
+            <div className="text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-[3px] leading-snug">${a.desc}</div>
+            <${I} name="ArrowRight" size=${14} className="mt-3 text-zinc-400"/>
           </button>
         `)}
       </div>
@@ -3605,41 +3614,55 @@ function DashboardView({profile, chats, projects, onNewChat, onOpenChat, setModu
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           ${recentChats.map(c=>html`
-            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
-              <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="MessageCircle" size=${13}/></div>
-              <div className="font-[600] text-[12px] truncate">${c.title||'Untitled chat'}</div>
-              <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(c.updated_at||c.created_at)}</div>
+            <button key=${c.id} onClick=${()=>onOpenChat(c.id)} className="text-left p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
+              <div className="w-8 h-8 rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-3"><${I} name="MessageCircle" size=${14}/></div>
+              <div className="font-[650] text-[12.5px] truncate">${c.title||'Untitled chat'}</div>
+              <div className="text-[10.5px] text-zinc-500 mt-[2px]">Chat</div>
+              <div className="text-[10px] text-zinc-400 mt-3">${formatDate(c.updated_at||c.created_at)}</div>
             </button>
           `)}
-          ${recentProjects.map(p=>html`
-            <button key=${p.id} onClick=${()=>setModule('projects')} className="text-left p-3 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
-              <div className="w-7 h-7 rounded-[8px] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center mb-2"><${I} name="FolderKanban" size=${13}/></div>
-              <div className="font-[600] text-[12px] truncate">${p.name||'Untitled project'}</div>
-              <div className="text-[10px] text-zinc-400 mt-[2px]">${formatDate(p.updated_at||p.created_at)}</div>
-            </button>
-          `)}
+          ${recentProjects.map(p=>{
+            const taskList = p.tasks||[];
+            const pct = taskList.length ? Math.round((taskList.filter(t=>t.done).length/taskList.length)*100) : 0;
+            return html`
+            <button key=${p.id} onClick=${()=>setModule('projects')} className="text-left p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center mb-3" style=${{background:'var(--zed-tint-bg2)', color:p.color||'var(--zed)'}}><${I} name=${p.icon||'FolderKanban'} size=${14}/></div>
+              <div className="font-[650] text-[12.5px] truncate">${p.title||'Untitled project'}</div>
+              <div className="text-[10.5px] text-zinc-500 mt-[2px]">${p.cat||'Project'}</div>
+              <div className="flex items-center gap-2 mt-3">
+                <div className="text-[10px] text-zinc-400 shrink-0">${formatDate(p.updated_at||p.created_at)}</div>
+                <div className="flex-1 h-[3px] rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden"><div className="h-full bg-[var(--zed)] rounded-full" style=${{width:pct+'%'}}></div></div>
+                <div className="text-[10px] text-zinc-400 shrink-0">${pct}%</div>
+              </div>
+            </button>`;
+          })}
         </div>
       `:null}
 
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Today's Overview</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="Lightbulb" size=${11}/> Ideas Captured</div>
-          <div className="text-[20px] font-[800] display mt-1">0</div>
-          <div className="text-[9.5px] text-zinc-400 mt-[2px]">Coming soon</div>
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="Lightbulb" size=${13} className="text-[var(--zed)]"/> Ideas Captured</div>
+          <div className="text-[22px] font-[800] display mt-[6px]">0</div>
+          <div className="text-[10.5px] text-zinc-400 mt-[2px]">Coming soon</div>
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="FolderKanban" size=${11}/> Projects in Progress</div>
-          <div className="text-[20px] font-[800] display mt-1">${projects.length}</div>
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="FolderKanban" size=${13} className="text-[var(--zed)]"/> Projects in Progress</div>
+          <div className="text-[22px] font-[800] display mt-[6px]">${projects.length}</div>
+          ${projectsToday>0?html`<div className="text-[10.5px] text-emerald-500 font-[600] mt-[2px]">↑ ${projectsToday} today</div>`:null}
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="MessageCircle" size=${11}/> Total Chats</div>
-          <div className="text-[20px] font-[800] display mt-1">${chats.length}</div>
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="Sparkles" size=${13} className="text-[var(--zed)]"/> AI Generations</div>
+          <div className="text-[22px] font-[800] display mt-[6px]">${(transactions||[]).length}</div>
+          ${genToday>0?html`<div className="text-[10.5px] text-emerald-500 font-[600] mt-[2px]">↑ ${genToday} today</div>`:null}
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
-          <div className="text-[10px] text-zinc-500 font-[600] flex items-center gap-1"><${I} name="Star" size=${11}/> Credits Left</div>
-          <div className="text-[20px] font-[800] display mt-1">${isAdminUser?'∞':`${credits.toLocaleString('en-IN')}`}</div>
-          ${!isAdminUser?html`<div className="text-[9.5px] text-zinc-400">of ${monthlyCredits.toLocaleString('en-IN')}</div>`:null}
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="Star" size=${13} className="text-[var(--zed)]"/> Credits Left</div>
+          <div className="text-[22px] font-[800] display mt-[6px]">${isAdminUser?'∞':`${credits.toLocaleString('en-IN')}`}</div>
+          ${!isAdminUser?html`
+            <div className="text-[10.5px] text-zinc-400 mb-1">of ${monthlyCredits.toLocaleString('en-IN')}</div>
+            <div className="h-[4px] rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden"><div className="h-full bg-[var(--zed)] rounded-full" style=${{width:Math.min(100,(credits/monthlyCredits)*100)+'%'}}></div></div>
+          `:null}
         </div>
       </div>
 
@@ -3735,12 +3758,12 @@ function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
 // ---------- Channel Analytics 2.0 ----------
 function ComingSoonCard({icon, title, note, className=''}){
   return html`
-  <div className=${`relative overflow-hidden rounded-[20px] border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-[var(--zed-surface)]/60 p-6 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
-    <div className="w-9 h-9 rounded-full bg-zinc-200/70 dark:bg-zinc-700/50 flex items-center justify-center text-zinc-500">
+  <div className=${`relative overflow-hidden rounded-[20px] border border-dashed border-zinc-300 dark:border-[var(--zed-border)] bg-zinc-50/60 dark:bg-[var(--zed-surface)] p-6 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
+    <div className="w-9 h-9 rounded-full bg-zinc-200/70 dark:bg-[var(--zed-tint-bg2)] flex items-center justify-center text-zinc-500 dark:text-[var(--zed)]">
       <${I} name=${icon} size=${16}/>
     </div>
-    <div className="font-[700] text-[12.5px] text-zinc-600 dark:text-zinc-300">${title}</div>
-    <div className="text-[11px] text-zinc-400 max-w-[260px]">${note||'Coming soon.'}</div>
+    <div className="font-[700] text-[12.5px] text-zinc-600 dark:text-zinc-200">${title}</div>
+    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 max-w-[260px]">${note||'Coming soon.'}</div>
   </div>`;
 }
 
@@ -3748,7 +3771,8 @@ function SkeletonBlock({className=''}){
   return html`<div className=${`animate-pulse rounded-[20px] bg-zinc-100 dark:bg-[var(--zed-surface)] ${className}`}></div>`;
 }
 
-function AnalyticsView({addNotification}){
+function AnalyticsView({addNotification, transactions}){
+  const [tab,setTab]=useState('Overview'); // Overview | YouTube | Content | Audience | AI Usage | Activity
   const [period,setPeriod]=useState('Daily'); // Daily | Monthly
   const [platformFilter,setPlatformFilter]=useState('All'); // All | YouTube | Instagram | X
   const [chartMetric,setChartMetric]=useState('Views'); // Views | Subscribers | Watch Time | Engagement
@@ -3956,34 +3980,48 @@ function AnalyticsView({addNotification}){
   const platformTabs = ['All','YouTube','Instagram','X'];
 
   return html`
-  <div className="flex-1 h-full bg-[var(--zed-page)] dark:bg-[#1a1a1a] overflow-y-auto">
+  <div className="flex-1 h-full bg-[var(--zed-page)] overflow-y-auto">
     <div className="px-5 md:px-9 py-7 max-w-[1320px] mx-auto">
 
       <!-- Hero -->
-      <div className="flex items-start justify-between flex-wrap gap-4 mb-7">
-        <div>
-          <div className="text-[26px] md:text-[30px] font-[800] display tracking-tight">Creator Analytics</div>
-          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Understand your growth. Improve every upload.</div>
-        </div>
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+        <div className="text-[24px] md:text-[26px] font-[800] display tracking-tight">Analytics</div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] backdrop-blur disabled:opacity-50">
-            <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
-          </button>
-          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[var(--zed-surface)] backdrop-blur disabled:opacity-50">
-            <${I} name="FileDown" size=${13}/> Export PDF
-          </button>
-          <div className="flex items-center bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
+          <div className="flex items-center bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[12px] p-[3px] text-[11.5px]">
             ${['Daily','Monthly'].map(p=>html`
               <button key=${p} onClick=${()=>setPeriod(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${period===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
             `)}
           </div>
-          <div className="flex items-center bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-[3px] text-[11.5px]">
-            ${platformTabs.map(p=>html`
-              <button key=${p} onClick=${()=>setPlatformFilter(p)} className=${`px-3 py-[7px] rounded-[9px] font-[650] transition-all ${platformFilter===p?'bg-[var(--zed-solid)] text-white shadow-sm':'text-zinc-500'}`}>${p}</button>
-            `)}
-          </div>
+          <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing||!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-zinc-600 dark:text-zinc-300 hover:text-[var(--zed)] transition-colors px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] disabled:opacity-50">
+            <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Refresh
+          </button>
+          <button onClick=${openInsights} disabled=${!connected} className="flex items-center gap-[6px] text-[12px] font-[600] text-white transition-colors px-3 py-[9px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] disabled:opacity-50">
+            <${I} name="FileDown" size=${13}/> Export
+          </button>
         </div>
       </div>
+
+      <!-- Tabs -->
+      <div className="flex items-center gap-5 border-b border-zinc-200 dark:border-[var(--zed-border)] mb-6 text-[13px] overflow-x-auto no-scrollbar">
+        ${['Overview','YouTube','Content','Audience','AI Usage','Activity'].map(t=>html`
+          <button key=${t} onClick=${()=>setTab(t)} className=${`pb-[10px] shrink-0 font-[600] border-b-2 transition-colors ${tab===t?'border-[var(--zed)] text-zinc-900 dark:text-white':'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>${t}</button>
+        `)}
+      </div>
+
+      ${connected && data?.channel ? html`
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-[10px] bg-red-500/15 text-red-500 flex items-center justify-center"><${I} name="Youtube" size=${18}/></div>
+          <div>
+            <div className="font-[700] text-[14px]">${data.channel.title||'YouTube Channel'}</div>
+            <div className="text-[11.5px] text-zinc-500">${fmt(data.channel.subscriberCount||0)} Subscribers</div>
+          </div>
+        </div>
+        <button onClick=${()=>loadAnalytics(true)} disabled=${refreshing} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] disabled:opacity-50">
+          <${I} name="RefreshCw" size=${13} className=${refreshing?'animate-spin':''}/> Sync Now
+        </button>
+      </div>
+      `:null}
 
       ${loading ? html`
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
@@ -3992,7 +4030,7 @@ function AnalyticsView({addNotification}){
         <${SkeletonBlock} className="h-[160px] mb-5"/>
         <${SkeletonBlock} className="h-[320px] mb-5"/>
       ` : !connected ? html`
-        <div className="bg-white dark:bg-[var(--zed-surface)] backdrop-blur border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-10 text-center max-w-[760px] shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
           <${I} name="Lock" size=${32} className="mx-auto text-[var(--zed)] mb-3"/>
           <div className="font-[700] text-[15px]">No Social Accounts Connected</div>
           <div className="text-[12.5px] text-zinc-500 mt-1">Connect your YouTube channel to unlock real analytics.</div>
@@ -4009,20 +4047,19 @@ function AnalyticsView({addNotification}){
           ` : html`
 
           <!-- Growth Overview cards -->
+          ${tab==='Overview' ? html`
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             ${metricCards.map(m=>html`
-              <div key=${m.label} className="group relative overflow-hidden rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] hover:-translate-y-[2px] transition-all duration-300">
-                <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-[0.10] group-hover:opacity-[0.16] transition-opacity" style=${{background:m.color}}></div>
-                <div className="flex items-center justify-between relative">
-                  <div className="text-[10.5px] text-zinc-500 font-[600] uppercase tracking-wide">${m.label}</div>
-                  <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style=${{background:m.color+'1a', color:m.color}}>
-                    <${I} name=${m.icon} size=${12.5}/>
-                  </div>
+              <div key=${m.label} className="rounded-[16px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] p-4 hover:border-[var(--zed)]/30 transition-colors">
+                <div className="flex items-center gap-[6px] text-[11.5px] text-zinc-500 dark:text-zinc-400 font-[600]">
+                  <${I} name=${m.icon} size=${13} style=${{color:m.color}}/> ${m.label}
                 </div>
-                <div className="text-[21px] font-[800] display mt-1 relative">${m.value}</div>
-                <div className="mt-[6px] flex items-center justify-between relative">
+                <div className="flex items-end justify-between mt-2">
+                  <div className="text-[22px] font-[800] display leading-none">${m.value}</div>
+                  ${!m.comingSoon && m.series?.length>1 ? html`<div className="w-[50px] h-[22px]"><${MiniSpark} data=${m.series} color=${m.color}/></div>` : null}
+                </div>
+                <div className="mt-[6px]">
                   ${m.comingSoon ? html`<span className="text-[10px] text-zinc-400 font-[600]">Coming soon</span>` : m.noTrend ? html`<span className="text-[10px] text-zinc-400">this period</span>` : html`<${TrendPill} value=${m.change}/>`}
-                  ${!m.comingSoon && m.series?.length>1 ? html`<div className="w-[46px] h-[20px]"><${MiniSpark} data=${m.series} color=${m.color}/></div>` : null}
                 </div>
               </div>
             `)}
@@ -4064,8 +4101,10 @@ function AnalyticsView({addNotification}){
               <${AreaChart} data=${activeChart.series} labels=${seriesLabels} color=${activeChart.color} fmt=${activeChart.fmt} h=${220}/>
             </div>
           </div>
+          ` : null}
 
           <!-- Platform Comparison -->
+          ${tab==='YouTube' ? html`
           <div>
             <div className="font-[750] text-[14px] display mb-3">Platform Comparison</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4085,8 +4124,10 @@ function AnalyticsView({addNotification}){
               <${ComingSoonCard} icon="Twitter" title="X (Twitter)" note="Connect X to see growth, top content, and engagement here."/>
             </div>
           </div>
+          ` : null}
 
           <!-- Best Performing Content -->
+          ${tab==='Content' ? html`
           <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div className="font-[750] text-[14px] display mb-3">Best Performing Content</div>
             ${topVideos.length ? html`
@@ -4147,8 +4188,10 @@ function AnalyticsView({addNotification}){
               `)}
             </div>
           </div>
+          ` : null}
 
           <!-- Audience -->
+          ${tab==='Audience' ? html`
           <div>
             <div className="font-[750] text-[14px] display mb-3">Audience</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4177,8 +4220,10 @@ function AnalyticsView({addNotification}){
               <${ComingSoonCard} icon="Repeat" title="Returning vs New Viewers" note="Viewer retention split will appear here once available from your connected account."/>
             </div>
           </div>
+          ` : null}
 
           <!-- Upload Performance Timeline -->
+          ${tab==='Content' ? html`
           <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] backdrop-blur-md p-5">
             <div className="font-[750] text-[14px] display mb-3">Upload Performance Timeline</div>
             ${topVideos.length ? html`
@@ -4198,12 +4243,13 @@ function AnalyticsView({addNotification}){
               </div>
             ` : html`<div className="text-[12px] text-zinc-400 text-center py-8">No uploads yet for this period.</div>`}
           </div>
+          ` : null}
 
           <!-- Competitor Snapshot -->
-          <${ComingSoonCard} icon="Swords" title="Competitor Snapshot" note="Track competitor uploads, average views, engagement, and growth here once this feature is connected." className="py-10"/>
+          ${tab==='Overview' ? html`<${ComingSoonCard} icon="Swords" title="Competitor Snapshot" note="Track competitor uploads, average views, engagement, and growth here once this feature is connected." className="py-10"/>` : null}
 
           <!-- Goals -->
-          <${GoalsCard} currentValues=${{
+          ${tab==='Overview' ? html`<${GoalsCard} currentValues=${{
             subscribers: data.channel?.subscriberCount ?? 0,
             views: data.overview.views ?? 0,
             watch_time_minutes: data.overview.watchTimeMinutes ?? 0
@@ -4219,6 +4265,73 @@ function AnalyticsView({addNotification}){
               <${I} name="FileDown" size=${14}/> Download PDF
             </button>
           </div>
+          ` : null}
+
+          <!-- AI Usage tab -->
+          ${tab==='AI Usage' ? html`
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              ${(()=>{
+                const featureCounts={};
+                (transactions||[]).forEach(t=>{ featureCounts[t.feature]=(featureCounts[t.feature]||0)+1; });
+                const featureLabels={normal:'Chat',web_search:'Web Search',voice:'Voice Studio',seo:'SEO Studio',trend_explorer:'Trend Explorer',image_gen:'Image Gen',youtube_analytics:'Analytics',channel_analytics:'Analytics'};
+                const totalSpent=(transactions||[]).reduce((s,t)=>s+(Number(t.credits_spent)||0),0);
+                const cards=[
+                  {label:'Total Generations',value:(transactions||[]).length,icon:'Sparkles'},
+                  {label:'Credits Spent',value:totalSpent.toLocaleString('en-IN'),icon:'Zap'},
+                  {label:'Most Used',value:Object.entries(featureCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] ? (featureLabels[Object.entries(featureCounts).sort((a,b)=>b[1]-a[1])[0][0]]||'—') : '—',icon:'Star'},
+                  {label:'Features Used',value:Object.keys(featureCounts).length,icon:'Grid3x3'},
+                ];
+                return cards.map(c=>html`
+                  <div key=${c.label} className="rounded-[16px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] p-4">
+                    <div className="flex items-center gap-[6px] text-[11px] text-zinc-500 font-[600]"><${I} name=${c.icon} size=${12} className="text-[var(--zed)]"/> ${c.label}</div>
+                    <div className="text-[19px] font-[800] display mt-[6px]">${c.value}</div>
+                  </div>
+                `);
+              })()}
+            </div>
+            <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] p-5">
+              <div className="font-[750] text-[14px] display mb-3">Usage by Feature</div>
+              ${(transactions||[]).length ? (()=>{
+                const featureCounts={};
+                (transactions||[]).forEach(t=>{ featureCounts[t.feature]=(featureCounts[t.feature]||0)+1; });
+                const featureLabels={normal:'Chat',web_search:'Web Search',voice:'Voice Studio',seo:'SEO Studio',trend_explorer:'Trend Explorer',image_gen:'Image Gen',youtube_analytics:'Analytics',channel_analytics:'Analytics'};
+                const max=Math.max(...Object.values(featureCounts),1);
+                return html`<div className="space-y-3">
+                  ${Object.entries(featureCounts).sort((a,b)=>b[1]-a[1]).map(([f,count])=>html`
+                    <div key=${f}>
+                      <div className="flex justify-between text-[12px] mb-1"><span className="font-[600]">${featureLabels[f]||f}</span><span className="text-zinc-500">${count}</span></div>
+                      <div className="h-[6px] rounded-full bg-zinc-100 dark:bg-[var(--zed-surface2)] overflow-hidden"><div className="h-full rounded-full bg-[var(--zed)]" style=${{width:(count/max*100)+'%'}}></div></div>
+                    </div>
+                  `)}
+                </div>`;
+              })() : html`<div className="text-[12px] text-zinc-400 text-center py-8">No AI usage recorded yet.</div>`}
+            </div>
+          </div>
+          ` : null}
+
+          <!-- Activity tab -->
+          ${tab==='Activity' ? html`
+          <div className="rounded-[20px] border border-zinc-200/70 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] p-5">
+            <div className="font-[750] text-[14px] display mb-3">Recent Activity</div>
+            ${(transactions||[]).length ? html`
+              <div className="space-y-1">
+                ${(()=>{
+                  const featureLabels={normal:'Used Chat',web_search:'Web Search',voice:'Generated a voice',seo:'Used SEO Studio',trend_explorer:'Used Trend Explorer',image_gen:'Generated an image',youtube_analytics:'Viewed analytics',channel_analytics:'Viewed analytics'};
+                  const featureIcons={normal:'MessageCircle',web_search:'Globe',voice:'Mic',seo:'Search',trend_explorer:'TrendingUp',image_gen:'Image',youtube_analytics:'BarChart3',channel_analytics:'BarChart3'};
+                  return transactions.slice(0,30).map((t,i)=>html`
+                    <div key=${t.id||i} className="flex items-center gap-3 py-[10px] border-b border-zinc-100 dark:border-[var(--zed-border)] last:border-0">
+                      <div className="w-7 h-7 rounded-full bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] text-[var(--zed)] flex items-center justify-center shrink-0"><${I} name=${featureIcons[t.feature]||'Sparkles'} size=${13}/></div>
+                      <div className="flex-1 min-w-0 text-[12.5px]">${featureLabels[t.feature]||t.feature}</div>
+                      <div className="text-[11px] text-zinc-400 shrink-0">${t.credits_spent||0} credits</div>
+                      <div className="text-[10.5px] text-zinc-400 shrink-0 w-[90px] text-right">${formatDate(t.created_at)}</div>
+                    </div>
+                  `);
+                })()}
+              </div>
+            ` : html`<div className="text-[12px] text-zinc-400 text-center py-8">No activity recorded yet.</div>`}
+          </div>
+          ` : null}
 
           `}
         </div>
