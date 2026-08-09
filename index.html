@@ -1616,6 +1616,7 @@ function App(){
     switch(module){
       case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
       case 'allchats': return html`<${AllChatsView} chats=${chats} onOpenChat=${openChat} onNewChat=${startNewChat} deleteChat=${deleteChat} updateChat=${updateChat} />`;
+      case 'canvas': return html`<${CanvasView} user=${user} />`;
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
       case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} updateProject=${updateProject} deleteProject=${deleteProject} onOpenProject=${openProject} />`;
@@ -1725,7 +1726,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
           ${!collapsed ? label : null}
         </button>
       `)}
-      <button onClick=${()=>openFeatureComingSoon({label:'Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."})} className=${itemCls(false)} title="Canvas">
+      <button onClick=${()=>setModule('canvas')} className=${itemCls(module==='canvas')} title="Canvas">
         <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'Canvas' : ''}
       </button>
       <button onClick=${()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})} className=${itemCls(false)} title="Ideas">
@@ -3560,7 +3561,7 @@ function DashboardView({profile, chats, projects, transactions, onNewChat, onOpe
   const recentChats = [...chats].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,4);
   const recentProjects = [...projects].sort((a,b)=> new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at)).slice(0,3);
 
-  const openCanvas = ()=>openFeatureComingSoon({label:'Canvas', icon:'LayoutDashboard', description:"An infinite AI workspace where you'll build content visually — drag, connect, and generate directly on a canvas instead of chatting. We're actively building this."});
+  const openCanvas = ()=>setModule('canvas');
 
   const quickActions = [
     {label:'AI Chat', desc:'Get AI answers and advice', icon:'MessageCircle', action:()=>onNewChat()},
@@ -3680,6 +3681,482 @@ function DashboardView({profile, chats, projects, transactions, onNewChat, onOpe
 }
 
 // ---------- All Chats (browsing list, separate from an open conversation) ----------
+// ---------- Canvas: block type config ----------
+const CANVAS_BLOCK_TYPES = {
+  idea:      {icon:'Lightbulb',    label:'Idea',      color:'#f5a623', defaultTitle:'New Idea'},
+  script:    {icon:'FileText',     label:'Script',     color:'#4a9eff', defaultTitle:'New Script'},
+  image:     {icon:'Image',        label:'Image',      color:'#e0457b', defaultTitle:'Thumbnail Reference'},
+  file:      {icon:'File',         label:'File',       color:'#8b8b8b', defaultTitle:'New File'},
+  voice:     {icon:'Mic',          label:'Voice',      color:'#22c1c3', defaultTitle:'Voice File'},
+  video:     {icon:'Video',        label:'Video',      color:'#e0457b', defaultTitle:'Video'},
+  checklist: {icon:'CheckSquare',  label:'Checklist',  color:'#22a06b', defaultTitle:'Editing Notes'},
+  link:      {icon:'Link',         label:'Link',       color:'#9253f7', defaultTitle:'Link'},
+  note:      {icon:'StickyNote',   label:'Note',       color:'#d4a24c', defaultTitle:'Note'},
+};
+const CANVAS_BLOCK_ORDER = ['idea','script','image','file','voice','video','checklist','link','note'];
+
+function uidBlock(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+// ---------- Canvas: list/gallery of a user's canvases ----------
+function CanvasListView({user, onOpenCanvas}){
+  const [canvases,setCanvases]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [creating,setCreating]=useState(false);
+
+  const load=async()=>{
+    setLoading(true);
+    const {data,error}=await supabase.from('canvases').select('id,name,updated_at,blocks').eq('user_id',user.id).order('updated_at',{ascending:false});
+    if(!error) setCanvases(data||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{ load(); },[]);
+
+  const createCanvas=async()=>{
+    setCreating(true);
+    const {data,error}=await supabase.from('canvases').insert({user_id:user.id, name:'Untitled Canvas', blocks:[], connections:[]}).select().single();
+    setCreating(false);
+    if(error){ toast('Could not create canvas: '+(error.message||'unknown error'),'err'); return; }
+    onOpenCanvas(data.id);
+  };
+
+  const deleteCanvas=async(id, e)=>{
+    e.stopPropagation();
+    if(!confirm('Delete this canvas? This cannot be undone.')) return;
+    await supabase.from('canvases').delete().eq('id',id);
+    setCanvases(cs=>cs.filter(c=>c.id!==id));
+  };
+
+  return html`
+  <div className="flex-1 h-full bg-[var(--zed-page)] overflow-y-auto">
+    <div className="px-5 md:px-9 py-7 max-w-[1100px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
+        <div>
+          <div className="text-[22px] md:text-[26px] font-[800] display flex items-center gap-2"><${I} name="LayoutDashboard" size=${22} className="text-[var(--zed)]"/> Canvas</div>
+          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Bring your ideas to life. Create, design, and visualize your content workflow.</div>
+        </div>
+        <button onClick=${createCanvas} disabled=${creating} className="flex items-center gap-[6px] text-[12.5px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[12px] transition-colors disabled:opacity-60">
+          <${I} name="Plus" size=${14}/> ${creating?'Creating…':'New Canvas'}
+        </button>
+      </div>
+
+      <div className="mt-6">
+        ${loading ? html`
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${[1,2,3].map(i=>html`<div key=${i} className="h-[150px] rounded-[16px] bg-zinc-100 dark:bg-[var(--zed-surface2)] animate-pulse"></div>`)}
+          </div>
+        ` : canvases.length===0 ? html`
+          <div className="text-center py-16 border border-dashed border-zinc-300 dark:border-[var(--zed-border)] rounded-[18px]">
+            <${I} name="LayoutDashboard" size=${32} className="mx-auto text-zinc-400 mb-3"/>
+            <div className="font-[700] text-[14px] mb-1">No canvases yet</div>
+            <div className="text-[12.5px] text-zinc-500 mb-4">Create your first canvas to start mapping out a content workflow.</div>
+            <button onClick=${createCanvas} disabled=${creating} className="inline-flex items-center gap-[6px] text-[12.5px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[12px] transition-colors disabled:opacity-60">
+              <${I} name="Plus" size=${14}/> Create Canvas
+            </button>
+          </div>
+        ` : html`
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${canvases.map(c=>html`
+              <button key=${c.id} onClick=${()=>onOpenCanvas(c.id)} className="group text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
+                <div className="h-[80px] rounded-[10px] bg-zinc-50 dark:bg-[var(--zed-surface2)] border border-zinc-100 dark:border-[var(--zed-border)] mb-3 flex items-center justify-center relative overflow-hidden">
+                  ${(c.blocks||[]).length>0 ? html`
+                    <div className="flex items-center gap-1 flex-wrap px-3 justify-center">
+                      ${(c.blocks||[]).slice(0,6).map((b,i)=>html`<div key=${i} className="w-5 h-5 rounded-[5px] flex items-center justify-center" style=${{background:(CANVAS_BLOCK_TYPES[b.type]||CANVAS_BLOCK_TYPES.note).color+'26'}}><${I} name=${(CANVAS_BLOCK_TYPES[b.type]||CANVAS_BLOCK_TYPES.note).icon} size=${11} style=${{color:(CANVAS_BLOCK_TYPES[b.type]||CANVAS_BLOCK_TYPES.note).color}}/></div>`)}
+                    </div>
+                  ` : html`<${I} name="LayoutDashboard" size=${22} className="text-zinc-300 dark:text-zinc-700"/>`}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="font-[650] text-[13px] truncate">${c.name||'Untitled Canvas'}</div>
+                    <div className="text-[10.5px] text-zinc-400 mt-[2px]">${(c.blocks||[]).length} block${(c.blocks||[]).length===1?'':'s'} · ${formatDate(c.updated_at)}</div>
+                  </div>
+                  <button onClick=${e=>deleteCanvas(c.id,e)} className="opacity-0 group-hover:opacity-100 p-[6px] rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-zinc-400 hover:text-red-500 transition-all shrink-0" title="Delete"><${I} name="Trash2" size=${13}/></button>
+                </div>
+              </button>
+            `)}
+          </div>
+        `}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- Canvas: top-level router (list vs editor) ----------
+function CanvasView({user}){
+  const [openId,setOpenId]=useState(null);
+  return openId
+    ? html`<${CanvasEditor} user=${user} canvasId=${openId} onBack=${()=>setOpenId(null)}/>`
+    : html`<${CanvasListView} user=${user} onOpenCanvas=${id=>setOpenId(id)}/>`;
+}
+
+// ---------- Canvas: the actual infinite pan/zoom editor ----------
+function CanvasEditor({user, canvasId, onBack}){
+  const [canvas,setCanvas]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [blocks,setBlocks]=useState([]);
+  const [connections,setConnections]=useState([]);
+  const [viewport,setViewport]=useState({x:0,y:0,zoom:1});
+  const [selectedId,setSelectedId]=useState(null);
+  const [connectingFrom,setConnectingFrom]=useState(null);
+  const [editingName,setEditingName]=useState(false);
+  const [nameInput,setNameInput]=useState('');
+  const [addMenuOpen,setAddMenuOpen]=useState(false);
+  const [saveState,setSaveState]=useState('saved'); // 'saved' | 'saving' | 'unsaved'
+
+  const canvasRef=useRef(null);
+  const panState=useRef(null); // {startX,startY,startVX,startVY}
+  const dragState=useRef(null); // {id, startX, startY, startBX, startBY}
+  const saveTimer=useRef(null);
+
+  // ---- Load ----
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      setLoading(true);
+      const {data,error}=await supabase.from('canvases').select('*').eq('id',canvasId).single();
+      if(cancelled) return;
+      if(error || !data){ toast('Could not load canvas','err'); onBack(); return; }
+      setCanvas(data);
+      setBlocks(data.blocks||[]);
+      setConnections(data.connections||[]);
+      setViewport(data.viewport||{x:0,y:0,zoom:1});
+      setNameInput(data.name||'Untitled Canvas');
+      setLoading(false);
+    })();
+    return ()=>{ cancelled=true; };
+  },[canvasId]);
+
+  // ---- Autosave (debounced) whenever blocks/connections/viewport change ----
+  const persist=(patch)=>{
+    setSaveState('unsaved');
+    if(saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(async()=>{
+      setSaveState('saving');
+      const {error}=await supabase.from('canvases').update({...patch, updated_at:new Date().toISOString()}).eq('id',canvasId);
+      setSaveState(error?'unsaved':'saved');
+    }, 700);
+  };
+
+  useEffect(()=>{
+    if(loading) return;
+    persist({blocks, connections, viewport});
+    // eslint-disable-next-line
+  },[blocks, connections, viewport]);
+
+  const saveName=async()=>{
+    setEditingName(false);
+    const name=nameInput.trim()||'Untitled Canvas';
+    setCanvas(c=>({...c, name}));
+    await supabase.from('canvases').update({name, updated_at:new Date().toISOString()}).eq('id',canvasId);
+  };
+
+  // ---- Coordinate helpers ----
+  const screenToCanvas=(sx,sy)=>{
+    const rect=canvasRef.current.getBoundingClientRect();
+    return { x:(sx-rect.left-viewport.x)/viewport.zoom, y:(sy-rect.top-viewport.y)/viewport.zoom };
+  };
+
+  // ---- Pan (mousedown on empty background) ----
+  const onCanvasMouseDown=(e)=>{
+    if(e.target!==e.currentTarget && !e.target.classList.contains('canvas-bg-hit')) return;
+    setSelectedId(null);
+    setConnectingFrom(null);
+    panState.current={startX:e.clientX, startY:e.clientY, startVX:viewport.x, startVY:viewport.y};
+  };
+  const onCanvasTouchStart=(e)=>{
+    if(e.touches.length!==1) return;
+    if(e.target!==e.currentTarget && !e.target.classList.contains('canvas-bg-hit')) return;
+    setSelectedId(null); setConnectingFrom(null);
+    const t=e.touches[0];
+    panState.current={startX:t.clientX, startY:t.clientY, startVX:viewport.x, startVY:viewport.y};
+  };
+
+  useEffect(()=>{
+    const onMove=(e)=>{
+      if(panState.current){
+        const dx=e.clientX-panState.current.startX, dy=e.clientY-panState.current.startY;
+        setViewport(v=>({...v, x:panState.current.startVX+dx, y:panState.current.startVY+dy}));
+      }
+      if(dragState.current){
+        const dx=(e.clientX-dragState.current.startX)/viewport.zoom, dy=(e.clientY-dragState.current.startY)/viewport.zoom;
+        setBlocks(bs=>bs.map(b=>b.id===dragState.current.id ? {...b, x:dragState.current.startBX+dx, y:dragState.current.startBY+dy} : b));
+      }
+    };
+    const onTouchMove=(e)=>{
+      if(e.touches.length!==1) return;
+      const t=e.touches[0];
+      if(panState.current){
+        const dx=t.clientX-panState.current.startX, dy=t.clientY-panState.current.startY;
+        setViewport(v=>({...v, x:panState.current.startVX+dx, y:panState.current.startVY+dy}));
+      }
+      if(dragState.current){
+        const dx=(t.clientX-dragState.current.startX)/viewport.zoom, dy=(t.clientY-dragState.current.startY)/viewport.zoom;
+        setBlocks(bs=>bs.map(b=>b.id===dragState.current.id ? {...b, x:dragState.current.startBX+dx, y:dragState.current.startBY+dy} : b));
+      }
+    };
+    const onUp=()=>{ panState.current=null; dragState.current=null; };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onTouchMove, {passive:true});
+    document.addEventListener('touchend', onUp);
+    return ()=>{
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onUp);
+    };
+  },[viewport.zoom]);
+
+  // ---- Zoom (wheel) ----
+  const onWheel=(e)=>{
+    e.preventDefault();
+    const rect=canvasRef.current.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const delta = e.deltaY>0 ? -0.08 : 0.08;
+    setViewport(v=>{
+      const newZoom=Math.min(2.5, Math.max(0.25, v.zoom+delta));
+      // zoom toward cursor position
+      const worldX=(mx-v.x)/v.zoom, worldY=(my-v.y)/v.zoom;
+      return { zoom:newZoom, x:mx-worldX*newZoom, y:my-worldY*newZoom };
+    });
+  };
+
+  const zoomBy=(delta)=>{
+    setViewport(v=>({...v, zoom:Math.min(2.5, Math.max(0.25, v.zoom+delta))}));
+  };
+  const resetView=()=>setViewport({x:0,y:0,zoom:1});
+
+  // ---- Block drag start ----
+  const onBlockMouseDown=(e, block)=>{
+    e.stopPropagation();
+    setSelectedId(block.id);
+    if(connectingFrom){
+      if(connectingFrom!==block.id){
+        setConnections(cs=>{
+          const exists=cs.some(c=>(c.from===connectingFrom&&c.to===block.id)||(c.from===block.id&&c.to===connectingFrom));
+          return exists ? cs : [...cs, {id:uidBlock('c'), from:connectingFrom, to:block.id}];
+        });
+      }
+      setConnectingFrom(null);
+      return;
+    }
+    dragState.current={id:block.id, startX:e.clientX, startY:e.clientY, startBX:block.x, startBY:block.y};
+  };
+  const onBlockTouchStart=(e, block)=>{
+    e.stopPropagation();
+    setSelectedId(block.id);
+    if(connectingFrom){
+      if(connectingFrom!==block.id){
+        setConnections(cs=>{
+          const exists=cs.some(c=>(c.from===connectingFrom&&c.to===block.id)||(c.from===block.id&&c.to===connectingFrom));
+          return exists ? cs : [...cs, {id:uidBlock('c'), from:connectingFrom, to:block.id}];
+        });
+      }
+      setConnectingFrom(null);
+      return;
+    }
+    const t=e.touches[0];
+    dragState.current={id:block.id, startX:t.clientX, startY:t.clientY, startBX:block.x, startBY:block.y};
+  };
+
+  // ---- Block CRUD ----
+  const addBlock=(type)=>{
+    const cfg=CANVAS_BLOCK_TYPES[type]||CANVAS_BLOCK_TYPES.note;
+    const rect=canvasRef.current?.getBoundingClientRect();
+    const cx = rect ? (rect.width/2 - viewport.x)/viewport.zoom - 90 : 100;
+    const cy = rect ? (rect.height/2 - viewport.y)/viewport.zoom - 50 : 100;
+    const nb={
+      id:uidBlock('b'), type, title:cfg.defaultTitle, content: type==='checklist' ? [] : '',
+      x: cx + (Math.random()*60-30), y: cy + (Math.random()*60-30), w:200, h:110,
+    };
+    setBlocks(bs=>[...bs, nb]);
+    setSelectedId(nb.id);
+    setAddMenuOpen(false);
+  };
+  const updateBlock=(id, patch)=> setBlocks(bs=>bs.map(b=>b.id===id?{...b,...patch}:b));
+  const deleteBlock=(id)=>{
+    setBlocks(bs=>bs.filter(b=>b.id!==id));
+    setConnections(cs=>cs.filter(c=>c.from!==id && c.to!==id));
+    if(selectedId===id) setSelectedId(null);
+  };
+  const duplicateBlock=(id)=>{
+    const b=blocks.find(x=>x.id===id);
+    if(!b) return;
+    const nb={...b, id:uidBlock('b'), x:b.x+24, y:b.y+24};
+    setBlocks(bs=>[...bs, nb]);
+    setSelectedId(nb.id);
+  };
+  const deleteConnection=(id)=> setConnections(cs=>cs.filter(c=>c.id!==id));
+
+  const selectedBlock = blocks.find(b=>b.id===selectedId) || null;
+
+  // ---- Connection line geometry ----
+  const blockCenter=(b)=>({x:b.x+b.w/2, y:b.y+b.h/2});
+  const edgePoint=(from,to)=>{
+    // simple: connect from block edge midpoint facing the other block
+    const c1=blockCenter(from), c2=blockCenter(to);
+    const dx=c2.x-c1.x, dy=c2.y-c1.y;
+    const angle=Math.atan2(dy,dx);
+    const hw=from.w/2, hh=from.h/2;
+    // clamp to rectangle edge
+    const ax=Math.abs(Math.cos(angle)), ay=Math.abs(Math.sin(angle));
+    const scale = (ax*hh > ay*hw) ? hw/ax : hh/ay;
+    return { x:c1.x+Math.cos(angle)*Math.min(scale,Math.max(hw,hh)*1.5), y:c1.y+Math.sin(angle)*Math.min(scale,Math.max(hw,hh)*1.5) };
+  };
+
+  if(loading){
+    return html`<div className="flex-1 h-full flex items-center justify-center bg-[var(--zed-page)]"><${I} name="Loader2" size=${22} className="animate-spin text-[var(--zed)]"/></div>`;
+  }
+
+  return html`
+  <div className="flex-1 h-full flex flex-col bg-[var(--zed-page)] overflow-hidden relative">
+    <!-- Top bar -->
+    <div className="h-[54px] px-3 md:px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] shrink-0 z-20">
+      <div className="flex items-center gap-2 min-w-0">
+        <button onClick=${onBack} className="p-[7px] rounded-lg hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] shrink-0" title="Back to canvases"><${I} name="ArrowLeft" size=${16}/></button>
+        ${editingName ? html`
+          <input autoFocus value=${nameInput} onChange=${e=>setNameInput(e.target.value)} onBlur=${saveName} onKeyDown=${e=>{ if(e.key==='Enter') saveName(); if(e.key==='Escape'){ setNameInput(canvas.name); setEditingName(false); } }} className="text-[14px] font-[700] bg-transparent border-b border-[var(--zed)] outline-none min-w-[120px]"/>
+        ` : html`
+          <button onClick=${()=>setEditingName(true)} className="text-[14px] font-[700] truncate hover:text-[var(--zed)] transition-colors flex items-center gap-1">
+            ${canvas?.name||'Untitled Canvas'} <${I} name="Pencil" size=${11} className="text-zinc-400 shrink-0"/>
+          </button>
+        `}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="text-[10.5px] text-zinc-400 hidden sm:flex items-center gap-1">
+          ${saveState==='saving' ? html`<${I} name="Loader2" size=${11} className="animate-spin"/> Saving…` : saveState==='unsaved' ? html`Unsaved` : html`<${I} name="Check" size=${11} className="text-emerald-500"/> Saved`}
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas area -->
+    <div
+      ref=${canvasRef}
+      className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing canvas-bg-hit"
+      style=${{backgroundColor:'var(--zed-page)', backgroundImage:'radial-gradient(circle, var(--zed-border) 1px, transparent 1px)', backgroundSize:`${24*viewport.zoom}px ${24*viewport.zoom}px`, backgroundPosition:`${viewport.x}px ${viewport.y}px`}}
+      onMouseDown=${onCanvasMouseDown}
+      onTouchStart=${onCanvasTouchStart}
+      onWheel=${onWheel}
+    >
+      <div className="absolute inset-0 canvas-bg-hit" style=${{transform:`translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`, transformOrigin:'0 0'}}>
+
+        <!-- Connections SVG layer -->
+        <svg className="absolute overflow-visible pointer-events-none" style=${{left:0, top:0, width:1, height:1}}>
+          ${connections.map(c=>{
+            const from=blocks.find(b=>b.id===c.from), to=blocks.find(b=>b.id===c.to);
+            if(!from||!to) return null;
+            const p1=edgePoint(from,to), p2=edgePoint(to,from);
+            const midX=(p1.x+p2.x)/2;
+            return html`
+              <g key=${c.id}>
+                <path d=${`M ${p1.x} ${p1.y} C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`} stroke="var(--zed)" strokeWidth=${2} fill="none" opacity="0.55" markerEnd="url(#zedArrow)"/>
+                <circle cx=${(p1.x+p2.x)/2} cy=${(p1.y+p2.y)/2} r="7" fill="var(--zed-page)" stroke="var(--zed)" strokeWidth="1.5" className="pointer-events-auto cursor-pointer" opacity="0.85" onClick=${(e)=>{ e.stopPropagation(); deleteConnection(c.id); }}/>
+              </g>`;
+          })}
+          <defs>
+            <marker id="zedArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="var(--zed)" opacity="0.6"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <!-- Blocks -->
+        ${blocks.map(b=>{
+          const cfg=CANVAS_BLOCK_TYPES[b.type]||CANVAS_BLOCK_TYPES.note;
+          const isSelected=selectedId===b.id;
+          const isConnectSource=connectingFrom===b.id;
+          return html`
+          <div key=${b.id}
+            onMouseDown=${e=>onBlockMouseDown(e,b)}
+            onTouchStart=${e=>onBlockTouchStart(e,b)}
+            className=${`absolute rounded-[14px] border-2 bg-white dark:bg-[var(--zed-surface)] shadow-[0_4px_16px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing select-none transition-shadow ${isSelected?'z-10':''}`}
+            style=${{left:b.x+'px', top:b.y+'px', width:b.w+'px', minHeight:b.h+'px', borderColor: isSelected||isConnectSource ? cfg.color : 'var(--zed-border)'}}>
+            <div className="px-3 py-[8px] flex items-center gap-[6px] border-b" style=${{borderColor:'var(--zed-border)'}}>
+              <div className="w-[20px] h-[20px] rounded-[6px] flex items-center justify-center shrink-0" style=${{background:cfg.color+'22', color:cfg.color}}><${I} name=${cfg.icon} size=${11}/></div>
+              <input value=${b.title} onChange=${e=>updateBlock(b.id,{title:e.target.value})} onMouseDown=${e=>e.stopPropagation()} onTouchStart=${e=>e.stopPropagation()} className="flex-1 min-w-0 bg-transparent text-[12px] font-[650] outline-none truncate"/>
+            </div>
+            <div className="p-3">
+              ${b.type==='checklist' ? html`
+                <div className="space-y-1" onMouseDown=${e=>e.stopPropagation()} onTouchStart=${e=>e.stopPropagation()}>
+                  ${(Array.isArray(b.content)?b.content:[]).map((item,i)=>html`
+                    <div key=${i} className="flex items-center gap-2">
+                      <button onClick=${()=>{ const items=[...b.content]; items[i]={...items[i],done:!items[i].done}; updateBlock(b.id,{content:items}); }} className=${`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${item.done?'bg-emerald-500 border-emerald-500':'border-zinc-300 dark:border-zinc-600'}`}>${item.done?html`<${I} name="Check" size=${10} className="text-white"/>`:null}</button>
+                      <input value=${item.text} onChange=${e=>{ const items=[...b.content]; items[i]={...items[i],text:e.target.value}; updateBlock(b.id,{content:items}); }} className=${`flex-1 min-w-0 bg-transparent text-[11.5px] outline-none ${item.done?'line-through text-zinc-400':''}`}/>
+                    </div>
+                  `)}
+                  <button onClick=${()=>updateBlock(b.id,{content:[...(Array.isArray(b.content)?b.content:[]),{text:'',done:false}]})} className="text-[11px] text-zinc-400 hover:text-[var(--zed)] flex items-center gap-1 mt-1"><${I} name="Plus" size=${11}/> Add item</button>
+                </div>
+              ` : b.type==='link' ? html`
+                <input value=${b.content} onChange=${e=>updateBlock(b.id,{content:e.target.value})} onMouseDown=${e=>e.stopPropagation()} onTouchStart=${e=>e.stopPropagation()} placeholder="https://..." className="w-full bg-transparent text-[11.5px] outline-none text-[var(--zed)]"/>
+              ` : html`
+                <textarea value=${b.content} onChange=${e=>updateBlock(b.id,{content:e.target.value})} onMouseDown=${e=>e.stopPropagation()} onTouchStart=${e=>e.stopPropagation()} placeholder=${`Add ${cfg.label.toLowerCase()} details…`} className="w-full bg-transparent text-[11.5px] outline-none resize-none leading-relaxed" rows="3"></textarea>
+              `}
+            </div>
+            ${isSelected ? html`
+              <div className="absolute -top-[38px] left-0 flex items-center gap-1 bg-[var(--zed-solid)] rounded-[10px] p-[4px] shadow-lg" onMouseDown=${e=>e.stopPropagation()} onTouchStart=${e=>e.stopPropagation()}>
+                <button onClick=${()=>{ setConnectingFrom(b.id); }} className="p-[6px] rounded-[7px] hover:bg-white/15 text-white" title="Connect to another block"><${I} name="GitBranch" size=${13}/></button>
+                <button onClick=${()=>duplicateBlock(b.id)} className="p-[6px] rounded-[7px] hover:bg-white/15 text-white" title="Duplicate"><${I} name="Copy" size=${13}/></button>
+                <button onClick=${()=>deleteBlock(b.id)} className="p-[6px] rounded-[7px] hover:bg-white/15 text-white" title="Delete"><${I} name="Trash2" size=${13}/></button>
+              </div>
+            `:null}
+          </div>`;
+        })}
+      </div>
+
+      ${connectingFrom ? html`
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-[var(--zed-solid)] text-white text-[11.5px] font-[600] px-3 py-[8px] rounded-full shadow-lg flex items-center gap-2 z-20">
+          <${I} name="GitBranch" size=${13}/> Click another block to connect
+          <button onClick=${()=>setConnectingFrom(null)} className="ml-1 hover:opacity-70"><${I} name="X" size=${13}/></button>
+        </div>
+      `:null}
+
+      ${blocks.length===0 ? html`
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center max-w-[280px]">
+            <${I} name="LayoutDashboard" size=${32} className="mx-auto text-zinc-300 dark:text-zinc-700 mb-3"/>
+            <div className="text-[13px] font-[650] text-zinc-500">This canvas is empty</div>
+            <div className="text-[11.5px] text-zinc-400 mt-1">Tap the + button to add your first block — an idea, script, thumbnail, or anything else.</div>
+          </div>
+        </div>
+      `:null}
+
+      <!-- Floating toolbar (compact, stays out of the way) -->
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[6px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.5)] z-20">
+        <div className="relative">
+          <button onClick=${()=>setAddMenuOpen(o=>!o)} className="flex items-center gap-[6px] px-3 py-[9px] rounded-[11px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12px] font-[650] transition-colors">
+            <${I} name="Plus" size=${14}/> Add Block
+          </button>
+          ${addMenuOpen ? html`
+            <div className="absolute bottom-[calc(100%+8px)] left-0 w-[200px] bg-white dark:bg-[var(--zed-surface2)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.15)] p-[6px] fade-in">
+              ${CANVAS_BLOCK_ORDER.map(type=>{
+                const cfg=CANVAS_BLOCK_TYPES[type];
+                return html`
+                <button key=${type} onClick=${()=>addBlock(type)} className="w-full flex items-center gap-[10px] px-[10px] py-[8px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] transition-colors text-left">
+                  <div className="w-[24px] h-[24px] rounded-[7px] flex items-center justify-center shrink-0" style=${{background:cfg.color+'22', color:cfg.color}}><${I} name=${cfg.icon} size=${13}/></div>
+                  <span className="text-[12.5px] font-[600]">${cfg.label}</span>
+                </button>`;
+              })}
+            </div>
+          `:null}
+        </div>
+        <div className="w-px h-[24px] bg-zinc-200 dark:bg-[var(--zed-border)] mx-1"></div>
+        <button onClick=${()=>zoomBy(-0.15)} className="p-[9px] rounded-[11px] hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] transition-colors" title="Zoom out"><${I} name="Minus" size=${14}/></button>
+        <button onClick=${resetView} className="px-2 text-[11px] font-[650] text-zinc-500 hover:text-[var(--zed)] transition-colors min-w-[42px] text-center" title="Reset view">${Math.round(viewport.zoom*100)}%</button>
+        <button onClick=${()=>zoomBy(0.15)} className="p-[9px] rounded-[11px] hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] transition-colors" title="Zoom in"><${I} name="Plus" size=${14}/></button>
+        <div className="w-px h-[24px] bg-zinc-200 dark:bg-[var(--zed-border)] mx-1"></div>
+        <button onClick=${resetView} className="p-[9px] rounded-[11px] hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)] transition-colors" title="Center view"><${I} name="Maximize" size=${14}/></button>
+      </div>
+    </div>
+
+    <!-- Selected block detail panel (mobile-friendly, slides from side on desktop) -->
+    ${selectedBlock ? html`
+      <div className="hidden md:block absolute top-[66px] right-3 w-[260px] bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.1)] z-20">
+        <div className="text-[10.5px] uppercase tracking-wide font-[700] text-zinc-400 mb-2">${(CANVAS_BLOCK_TYPES[selectedBlock.type]||CANVAS_BLOCK_TYPES.note).label} Block</div>
+        <div className="text-[11.5px] text-zinc-500">Drag the block to move it. Use the toolbar above the block to connect, duplicate, or delete.</div>
+      </div>
+    `:null}
+  </div>`;
+}
+
 function AllChatsView({chats, onOpenChat, onNewChat, deleteChat, updateChat}){
   const [query,setQuery]=useState('');
   const filtered = chats.filter(c=> (c.title||'Untitled chat').toLowerCase().includes(query.toLowerCase()));
