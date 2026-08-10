@@ -1628,6 +1628,7 @@ function App(){
       case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
+      case 'explorer': return html`<${ChannelExplorerView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
@@ -1756,6 +1757,9 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
         </button>
         <button onClick=${()=>setModule('analytics')} className=${itemCls(module==='analytics')} title="Channel Analytics">
           <${I} name="BarChart3" size=${17}/> ${!collapsed ? 'Channel Analytics' : ''}
+        </button>
+        <button onClick=${()=>setModule('explorer')} className=${itemCls(module==='explorer')} title="Channel Explorer">
+          <${I} name="Radar" size=${17}/> ${!collapsed ? 'Channel Explorer' : ''}
         </button>
         <button onClick=${()=>setModule('picks')} className=${itemCls(module==='picks')} title="Zedith Picks">
           <${I} name="Compass" size=${17}/> ${!collapsed ? 'Zedith Picks' : ''}
@@ -4154,6 +4158,262 @@ function CanvasEditor({user, canvasId, onBack}){
         <div className="text-[11.5px] text-zinc-500">Drag the block to move it. Use the toolbar above the block to connect, duplicate, or delete.</div>
       </div>
     `:null}
+  </div>`;
+}
+
+// ---------- Channel Explorer ----------
+function parseISO8601Duration(iso){
+  if(!iso) return 0;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if(!m) return 0;
+  const h=Number(m[1]||0), min=Number(m[2]||0), s=Number(m[3]||0);
+  return h*3600+min*60+s;
+}
+function formatDuration(sec){
+  if(!sec) return '';
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+function fmtCompact(n){
+  n=Number(n)||0;
+  if(n>=1000000000) return (n/1000000000).toFixed(1)+'B';
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return String(n);
+}
+
+// Real, computed-only analysis — every number here comes from the actual
+// fetched videos/channel data. Nothing is invented or guessed by an LLM.
+function analyzeChannel(channel, videos){
+  const withViews = videos.filter(v=>v.views!=null);
+  if(withViews.length===0) return null;
+
+  const totalViews = withViews.reduce((s,v)=>s+v.views,0);
+  const avgViews = totalViews/withViews.length;
+  const sorted = [...withViews].sort((a,b)=>b.views-a.views);
+  const best = sorted[0];
+  const worst = sorted[sorted.length-1];
+
+  // Upload consistency: gaps in days between consecutive fetched uploads
+  const dated = videos.filter(v=>v.publishedAt).map(v=>new Date(v.publishedAt)).sort((a,b)=>b-a);
+  let avgGapDays = null;
+  if(dated.length>=2){
+    let totalGap=0;
+    for(let i=0;i<dated.length-1;i++){ totalGap += (dated[i]-dated[i+1])/86400000; }
+    avgGapDays = totalGap/(dated.length-1);
+  }
+
+  // Shorts vs long-form split (durations <= 60s treated as Shorts)
+  const withDuration = videos.filter(v=>v.duration!=null).map(v=>({...v, seconds:parseISO8601Duration(v.duration)}));
+  const shortsCount = withDuration.filter(v=>v.seconds>0 && v.seconds<=60).length;
+  const longformCount = withDuration.filter(v=>v.seconds>60).length;
+
+  // Common words in titles (real frequency count, excluding stopwords)
+  const stopwords = new Set(['the','a','an','and','or','to','of','in','on','for','with','is','this','my','how','you','your','i','it','at','vs','&']);
+  const wordFreq = {};
+  videos.forEach(v=>{
+    (v.title||'').toLowerCase().replace(/[^\w\s]/g,'').split(/\s+/).forEach(w=>{
+      if(w.length>2 && !stopwords.has(w)) wordFreq[w]=(wordFreq[w]||0)+1;
+    });
+  });
+  const topWords = Object.entries(wordFreq).filter(([,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Engagement proxy: (likes+comments)/views, only where all 3 present
+  const withEngagement = videos.filter(v=>v.views && (v.likes!=null || v.comments!=null));
+  const avgEngagementRate = withEngagement.length ? withEngagement.reduce((s,v)=>s+(((v.likes||0)+(v.comments||0))/v.views),0)/withEngagement.length*100 : null;
+
+  // ---- Score (/10), built from real signals only ----
+  let score=5;
+  const reasons=[];
+  if(channel.subscriberCount!=null){
+    if(channel.subscriberCount>1000000){ score+=1.5; reasons.push('Large, established subscriber base (1M+)'); }
+    else if(channel.subscriberCount>100000){ score+=1; reasons.push('Solid subscriber base (100K+)'); }
+    else if(channel.subscriberCount<1000){ score-=0.5; reasons.push('Small subscriber base so far'); }
+  }
+  if(avgGapDays!=null){
+    if(avgGapDays<=4){ score+=1.5; reasons.push('Very consistent upload schedule (~every '+avgGapDays.toFixed(1)+' days)'); }
+    else if(avgGapDays<=10){ score+=0.75; reasons.push('Fairly consistent uploads (~every '+avgGapDays.toFixed(1)+' days)'); }
+    else { score-=0.5; reasons.push('Inconsistent upload gaps (~every '+avgGapDays.toFixed(0)+' days)'); }
+  }
+  if(avgEngagementRate!=null){
+    if(avgEngagementRate>5){ score+=1.5; reasons.push(`Strong engagement rate (~${avgEngagementRate.toFixed(1)}% likes+comments/views)`); }
+    else if(avgEngagementRate>1.5){ score+=0.5; reasons.push(`Healthy engagement rate (~${avgEngagementRate.toFixed(1)}%)`); }
+    else { reasons.push(`Engagement rate is on the lower side (~${avgEngagementRate.toFixed(1)}%)`); }
+  }
+  if(best && avgViews>0 && best.views > avgViews*3){ score+=0.5; reasons.push(`"${best.title}" significantly outperforms this channel's average — a real breakout format`); }
+  score=Math.max(1,Math.min(10,Math.round(score*10)/10));
+
+  return { avgViews, best, worst, avgGapDays, shortsCount, longformCount, topWords, avgEngagementRate, score, reasons };
+}
+
+function ChannelExplorerView(){
+  const [input,setInput]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState(null);
+  const [data,setData]=useState(null);
+
+  const search=async()=>{
+    if(!input.trim()) return;
+    setLoading(true); setError(null); setData(null);
+    try{
+      const res=await fetch('/api/channel-explorer', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({input:input.trim()})
+      });
+      const json=await res.json();
+      if(!res.ok) throw new Error(json.error||'Could not find that channel');
+      setData(json);
+    }catch(e){
+      setError(e.message||'Could not find that channel. Try a different URL, @handle, or name.');
+    }finally{ setLoading(false); }
+  };
+
+  const analysis = data ? analyzeChannel(data.channel, data.recentVideos) : null;
+
+  return html`
+  <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8 bg-[var(--zed-page)]">
+    <div className="max-w-[980px] mx-auto">
+      <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Compass" size=${18} className="text-[var(--zed)]"/> Channel Explorer</div>
+      <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1 mb-6">Research any public YouTube channel — no login required.</div>
+
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px]">
+        <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Channel URL, @handle, or name</label>
+        <div className="flex gap-2 mt-[6px]">
+          <input value=${input} onChange=${e=>setInput(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') search(); }} placeholder="e.g. @mkbhd, youtube.com/@veritasium, or 'MrBeast'" className="flex-1 px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
+          <button onClick=${search} disabled=${loading||!input.trim()} className="px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center gap-2 disabled:opacity-50 transition shrink-0">
+            ${loading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="Search" size=${15}/>`}
+            ${loading?'Searching…':'Explore'}
+          </button>
+        </div>
+        ${error ? html`<div className="mt-3 text-[12.5px] text-red-500">${error}</div>` : null}
+      </div>
+
+      ${data ? html`
+        <div className="mt-7 space-y-6">
+
+          <!-- Channel Overview -->
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+            <div className="flex items-start gap-4 flex-wrap">
+              ${data.channel.thumbnail ? html`<img src=${data.channel.thumbnail} className="w-16 h-16 rounded-full border border-zinc-200 dark:border-[var(--zed-border)]"/>` : null}
+              <div className="flex-1 min-w-[200px]">
+                <div className="font-[800] text-[17px] display">${data.channel.title}</div>
+                ${data.channel.customUrl ? html`<div className="text-[12px] text-zinc-500">${data.channel.customUrl}</div>` : null}
+                ${data.channel.description ? html`<div className="text-[12.5px] text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed line-clamp-3 max-w-[560px]">${data.channel.description.slice(0,220)}${data.channel.description.length>220?'…':''}</div>` : null}
+              </div>
+              ${analysis ? html`
+                <div className="shrink-0 text-center px-4 py-3 rounded-[14px]" style=${{background:'var(--zed-tint-bg2)'}}>
+                  <div className="text-[10px] uppercase tracking-wide text-zinc-500 font-[700]">Zedith Score</div>
+                  <div className="text-[26px] font-[800] display" style=${{color:'var(--zed)'}}>${analysis.score}<span className="text-[13px] text-zinc-400">/10</span></div>
+                </div>
+              `:null}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+              <div className="p-3 rounded-[12px] bg-zinc-50 dark:bg-[var(--zed-surface2)]">
+                <div className="text-[10px] text-zinc-500 font-[600]">Subscribers</div>
+                <div className="text-[17px] font-[800] display mt-1">${data.channel.subscriberCount!=null?fmtCompact(data.channel.subscriberCount):'Hidden'}</div>
+              </div>
+              <div className="p-3 rounded-[12px] bg-zinc-50 dark:bg-[var(--zed-surface2)]">
+                <div className="text-[10px] text-zinc-500 font-[600]">Total Views</div>
+                <div className="text-[17px] font-[800] display mt-1">${fmtCompact(data.channel.viewCount)}</div>
+              </div>
+              <div className="p-3 rounded-[12px] bg-zinc-50 dark:bg-[var(--zed-surface2)]">
+                <div className="text-[10px] text-zinc-500 font-[600]">Total Videos</div>
+                <div className="text-[17px] font-[800] display mt-1">${fmtCompact(data.channel.videoCount)}</div>
+              </div>
+              <div className="p-3 rounded-[12px] bg-zinc-50 dark:bg-[var(--zed-surface2)]">
+                <div className="text-[10px] text-zinc-500 font-[600]">Channel Created</div>
+                <div className="text-[13.5px] font-[700] mt-[6px]">${data.channel.publishedAt?new Date(data.channel.publishedAt).toLocaleDateString('en-US',{month:'short',year:'numeric'}):'—'}</div>
+              </div>
+            </div>
+          </div>
+
+          ${analysis ? html`
+          <!-- Score reasons -->
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+            <div className="font-[750] text-[14px] display mb-3">Why This Score</div>
+            <div className="space-y-2">
+              ${analysis.reasons.map((r,i)=>html`<div key=${i} className="flex items-start gap-2 text-[12.5px] text-zinc-600 dark:text-zinc-300"><${I} name="Dot" size=${16} className="text-[var(--zed)] shrink-0 -mt-[1px]"/> ${r}</div>`)}
+            </div>
+          </div>
+
+          <!-- Content Insights -->
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+            <div className="font-[750] text-[14px] display mb-4">Content Insights</div>
+            <div className="grid md:grid-cols-2 gap-5">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-2">Recurring Topics in Titles</div>
+                ${analysis.topWords.length ? html`
+                  <div className="flex flex-wrap gap-[6px]">
+                    ${analysis.topWords.map(([w,c])=>html`<span key=${w} className="px-[10px] py-[5px] rounded-full text-[11.5px] font-[600]" style=${{background:'var(--zed-tint-bg2)', color:'var(--zed)'}}>${w} <span className="opacity-60">×${c}</span></span>`)}
+                  </div>
+                `:html`<div className="text-[12px] text-zinc-400">Not enough recent titles to detect a pattern.</div>`}
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-2">Format Mix (recent uploads)</div>
+                <div className="flex items-center gap-4 text-[12.5px]">
+                  <div><span className="font-[700]">${analysis.shortsCount}</span> Shorts</div>
+                  <div><span className="font-[700]">${analysis.longformCount}</span> Long-form</div>
+                </div>
+              </div>
+              ${analysis.best ? html`
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-2">Best Performing (fetched sample)</div>
+                  <div className="text-[12.5px] font-[600] truncate">${analysis.best.title}</div>
+                  <div className="text-[11px] text-zinc-500">${fmtCompact(analysis.best.views)} views</div>
+                </div>
+              `:null}
+              ${analysis.avgGapDays!=null ? html`
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-2">Upload Frequency</div>
+                  <div className="text-[12.5px]">About every <span className="font-[700]">${analysis.avgGapDays.toFixed(1)} days</span> (based on recent uploads)</div>
+                </div>
+              `:null}
+            </div>
+          </div>
+
+          <!-- Opportunities -->
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+            <div className="font-[750] text-[14px] display mb-3">Opportunities</div>
+            <div className="space-y-2 text-[12.5px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
+              ${analysis.topWords[0] ? html`<div className="flex items-start gap-2"><${I} name="Lightbulb" size=${14} className="text-[var(--zed)] shrink-0 mt-[1px]"/> "${analysis.topWords[0][0]}" appears repeatedly in this channel's recent titles — a format or topic clearly worth exploring if you're in a similar niche.</div>` : null}
+              ${analysis.best && analysis.worst && analysis.best.id!==analysis.worst.id ? html`<div className="flex items-start gap-2"><${I} name="Lightbulb" size=${14} className="text-[var(--zed)] shrink-0 mt-[1px]"/> There's a real gap between this channel's best (${fmtCompact(analysis.best.views)} views) and weakest (${fmtCompact(analysis.worst.views)} views) recent video — study what the top one did differently in its title, thumbnail, and hook.</div>` : null}
+              ${analysis.shortsCount>0 && analysis.longformCount>0 ? html`<div className="flex items-start gap-2"><${I} name="Lightbulb" size=${14} className="text-[var(--zed)] shrink-0 mt-[1px]"/> This channel mixes Shorts and long-form — worth comparing which format is getting the stronger recent view counts for them.</div>` : null}
+              ${analysis.avgEngagementRate!=null && analysis.avgEngagementRate<1.5 ? html`<div className="flex items-start gap-2"><${I} name="Lightbulb" size=${14} className="text-[var(--zed)] shrink-0 mt-[1px]"/> Engagement rate is relatively low for this channel's view counts — a content gap where a stronger call-to-action could stand out.</div>` : null}
+            </div>
+            <div className="text-[10.5px] text-zinc-400 mt-4">These are observations based on this channel's real public data — not copied content.</div>
+          </div>
+          `:html`<div className="text-[12px] text-zinc-400 text-center py-4">Not enough public view/stat data on recent uploads to generate insights for this channel.</div>`}
+
+          <!-- Recent Content -->
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+            <div className="font-[750] text-[14px] display mb-4">Recent Content</div>
+            ${data.recentVideos.length ? html`
+              <div className="space-y-2">
+                ${data.recentVideos.map(v=>html`
+                  <div key=${v.id} className="flex items-center gap-3 p-2 rounded-[12px] hover:bg-zinc-50 dark:hover:bg-[var(--zed-surface2)] transition-colors">
+                    <div className="relative shrink-0">
+                      ${v.thumbnail ? html`<img src=${v.thumbnail} className="w-[100px] h-[56px] rounded-[8px] object-cover"/>`:html`<div className="w-[100px] h-[56px] rounded-[8px] bg-zinc-100 dark:bg-zinc-800"></div>`}
+                      ${v.duration ? html`<span className="absolute bottom-1 right-1 text-[9.5px] bg-black/80 text-white px-1 rounded">${formatDuration(parseISO8601Duration(v.duration))}</span>` : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-[600] text-[12.5px] truncate">${v.title}</div>
+                      <div className="text-[11px] text-zinc-500 mt-[2px]">${v.publishedAt?formatDate(v.publishedAt):''}</div>
+                    </div>
+                    <div className="flex gap-4 text-[11px] text-zinc-500 shrink-0">
+                      ${v.views!=null?html`<div className="text-center"><div className="font-[700] text-zinc-700 dark:text-zinc-200">${fmtCompact(v.views)}</div>views</div>`:null}
+                      ${v.likes!=null?html`<div className="text-center"><div className="font-[700] text-zinc-700 dark:text-zinc-200">${fmtCompact(v.likes)}</div>likes</div>`:null}
+                      ${v.comments!=null?html`<div className="text-center"><div className="font-[700] text-zinc-700 dark:text-zinc-200">${fmtCompact(v.comments)}</div>comments</div>`:null}
+                    </div>
+                  </div>
+                `)}
+              </div>
+            `:html`<div className="text-[12px] text-zinc-400 text-center py-6">No public video data available.</div>`}
+          </div>
+
+        </div>
+      `:null}
+    </div>
   </div>`;
 }
 
