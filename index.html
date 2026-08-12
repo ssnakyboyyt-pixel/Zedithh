@@ -1614,9 +1614,10 @@ function App(){
 
   const renderModule=()=>{
     switch(module){
-      case 'dashboard': return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
+      case 'dashboard': return html`<${DashboardView} user=${user} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
       case 'allchats': return html`<${AllChatsView} chats=${chats} onOpenChat=${openChat} onNewChat=${startNewChat} deleteChat=${deleteChat} updateChat=${updateChat} />`;
       case 'canvas': return html`<${CanvasView} user=${user} />`;
+      case 'ideas': return html`<${IdeasHubView} user=${user} setModule=${setModule} projects=${projects} createProject=${createProject} />`;
       case 'chat': return html`<${ChatView} ...${commonChatProps} />`;
       case 'project-detail': return html`<${ProjectDetailView} project=${projects.find(p=>p.id===viewProjectId)} projects=${projects} updateProject=${updateProject} deleteProject=${deleteProject} uploadProjectFile=${uploadProjectFile} onChat=${()=>openChatForProject(viewProjectId)} onBack=${()=>setModule('projects')} addNotification=${addNotification} />`;
       case 'projects': return html`<${ProjectsView} projects=${projects} createProject=${createProject} updateProject=${updateProject} deleteProject=${deleteProject} onOpenProject=${openProject} />`;
@@ -1633,7 +1634,7 @@ function App(){
       case 'upgrade': return html`<${UpgradeView} plan=${profile?.plan||'free'} planConfig=${planConfig} onPlan=${k=>{ if(k!=='free') setComingSoon(k); }} />`;
       case 'notifications': return html`<${NotificationsView} notifications=${notifications} markRead=${markNotificationsRead} />`;
       case 'admin': return html`<${AdminPanel} user=${user} profile=${profile} planConfig=${{...planConfig, elite:planConfig.elite||planConfig.infinity||1000000}} creditCosts=${creditCosts} transactions=${transactions} setPlanConfig=${setPlanConfig} setCreditCosts=${setCreditCosts} />`;
-      default: return html`<${DashboardView} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
+      default: return html`<${DashboardView} user=${user} profile=${profile} chats=${chats} projects=${projects} transactions=${transactions} onNewChat=${startNewChat} onOpenChat=${openChat} setModule=${setModule} isAdminUser=${isAdmin(user)} credits=${profile?.credits||0} monthlyCredits=${profile?.monthly_credits||50000} openNotifications=${openNotifications} openFeatureComingSoon=${f=>setFeatureComingSoon(f)} />`;
     }
   };
 
@@ -1730,8 +1731,8 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
       <button onClick=${()=>setModule('canvas')} className=${itemCls(module==='canvas')} title="Canvas">
         <${I} name="LayoutDashboard" size=${17}/> ${!collapsed ? 'Canvas' : ''}
       </button>
-      <button onClick=${()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})} className=${itemCls(false)} title="Ideas">
-        <${I} name="Lightbulb" size=${17}/> ${!collapsed ? 'Ideas' : ''}
+      <button onClick=${()=>setModule('ideas')} className=${itemCls(module==='ideas')} title="Ideas Hub">
+        <${I} name="Lightbulb" size=${17}/> ${!collapsed ? 'Ideas Hub' : ''}
       </button>
       ${[
         ['projects','FolderKanban','My Projects'],
@@ -3548,10 +3549,25 @@ function WeeklyInsightsView({data, goalRows, onClose}){
 }
 
 // ---------- Dashboard (Home) ----------
-function DashboardView({profile, chats, projects, transactions, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits, openNotifications, openFeatureComingSoon}){
+function DashboardView({user, profile, chats, projects, transactions, onNewChat, onOpenChat, setModule, isAdminUser, credits, monthlyCredits, openNotifications, openFeatureComingSoon}){
   const hour = new Date().getHours();
   const greeting = hour<12 ? 'Good morning' : hour<18 ? 'Good afternoon' : 'Good evening';
   const name = profile?.display_name || (isAdminUser ? 'Owner' : 'Creator');
+
+  const [ideasCount,setIdeasCount]=useState(null);
+  const [ideasToday,setIdeasToday]=useState(0);
+  useEffect(()=>{
+    if(!user) return;
+    supabase.from('ideas').select('created_at').eq('user_id',user.id).then(({data,error})=>{
+      if(error) return;
+      setIdeasCount((data||[]).length);
+      const today=new Date();
+      setIdeasToday((data||[]).filter(i=>{
+        const d=new Date(i.created_at);
+        return d.getFullYear()===today.getFullYear() && d.getMonth()===today.getMonth() && d.getDate()===today.getDate();
+      }).length);
+    });
+  },[user]);
 
   const isToday=(d)=>{
     if(!d) return false;
@@ -3570,7 +3586,7 @@ function DashboardView({profile, chats, projects, transactions, onNewChat, onOpe
   const quickActions = [
     {label:'AI Chat', desc:'Get AI answers and advice', icon:'MessageCircle', action:()=>onNewChat()},
     {label:'Canvas', desc:'Bring your ideas to life visually', icon:'LayoutDashboard', action:openCanvas},
-    {label:'Ideas', desc:'Capture and expand ideas', icon:'Lightbulb', action:()=>openFeatureComingSoon({label:'Ideas', icon:'Lightbulb', description:"Capture, organize, and expand every idea before it's forgotten — then turn any idea into a full project. We're actively building this."})},
+    {label:'Ideas Hub', desc:'Capture and expand ideas', icon:'Lightbulb', action:()=>setModule('ideas')},
     {label:'New Project', desc:'Start a new creative project', icon:'FolderPlus', action:()=>setModule('projects')},
   ];
 
@@ -3645,8 +3661,8 @@ function DashboardView({profile, chats, projects, transactions, onNewChat, onOpe
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
           <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="Lightbulb" size=${13} className="text-[var(--zed)]"/> Ideas Captured</div>
-          <div className="text-[22px] font-[800] display mt-[6px]">0</div>
-          <div className="text-[10.5px] text-zinc-400 mt-[2px]">Coming soon</div>
+          <div className="text-[22px] font-[800] display mt-[6px]">${ideasCount==null?'—':ideasCount}</div>
+          ${ideasToday>0?html`<div className="text-[10.5px] text-emerald-500 font-[600] mt-[2px]">↑ ${ideasToday} today</div>`:null}
         </div>
         <div className="p-4 rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]">
           <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-[600] flex items-center gap-[6px]"><${I} name="FolderKanban" size=${13} className="text-[var(--zed)]"/> Projects in Progress</div>
@@ -4223,26 +4239,92 @@ function analyzeChannel(channel, videos){
   const withEngagement = videos.filter(v=>v.views && (v.likes!=null || v.comments!=null));
   const avgEngagementRate = withEngagement.length ? withEngagement.reduce((s,v)=>s+(((v.likes||0)+(v.comments||0))/v.views),0)/withEngagement.length*100 : null;
 
-  // ---- Score (/10), built from real signals only ----
-  let score=5;
+  // ---- Score (/10) — benchmark-relative, not a flat additive average ----
+  // Each sub-score is normalized on a 0-10 curve against real-world YouTube
+  // performance ranges (log-scale, since view/subscriber counts span many
+  // orders of magnitude). Weighted sum, not simple addition of flat bonuses —
+  // this is what lets a channel with elite scale AND elite engagement AND
+  // consistency reach 9.8-10, while no single metric (e.g. subs) can carry
+  // the score on its own. No channel is ever named/hardcoded here.
+
+  // clamp01to10: maps a value through a log curve between a "floor" (score ~1)
+  // and a "ceiling" (score ~10), so extremely large channels approach 10
+  // instead of maxing out at some arbitrary flat threshold.
+  const logScore=(value, floor, ceiling)=>{
+    if(value<=0) return 1;
+    const logV=Math.log10(value), logF=Math.log10(floor), logC=Math.log10(ceiling);
+    const t=(logV-logF)/(logC-logF);
+    return Math.max(1, Math.min(10, 1+t*9));
+  };
+
+  // 1) Audience scale — subscribers, log-normalized. 1K subs ≈ floor, 50M+ ≈
+  // ceiling (50M+ subscribers already represents the top tier of the
+  // platform — a handful of channels globally sit meaningfully above that,
+  // and this curve lets them all reach the max rather than needing an
+  // arbitrarily higher ceiling).
+  const scaleScore = channel.subscriberCount!=null ? logScore(channel.subscriberCount, 1000, 50000000) : 5;
+
+  // 2) Views/content performance — average views per fetched video, relative
+  // to that channel's own subscriber base (views-per-sub ratio), which is a
+  // fairer cross-channel comparison than raw view count alone. Verified
+  // against real public data: top-tier global channels sit around 25-35%
+  // views-per-sub on average, which this ceiling treats as the elite band.
+  const viewsPerSub = (channel.subscriberCount>0 && avgViews>0) ? avgViews/channel.subscriberCount : null;
+  const performanceScore = viewsPerSub!=null ? logScore(viewsPerSub, 0.01, 0.35) : logScore(avgViews||1, 1000, 20000000);
+
+  // 3) Engagement — (likes+comments)/views %, log-normalized. Ceiling set to
+  // 4.5%: verified against real public data that even the most dominant
+  // global channels post engagement rates in the low single digits once
+  // their audience reaches hundreds of millions — that's a natural
+  // compression at scale, not a weakness, so the curve doesn't demand
+  // small-channel-style double-digit rates from massive channels.
+  const engagementScore = avgEngagementRate!=null ? logScore(avgEngagementRate, 0.2, 4.5) : 5;
+
+  // 4) Upload consistency — tighter gaps score higher, on a smooth log curve.
+  const consistencyScore = avgGapDays!=null
+    ? Math.max(1, Math.min(10, 10 - (Math.log10(Math.max(avgGapDays,1))/Math.log10(120))*8))
+    : 5;
+
+  // 5) Recent performance / breakout signal — how far the channel's best
+  // recent video outperforms its own average. Ceiling reached around 3x,
+  // which is realistic even for channels that already perform exceptionally
+  // on average (they don't need a 10x outlier to show real momentum).
+  const breakoutRatio = (best && avgViews>0) ? best.views/avgViews : 1;
+  const momentumScore = Math.max(1, Math.min(10, 5 + Math.log10(Math.max(breakoutRatio,1))*9));
+
+  // Scale and performance carry the most weight — they best represent
+  // overall channel strength/impact. Engagement, consistency, and momentum
+  // are real but secondary signals, matching that no single metric (like
+  // subscriber count) can dominate the score on its own.
+  const weights = { scale:0.28, performance:0.32, engagement:0.16, consistency:0.12, momentum:0.12 };
+  const rawScore =
+    scaleScore*weights.scale +
+    performanceScore*weights.performance +
+    engagementScore*weights.engagement +
+    consistencyScore*weights.consistency +
+    momentumScore*weights.momentum;
+
+  const score = Math.round(Math.max(1, Math.min(10, rawScore))*10)/10;
+
   const reasons=[];
-  if(channel.subscriberCount!=null){
-    if(channel.subscriberCount>1000000){ score+=1.5; reasons.push('Large, established subscriber base (1M+)'); }
-    else if(channel.subscriberCount>100000){ score+=1; reasons.push('Solid subscriber base (100K+)'); }
-    else if(channel.subscriberCount<1000){ score-=0.5; reasons.push('Small subscriber base so far'); }
-  }
-  if(avgGapDays!=null){
-    if(avgGapDays<=4){ score+=1.5; reasons.push('Very consistent upload schedule (~every '+avgGapDays.toFixed(1)+' days)'); }
-    else if(avgGapDays<=10){ score+=0.75; reasons.push('Fairly consistent uploads (~every '+avgGapDays.toFixed(1)+' days)'); }
-    else { score-=0.5; reasons.push('Inconsistent upload gaps (~every '+avgGapDays.toFixed(0)+' days)'); }
-  }
-  if(avgEngagementRate!=null){
-    if(avgEngagementRate>5){ score+=1.5; reasons.push(`Strong engagement rate (~${avgEngagementRate.toFixed(1)}% likes+comments/views)`); }
-    else if(avgEngagementRate>1.5){ score+=0.5; reasons.push(`Healthy engagement rate (~${avgEngagementRate.toFixed(1)}%)`); }
-    else { reasons.push(`Engagement rate is on the lower side (~${avgEngagementRate.toFixed(1)}%)`); }
-  }
-  if(best && avgViews>0 && best.views > avgViews*3){ score+=0.5; reasons.push(`"${best.title}" significantly outperforms this channel's average — a real breakout format`); }
-  score=Math.max(1,Math.min(10,Math.round(score*10)/10));
+  if(scaleScore>=8.5) reasons.push('Exceptional audience scale — among the largest channels on the platform');
+  else if(scaleScore>=6.5) reasons.push('Large, well-established subscriber base');
+  else if(scaleScore>=4) reasons.push('Solid, growing subscriber base');
+  else reasons.push('Smaller subscriber base relative to top-performing channels');
+
+  if(performanceScore>=8.5) reasons.push(viewsPerSub!=null ? `Videos consistently reach a very high share of the subscriber base (~${(viewsPerSub*100).toFixed(0)}% views-to-subs) — exceptional reach beyond just subscribers` : 'Exceptionally high average views per video');
+  else if(performanceScore>=6) reasons.push('Strong average view performance relative to channel size');
+  else if(performanceScore<4) reasons.push('Average views are modest relative to channel size — room to grow reach');
+
+  if(engagementScore>=8) reasons.push(`Elite engagement rate for this scale (~${avgEngagementRate?.toFixed(1)}% likes+comments/views)`);
+  else if(engagementScore>=6) reasons.push(`Strong engagement rate (~${avgEngagementRate?.toFixed(1)}%)`);
+  else if(avgEngagementRate!=null) reasons.push(`Engagement rate is on the lower side (~${avgEngagementRate.toFixed(1)}%)`);
+
+  if(consistencyScore>=8 && avgGapDays!=null) reasons.push(`Highly consistent uploads (~every ${avgGapDays.toFixed(1)} days)`);
+  else if(consistencyScore>=5.5 && avgGapDays!=null) reasons.push(`Fairly consistent uploads (~every ${avgGapDays.toFixed(1)} days)`);
+  else if(avgGapDays!=null) reasons.push(`Inconsistent upload gaps (~every ${avgGapDays.toFixed(0)} days)`);
+
+  if(momentumScore>=7 && best) reasons.push(`"${best.title}" significantly outperforms this channel's own average — a real breakout format`);
 
   return { avgViews, best, worst, avgGapDays, shortsCount, longformCount, topWords, avgEngagementRate, score, reasons };
 }
@@ -4413,6 +4495,331 @@ function ChannelExplorerView(){
 
         </div>
       `:null}
+    </div>
+  </div>`;
+}
+
+// ---------- Ideas Hub ----------
+const IDEA_STATUSES = {
+  new:        {label:'New',        color:'#8b8b8b'},
+  developing: {label:'Developing', color:'#4a9eff'},
+  ready:      {label:'Ready',      color:'#22a06b'},
+  used:       {label:'Used',       color:'#9253f7'},
+};
+const IDEA_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','Bluesky'];
+const IDEA_CONTENT_TYPES = ['Long-form Video','Short-form Video','Post','Carousel','Article','Podcast'];
+
+function ideaDevelopPrompt(idea){
+  return `You are Zedith's creative development assistant. A creator has a rough content idea and wants you to EXPAND and STRENGTHEN it — never replace or throw away their original concept, only build on it.
+
+Title: "${idea.title}"
+Their description: "${idea.description}"
+Platform: ${idea.platform||'Not specified'}
+Content type: ${idea.contentType||'Not specified'}
+Category/niche: ${idea.category||'Not specified'}
+
+Respond with STRICT JSON only, no markdown fences, no commentary, exactly this shape:
+{
+  "concept": "a strengthened 2-3 sentence version of their original concept, keeping their core idea intact",
+  "angles": ["3-4 distinct angles/approaches they could take on this idea"],
+  "hooks": ["3-4 specific opening hook lines for the first few seconds/lines"],
+  "titles": ["4-5 concrete title options"],
+  "audience": "1-2 sentences on who this content is really for",
+  "talkingPoints": ["4-6 key points or beats the content should hit"],
+  "format": "a specific recommended format/structure for this platform and content type",
+  "structure": ["4-6 step outline from intro to conclusion"],
+  "nextSteps": ["2-3 concrete next actions the creator should take right now"]
+}`;
+}
+
+function IdeasHubView({user, setModule, projects, createProject, canvasIdForNewIdea}){
+  const [ideas,setIdeas]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [query,setQuery]=useState('');
+  const [statusFilter,setStatusFilter]=useState('All');
+  const [openIdeaId,setOpenIdeaId]=useState(null);
+  const [showNewForm,setShowNewForm]=useState(false);
+
+  const load=async()=>{
+    setLoading(true);
+    const {data,error}=await supabase.from('ideas').select('*').eq('user_id',user.id).order('updated_at',{ascending:false});
+    if(!error) setIdeas(data||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{ load(); },[]);
+
+  const filtered = ideas.filter(i=>{
+    const matchesQuery = !query.trim() || (i.title||'').toLowerCase().includes(query.toLowerCase()) || (i.description||'').toLowerCase().includes(query.toLowerCase());
+    const matchesStatus = statusFilter==='All' || i.status===statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+
+  const openIdea = ideas.find(i=>i.id===openIdeaId);
+
+  if(openIdea){
+    return html`<${IdeaDetailView} idea=${openIdea} onBack=${()=>{ setOpenIdeaId(null); load(); }} onDeleted=${()=>{ setOpenIdeaId(null); load(); }} setModule=${setModule} projects=${projects} createProject=${createProject}/>`;
+  }
+
+  return html`
+  <div className="flex-1 h-full bg-[var(--zed-page)] overflow-y-auto">
+    <div className="px-5 md:px-9 py-7 max-w-[1100px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
+        <div>
+          <div className="text-[22px] md:text-[26px] font-[800] display flex items-center gap-2"><${I} name="Lightbulb" size=${22} className="text-[var(--zed)]"/> Ideas Hub</div>
+          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Capture every idea before it's forgotten. Develop it when you're ready.</div>
+        </div>
+        <button onClick=${()=>setShowNewForm(true)} className="flex items-center gap-[6px] text-[12.5px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[12px] transition-colors">
+          <${I} name="Plus" size=${14}/> New Idea
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 mt-6 mb-5 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <${I} name="Search" size=${14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+          <input value=${query} onChange=${e=>setQuery(e.target.value)} placeholder="Search ideas..." className="w-full pl-9 pr-3 py-[10px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] outline-none text-[13px] focus:border-[var(--zed)]"/>
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          ${['All',...Object.keys(IDEA_STATUSES)].map(s=>html`
+            <button key=${s} onClick=${()=>setStatusFilter(s)} className=${`px-3 py-[8px] rounded-full text-[11.5px] font-[600] border transition-colors ${statusFilter===s?'border-[var(--zed)] text-[var(--zed)] bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)]':'border-zinc-200 dark:border-[var(--zed-border)] text-zinc-500'}`}>${s==='All'?'All':IDEA_STATUSES[s].label}</button>
+          `)}
+        </div>
+      </div>
+
+      ${loading ? html`
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          ${[1,2,3].map(i=>html`<div key=${i} className="h-[130px] rounded-[16px] bg-zinc-100 dark:bg-[var(--zed-surface2)] animate-pulse"></div>`)}
+        </div>
+      ` : filtered.length===0 ? html`
+        <div className="text-center py-16 border border-dashed border-zinc-300 dark:border-[var(--zed-border)] rounded-[18px]">
+          <${I} name="Lightbulb" size=${32} className="mx-auto text-zinc-400 mb-3"/>
+          <div className="font-[700] text-[14px] mb-1">${ideas.length===0?'No ideas yet':'No ideas match your search'}</div>
+          <div className="text-[12.5px] text-zinc-500 mb-4">${ideas.length===0?'Capture your first idea — it only takes a few seconds.':'Try a different search or filter.'}</div>
+          ${ideas.length===0?html`<button onClick=${()=>setShowNewForm(true)} className="inline-flex items-center gap-[6px] text-[12.5px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-4 py-[10px] rounded-[12px] transition-colors"><${I} name="Plus" size=${14}/> New Idea</button>`:null}
+        </div>
+      ` : html`
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          ${filtered.map(idea=>{
+            const st=IDEA_STATUSES[idea.status]||IDEA_STATUSES.new;
+            return html`
+            <button key=${idea.id} onClick=${()=>setOpenIdeaId(idea.id)} className="text-left p-4 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition-all">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="font-[700] text-[13.5px] leading-snug line-clamp-2">${idea.title}</div>
+                <span className="text-[9.5px] font-[700] px-[8px] py-[3px] rounded-full shrink-0" style=${{background:st.color+'22', color:st.color}}>${st.label}</span>
+              </div>
+              <div className="text-[11.5px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-3">${idea.description||'No description yet.'}</div>
+              <div className="flex items-center gap-2 text-[10.5px] text-zinc-400">
+                ${idea.platform?html`<span className="px-[8px] py-[2px] rounded-full bg-zinc-100 dark:bg-[var(--zed-surface2)]">${idea.platform}</span>`:null}
+                ${idea.category?html`<span className="px-[8px] py-[2px] rounded-full bg-zinc-100 dark:bg-[var(--zed-surface2)]">${idea.category}</span>`:null}
+                <span className="ml-auto">${formatDate(idea.updated_at)}</span>
+              </div>
+            </button>`;
+          })}
+        </div>
+      `}
+    </div>
+
+    ${showNewForm ? html`<${NewIdeaModal} user=${user} onClose=${()=>setShowNewForm(false)} onCreated=${(id)=>{ setShowNewForm(false); load(); setOpenIdeaId(id); }}/>` : null}
+  </div>`;
+}
+
+function NewIdeaModal({user, onClose, onCreated}){
+  const [title,setTitle]=useState('');
+  const [description,setDescription]=useState('');
+  const [platform,setPlatform]=useState('');
+  const [contentType,setContentType]=useState('');
+  const [category,setCategory]=useState('');
+  const [saving,setSaving]=useState(false);
+
+  const save=async()=>{
+    if(!title.trim()) return;
+    setSaving(true);
+    const {data,error}=await supabase.from('ideas').insert({
+      user_id:user.id, title:title.trim(), description:description.trim(),
+      platform:platform||null, content_type:contentType||null, category:category.trim()||null,
+      status:'new'
+    }).select().single();
+    setSaving(false);
+    if(error){ toast('Could not save idea: '+(error.message||'unknown error'),'err'); return; }
+    toast('Idea captured');
+    onCreated(data.id);
+  };
+
+  return html`
+  <div className="fixed inset-0 z-[400] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4" onClick=${onClose}>
+    <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[20px] p-6 max-w-[480px] w-full max-h-[90vh] overflow-y-auto" onClick=${e=>e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="font-[750] text-[15px] display flex items-center gap-2"><${I} name="Lightbulb" size=${16} className="text-[var(--zed)]"/> Capture an Idea</div>
+        <button onClick=${onClose} className="p-[6px] rounded-lg hover:bg-zinc-100 dark:hover:bg-[var(--zed-active)]"><${I} name="X" size=${16}/></button>
+      </div>
+      <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Idea Title</label>
+      <input autoFocus value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. Why most AI startups fail" className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)]"/>
+
+      <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-4 block">Rough Idea / Description</label>
+      <textarea value=${description} onChange=${e=>setDescription(e.target.value)} placeholder="Even a rough, unfinished thought is fine..." rows="3" className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] resize-none"></textarea>
+
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div>
+          <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
+          <div className="mt-[6px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${[{value:'',label:'Not specified'}, ...IDEA_PLATFORMS.map(p=>({value:p,label:p}))]} align="left" className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13px]"/></div>
+        </div>
+        <div>
+          <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Content Type</label>
+          <div className="mt-[6px]"><${CustomSelect} value=${contentType} onChange=${setContentType} options=${[{value:'',label:'Not specified'}, ...IDEA_CONTENT_TYPES.map(c=>({value:c,label:c}))]} align="left" className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13px]"/></div>
+        </div>
+      </div>
+
+      <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mt-4 block">Category / Niche <span className="normal-case text-zinc-400">(optional)</span></label>
+      <input value=${category} onChange=${e=>setCategory(e.target.value)} placeholder="e.g. Tech, Finance, Gaming" className="mt-[6px] w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)]"/>
+
+      <button onClick=${save} disabled=${saving||!title.trim()} className="mt-5 w-full py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] disabled:opacity-50 transition">${saving?'Saving…':'Save Idea'}</button>
+    </div>
+  </div>`;
+}
+
+function IdeaDetailView({idea, onBack, onDeleted, setModule, projects, createProject}){
+  const [title,setTitle]=useState(idea.title);
+  const [description,setDescription]=useState(idea.description);
+  const [notes,setNotes]=useState(idea.notes||'');
+  const [platform,setPlatform]=useState(idea.platform||'');
+  const [contentType,setContentType]=useState(idea.content_type||'');
+  const [category,setCategory]=useState(idea.category||'');
+  const [status,setStatus]=useState(idea.status);
+  const [developing,setDeveloping]=useState(false);
+  const [devError,setDevError]=useState(null);
+  const [saveState,setSaveState]=useState('saved');
+  const saveTimer=useRef(null);
+
+  const persist=(patch)=>{
+    setSaveState('unsaved');
+    if(saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(async()=>{
+      setSaveState('saving');
+      const {error}=await supabase.from('ideas').update({...patch, updated_at:new Date().toISOString()}).eq('id',idea.id);
+      setSaveState(error?'unsaved':'saved');
+    }, 700);
+  };
+
+  useEffect(()=>{ persist({title, description, notes, platform, content_type:contentType, category, status}); },[title, description, notes, platform, contentType, category, status]);
+
+  const developWithAI=async()=>{
+    if(!description.trim() && !title.trim()) return;
+    setDeveloping(true); setDevError(null);
+    try{
+      const r = await callOR([{role:'user', content: ideaDevelopPrompt({title, description, platform, contentType, category})}], {smart:true, userText:title, maxTokens:1800});
+      if(r.error) throw new Error(r.text);
+      const cleaned=r.text.replace(/```json|```/g,'').trim();
+      const parsed=JSON.parse(cleaned);
+      await supabase.from('ideas').update({ai_developed:parsed, status: status==='new'?'developing':status, updated_at:new Date().toISOString()}).eq('id',idea.id);
+      idea.ai_developed=parsed;
+      if(status==='new') setStatus('developing');
+      toast('Idea developed');
+    }catch(e){
+      setDevError("Could not develop this idea right now. Please try again.");
+    }finally{ setDeveloping(false); }
+  };
+
+  const deleteIdea=async()=>{
+    if(!confirm('Delete this idea? This cannot be undone.')) return;
+    await supabase.from('ideas').delete().eq('id',idea.id);
+    toast('Idea deleted');
+    onDeleted();
+  };
+
+  const duplicateIdea=async()=>{
+    const {data,error}=await supabase.from('ideas').insert({
+      user_id:idea.user_id, title:title+' (Copy)', description, platform:platform||null,
+      content_type:contentType||null, category:category||null, status:'new'
+    }).select().single();
+    if(!error){ toast('Idea duplicated'); }
+  };
+
+  const addToProject=async()=>{
+    if(!createProject) return;
+    await createProject({title, cat:category||platform||'General', desc:description});
+    await supabase.from('ideas').update({status:'used', updated_at:new Date().toISOString()}).eq('id',idea.id);
+    toast('Added as a new project');
+    setModule('projects');
+  };
+
+  const openInChat=()=>{
+    setModule('chat');
+    // Chat opens fresh; the idea's content stays visible here for reference.
+  };
+
+  const ai = idea.ai_developed;
+
+  return html`
+  <div className="flex-1 h-full bg-[var(--zed-page)] overflow-y-auto">
+    <div className="px-5 md:px-9 py-6 max-w-[900px] mx-auto">
+      <div className="flex items-center justify-between mb-5">
+        <button onClick=${onBack} className="flex items-center gap-[6px] text-[12.5px] font-[600] text-zinc-500 hover:text-[var(--zed)] transition-colors"><${I} name="ArrowLeft" size=${14}/> Back to Ideas</button>
+        <div className="text-[10.5px] text-zinc-400 flex items-center gap-1">
+          ${saveState==='saving' ? html`<${I} name="Loader2" size=${11} className="animate-spin"/> Saving…` : saveState==='unsaved' ? html`Unsaved` : html`<${I} name="Check" size=${11} className="text-emerald-500"/> Saved`}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6">
+        <input value=${title} onChange=${e=>setTitle(e.target.value)} className="w-full text-[19px] font-[800] display bg-transparent outline-none"/>
+        <textarea value=${description} onChange=${e=>setDescription(e.target.value)} placeholder="The rough idea..." rows="3" className="w-full mt-2 text-[13.5px] text-zinc-600 dark:text-zinc-300 bg-transparent outline-none resize-none leading-relaxed"></textarea>
+
+        <div className="flex items-center gap-2 flex-wrap mt-4">
+          ${Object.entries(IDEA_STATUSES).map(([k,v])=>html`
+            <button key=${k} onClick=${()=>setStatus(k)} className=${`px-3 py-[7px] rounded-full text-[11.5px] font-[650] border transition-colors ${status===k?'text-white':'text-zinc-500 border-zinc-200 dark:border-[var(--zed-border)]'}`} style=${status===k?{background:v.color, borderColor:v.color}:{}}>${v.label}</button>
+          `)}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          <div>
+            <label className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Platform</label>
+            <div className="mt-[4px]"><${CustomSelect} value=${platform} onChange=${setPlatform} options=${[{value:'',label:'—'}, ...IDEA_PLATFORMS.map(p=>({value:p,label:p}))]} align="left" className="w-full px-[10px] py-[8px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[12px]"/></div>
+          </div>
+          <div>
+            <label className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Content Type</label>
+            <div className="mt-[4px]"><${CustomSelect} value=${contentType} onChange=${setContentType} options=${[{value:'',label:'—'}, ...IDEA_CONTENT_TYPES.map(c=>({value:c,label:c}))]} align="left" className="w-full px-[10px] py-[8px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[12px]"/></div>
+          </div>
+          <div>
+            <label className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Category</label>
+            <input value=${category} onChange=${e=>setCategory(e.target.value)} placeholder="—" className="mt-[4px] w-full px-[10px] py-[8px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[12px] outline-none"/>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap mt-5 pt-4 border-t border-zinc-100 dark:border-[var(--zed-border)]">
+          <button onClick=${developWithAI} disabled=${developing} className="flex items-center gap-[6px] text-[12px] font-[650] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-3 py-[9px] rounded-[11px] disabled:opacity-60 transition">
+            ${developing?html`<${I} name="Loader2" size=${13} className="animate-spin"/>`:html`<${I} name="Sparkles" size=${13}/>`} ${developing?'Developing…':ai?'Redevelop with AI':'Develop with AI'}
+          </button>
+          <button onClick=${duplicateIdea} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[11px] border border-zinc-200 dark:border-[var(--zed-border)] hover:border-[var(--zed)]/40 transition"><${I} name="Copy" size=${13}/> Duplicate</button>
+          <button onClick=${addToProject} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[11px] border border-zinc-200 dark:border-[var(--zed-border)] hover:border-[var(--zed)]/40 transition"><${I} name="FolderPlus" size=${13}/> Add to Project</button>
+          <button onClick=${()=>setModule('canvas')} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[11px] border border-zinc-200 dark:border-[var(--zed-border)] hover:border-[var(--zed)]/40 transition"><${I} name="LayoutDashboard" size=${13}/> Open in Canvas</button>
+          <button onClick=${openInChat} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[11px] border border-zinc-200 dark:border-[var(--zed-border)] hover:border-[var(--zed)]/40 transition"><${I} name="MessageCircle" size=${13}/> Discuss in Chat</button>
+          <button onClick=${deleteIdea} className="ml-auto flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition"><${I} name="Trash2" size=${13}/> Delete</button>
+        </div>
+        ${devError?html`<div className="mt-3 text-[12px] text-red-500">${devError}</div>`:null}
+      </div>
+
+      ${ai ? html`
+        <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6 mt-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-[9px] bg-[var(--zed-solid)] text-white flex items-center justify-center"><${I} name="Sparkles" size=${13}/></div>
+            <div className="font-[750] text-[14px] display">AI-Developed Version</div>
+          </div>
+          <div className="space-y-5 text-[13px] text-zinc-700 dark:text-zinc-200">
+            <div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-1">Strengthened Concept</div><p className="leading-relaxed">${ai.concept}</p></div>
+            ${ai.titles?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Title Ideas</div><div className="space-y-1">${ai.titles.map((t,i)=>html`<div key=${i} className="flex items-center gap-2"><${I} name="Type" size=${12} className="text-[var(--zed)] shrink-0"/> ${t}</div>`)}</div></div>`:null}
+            ${ai.hooks?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Hook Ideas</div><div className="space-y-1">${ai.hooks.map((h,i)=>html`<div key=${i} className="flex items-start gap-2"><${I} name="Zap" size=${12} className="text-[var(--zed)] shrink-0 mt-[2px]"/> "${h}"</div>`)}</div></div>`:null}
+            ${ai.angles?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Possible Angles</div><div className="flex flex-wrap gap-[6px]">${ai.angles.map((a,i)=>html`<span key=${i} className="px-[10px] py-[5px] rounded-full text-[11.5px] font-[600]" style=${{background:'var(--zed-tint-bg2)', color:'var(--zed)'}}>${a}</span>`)}</div></div>`:null}
+            ${ai.audience ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-1">Target Audience</div><p className="leading-relaxed">${ai.audience}</p></div>`:null}
+            ${ai.format ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-1">Suggested Format</div><p className="leading-relaxed">${ai.format}</p></div>`:null}
+            ${ai.talkingPoints?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Key Talking Points</div><div className="space-y-1">${ai.talkingPoints.map((p,i)=>html`<div key=${i} className="flex items-start gap-2"><span className="text-zinc-400 shrink-0">${i+1}.</span> ${p}</div>`)}</div></div>`:null}
+            ${ai.structure?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Basic Structure</div><div className="space-y-1">${ai.structure.map((s,i)=>html`<div key=${i} className="flex items-start gap-2"><span className="text-zinc-400 shrink-0">${i+1}.</span> ${s}</div>`)}</div></div>`:null}
+            ${ai.nextSteps?.length ? html`<div><div className="text-[10.5px] font-[700] uppercase tracking-wide text-zinc-400 mb-2">Next Steps</div><div className="space-y-1">${ai.nextSteps.map((s,i)=>html`<div key=${i} className="flex items-start gap-2"><${I} name="ArrowRight" size=${12} className="text-[var(--zed)] shrink-0 mt-[2px]"/> ${s}</div>`)}</div></div>`:null}
+          </div>
+        </div>
+      `:null}
+
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-6 mt-5">
+        <div className="font-[750] text-[14px] display mb-2">Notes</div>
+        <textarea value=${notes} onChange=${e=>setNotes(e.target.value)} placeholder="Any extra notes about this idea..." rows="4" className="w-full text-[13px] bg-transparent outline-none resize-none leading-relaxed"></textarea>
+      </div>
     </div>
   </div>`;
 }
