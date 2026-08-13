@@ -658,6 +658,43 @@ async function realWebSearch(query){
   }
 }
 
+// Server-side fetch + parse of a URL for Website SEO analysis. This never
+// runs in the browser directly (cross-origin pages can't be fetched from
+// client JS), so it hits a backend route that fetches the page, parses the
+// HTML, and returns only real, verifiable signals — never invented data.
+async function realAnalyzeUrl(url){
+  try{
+    const r = await fetch('/api/analyze-url', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    });
+    const d = await r.json().catch(()=>null);
+    if(!r.ok || !d) return { ok:false, error: d?.error || `HTTP ${r.status}` };
+    return { ok:true, data: d };
+  }catch(e){
+    return { ok:false, error: 'network error: '+e.message };
+  }
+}
+
+// Optional Google Search Console status/data fetch. Search Console is never
+// required for Website SEO analysis — if disconnected or the call fails,
+// callers simply show the "Connect" prompt and continue without it.
+async function fetchSearchConsoleData(siteUrl){
+  try{
+    const r = await fetch('/api/gsc/data', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ siteUrl })
+    });
+    const d = await r.json().catch(()=>null);
+    if(!r.ok || !d) return { connected:false };
+    return d; // { connected: true/false, queries:[...], clicks, impressions, ctr, avgPosition, topPages:[...] }
+  }catch(e){
+    return { connected:false };
+  }
+}
+
 function imageGenUrl(prompt){ return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${Math.floor(Math.random()*99999)}&model=flux`; }
 
 // ---------- Real thumbnail composer: generates AI background art, then bakes
@@ -1627,7 +1664,7 @@ function App(){
       case 'voice': return html`<${VoiceStudioView} plan=${profile?.plan||'free'} credits=${profile?.credits||0} isAdminUser=${isAdmin(user)} user=${user} openUpgrade=${openUpgrade} createVoiceEntry=${createVoiceEntry} voiceHistory=${voiceHistory} myVoices=${myVoices} setMyVoices=${setMyVoices} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
       case 'analytics': return html`<${AnalyticsView} addNotification=${addNotification} transactions=${transactions} />`;
       case 'seo': return html`<${SEOStudioView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
-      case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} />`;
+      case 'trends': return html`<${TrendExplorerView} plan=${profile?.plan||'free'} isAdminUser=${isAdmin(user)} openUpgrade=${openUpgrade} deductCredits=${deductCredits} hasEnoughCredits=${hasEnoughCredits} setModule=${setModule} />`;
       case 'picks': return html`<${ZedithPicksView} />`;
       case 'explorer': return html`<${ChannelExplorerView} />`;
       case 'settings': return html`<${SettingsView} settings=${settings} setSettings=${updateSettings} theme=${theme} setTheme=${setTheme} profile=${profile} saveProfile=${saveProfile} openUpgrade=${openUpgrade} />`;
@@ -6956,7 +6993,47 @@ CRITICAL: Respond with STRICT JSON only. No markdown code fences, no commentary 
   return `${base}\n\nRequired JSON shape:\n${spec.shape}\n\nContent requirements:\n${spec.depth}\n\nMake it genuinely specific to the topic "${topic}" and the "${niche}" niche — real, usable content a creator could post immediately, not generic template filler.`;
 }
 
+// Turns raw, real, server-fetched page signals into a scored analysis +
+// prioritized recommendations. The model is instructed to only use what's
+// actually present in the extracted data — never invent metrics it wasn't
+// given — and to clearly mark anything the crawler couldn't access.
+function websiteSeoPromptFor(pageData, gscData){
+  const gscBlock = gscData && gscData.connected
+    ? `\n\nGOOGLE SEARCH CONSOLE DATA (real, connected):\n${JSON.stringify({
+        clicks: gscData.clicks, impressions: gscData.impressions, ctr: gscData.ctr,
+        avgPosition: gscData.avgPosition, topQueries: (gscData.queries||[]).slice(0,10),
+        topPages: (gscData.topPages||[]).slice(0,10)
+      })}\nUse this real data to add or sharpen recommendations where relevant (e.g. low CTR on a high-impression query, pages ranking just outside page 1).`
+    : `\n\nGoogle Search Console is not connected for this site — do not reference search query, click, impression, CTR, or ranking-position data since none is available.`;
+
+  return `You are Zedith's Website SEO Studio. Analyze the following REAL, server-extracted data from a webpage and produce an honest SEO assessment. Do NOT invent any data point not present below. If something needed for a category couldn't be checked (marked null/missing below), say so plainly instead of guessing.
+
+EXTRACTED PAGE DATA:
+${JSON.stringify(pageData)}
+${gscBlock}
+
+Respond with STRICT JSON only, no markdown fences, no commentary, in this exact shape:
+{
+ "score": 0-100,
+ "categoryScores": {"onPage":0-100,"technical":0-100,"content":0-100,"metadata":0-100,"searchVisibility":0-100},
+ "summary": "2-3 sentence honest overall assessment",
+ "recommendations": [
+   {"priority":"High|Medium|Opportunity", "title":"short actionable title", "detail":"specific explanation of what to change and why, referencing the actual page data"}
+ ],
+ "checksPerformed": ["list of what was actually analyzed"],
+ "checksUnavailable": ["list of what could not be checked and why, e.g. 'JavaScript-rendered content could not be fully read'"]
+}
+
+Rules:
+- Base the score strictly on the extracted data provided — a thin/generic page should score low, a well-optimized page should score high.
+- Give at least 4 recommendations, ordered High -> Medium -> Opportunity, each specific to this page's actual content (not generic "improve your SEO" advice).
+- If title or meta description is missing, empty, too short, or too long, flag it specifically with the actual character count.
+- If GSC data was provided, you may add one recommendation grounded in it.
+- Never fabricate traffic numbers, rankings, or competitor data.`;
+}
+
 function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
+  const [seoMode,setSeoMode]=useState('creator'); // 'creator' | 'website'
   const [topic,setTopic]=useState('');
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
@@ -6967,6 +7044,90 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
   const [error,setError]=useState(null);
   const [showHowItWorks,setShowHowItWorks]=useState(false);
   const SEO_COST = 100;
+
+  // Pick up a hand-off from Trend Explorer's "Optimize with SEO Studio"
+  // action, if present, then clear it so it doesn't stick around stale.
+  useEffect(()=>{
+    try{
+      const raw = sessionStorage.getItem('zedith_seo_prefill');
+      if(raw){
+        const pre = JSON.parse(raw);
+        if(pre.topic) setTopic(pre.topic);
+        if(pre.platform && SEO_PLATFORMS.includes(pre.platform)) setPlatform(pre.platform);
+        if(pre.niche && SEO_NICHES.includes(pre.niche)) setNiche(pre.niche);
+        sessionStorage.removeItem('zedith_seo_prefill');
+      }
+    }catch(e){}
+  },[]);
+
+  // ---- Website SEO state (separate from creator-SEO state above, so
+  // switching modes never clobbers the other mode's in-progress work) ----
+  const [siteUrl,setSiteUrl]=useState('');
+  const [siteLoading,setSiteLoading]=useState(false);
+  const [siteResult,setSiteResult]=useState(null);
+  const [siteError,setSiteError]=useState(null);
+  const [gscConnected,setGscConnected]=useState(false);
+  const [gscData,setGscData]=useState(null);
+  const [gscChecking,setGscChecking]=useState(true);
+  const WEBSITE_SEO_COST = 120;
+
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      const d = await fetchSearchConsoleData(null);
+      if(!cancelled){ setGscConnected(!!d.connected); setGscChecking(false); }
+    })();
+    return ()=>{ cancelled=true; };
+  },[]);
+
+  const normalizeUrl=(raw)=>{
+    let u = raw.trim();
+    if(!u) return '';
+    if(!/^https?:\/\//i.test(u)) u = 'https://'+u;
+    return u;
+  };
+
+  const analyzeWebsite=async()=>{
+    const url = normalizeUrl(siteUrl);
+    if(!url) return;
+    let parsed;
+    try{ parsed = new URL(url); }catch(e){ setSiteError('That doesn\'t look like a valid URL. Try something like https://example.com'); return; }
+
+    if(!isAdminUser){
+      const enough = await hasEnoughCredits(WEBSITE_SEO_COST);
+      if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
+    }
+
+    setSiteLoading(true); setSiteError(null); setSiteResult(null);
+    try{
+      const fetched = await realAnalyzeUrl(url);
+      if(!fetched.ok) throw new Error(fetched.error||'fetch-failed');
+
+      let gsc = null;
+      if(gscConnected){
+        gsc = await fetchSearchConsoleData(`${parsed.protocol}//${parsed.host}`);
+      }
+
+      const r = await callOR([{role:'user', content: websiteSeoPromptFor(fetched.data, gsc)}], {smart:true, userText:url, maxTokens:1800});
+      if(r.error) throw new Error(r.text);
+      const cleaned = r.text.replace(/```json|```/g,'').trim();
+      let analysis;
+      try{ analysis = JSON.parse(cleaned); }
+      catch(e){ throw new Error('parse-failed'); }
+
+      setSiteResult({ url, page: fetched.data, analysis, gsc: gsc && gsc.connected ? gsc : null });
+      await deductCredits(WEBSITE_SEO_COST, 'seo', {url, mode:'website'});
+    }catch(e){
+      console.error('[WebsiteSEO] analysis failed:', e);
+      setSiteError('Could not analyze that URL right now. It may be unreachable, blocking crawlers, or our analysis service is temporarily busy — please try again.');
+    }finally{ setSiteLoading(false); }
+  };
+
+  const connectSearchConsole=()=>{
+    // Kicks off the OAuth flow on the backend; the backend route owns the
+    // Google client id/secret via env vars and redirects back into Zedith.
+    window.location.href = '/api/gsc/connect';
+  };
 
   const generate=async(platformOverride)=>{
     const genPlatform = platformOverride || platform;
@@ -7094,13 +7255,131 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
       </div>`;
   };
 
+  const ModeTabs = ()=> html`
+    <div className="flex items-center gap-1 mt-5 mb-1 p-1 rounded-[14px] bg-zinc-100 dark:bg-[var(--zed-surface2)] w-fit">
+      <button onClick=${()=>setSeoMode('creator')} className=${`flex items-center gap-[6px] text-[12.5px] font-[650] px-4 py-[8px] rounded-[10px] transition ${seoMode==='creator'?'bg-white dark:bg-[var(--zed-surface)] text-zinc-900 dark:text-white shadow-sm':'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+        <${I} name="Sparkles" size=${13}/> Creator SEO
+      </button>
+      <button onClick=${()=>setSeoMode('website')} className=${`flex items-center gap-[6px] text-[12.5px] font-[650] px-4 py-[8px] rounded-[10px] transition ${seoMode==='website'?'bg-white dark:bg-[var(--zed-surface)] text-zinc-900 dark:text-white shadow-sm':'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+        <${I} name="Globe" size=${13}/> Website SEO
+      </button>
+    </div>`;
+
+  const scoreColor=(s)=> s>=80?'#16a34a':s>=60?'#ca8a04':s>=40?'#ea580c':'#dc2626';
+  const priorityStyle=(p)=> p==='High' ? {bg:'#dc262620', fg:'#dc2626', label:'High priority'} : p==='Medium' ? {bg:'#ca8a0420', fg:'#ca8a04', label:'Medium priority'} : {bg:'#16a34a20', fg:'#16a34a', label:'Opportunity'};
+
+  const renderWebsiteSeo=()=> html`
+    <div>
+      <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px] mt-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">1</div>
+          <div className="text-[13px] font-[700]">Enter a Website URL</div>
+        </div>
+        <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Website or Page URL</label>
+        <div className="flex flex-col sm:flex-row gap-3 mt-[6px]">
+          <input value=${siteUrl} onChange=${e=>setSiteUrl(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') analyzeWebsite(); }} placeholder="https://example.com" className="flex-1 px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
+          <button onClick=${analyzeWebsite} disabled=${siteLoading || !siteUrl.trim()} className="px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition shrink-0">
+            ${siteLoading ? html`<${I} name="Loader2" size=${15} className="animate-spin"/>` : html`<${I} name="ScanSearch" size=${15}/>`}
+            ${siteLoading ? 'Analyzing…' : 'Analyze Website'}
+          </button>
+        </div>
+        ${siteError ? html`<div className="mt-3 text-[12.5px] text-red-500">${siteError}</div>` : null}
+
+        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-[var(--zed-border)] flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-[12.5px]">
+            <${I} name="LineChart" size=${14} className="text-zinc-400"/>
+            <span className="font-[650]">Google Search Console</span>
+            <span className="text-zinc-400">— optional, adds real search performance data</span>
+          </div>
+          ${gscChecking ? html`<span className="text-[11.5px] text-zinc-400">Checking…</span>` :
+            gscConnected ? html`<span className="flex items-center gap-1.5 text-[11.5px] font-[650] text-emerald-500"><span className="w-[6px] h-[6px] rounded-full bg-emerald-500"></span> Connected</span>` :
+            html`<button onClick=${connectSearchConsole} className="text-[11.5px] font-[650] px-3 py-[6px] rounded-[10px] border border-zinc-200 dark:border-[var(--zed-border)] hover:border-[var(--zed)]/40 transition">Connect</button>`}
+        </div>
+      </div>
+
+      ${siteLoading ? html`
+        <div className="mt-8 space-y-4">
+          ${[1,2].map(i=>html`<div key=${i} className="h-[120px] rounded-[16px] bg-zinc-100 dark:bg-[var(--zed-surface2)] animate-pulse"></div>`)}
+        </div>
+      `:null}
+
+      ${siteResult ? html`
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">2</div>
+            <div className="text-[13px] font-[700]">Website SEO Report</div>
+            <span className="text-[11px] text-zinc-400">${siteResult.url}</span>
+          </div>
+
+          <div className="grid md:grid-cols-[160px_1fr] gap-4 mb-4">
+            <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px] flex flex-col items-center justify-center">
+              <div className="text-[36px] font-[800] display" style=${{color:scoreColor(siteResult.analysis.score)}}>${siteResult.analysis.score}</div>
+              <div className="text-[11px] text-zinc-400 font-[650]">SEO Score / 100</div>
+            </div>
+            <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px]">
+              <div className="text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Category Breakdown</div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                ${Object.entries({onPage:'On-page',technical:'Technical',content:'Content',metadata:'Metadata',searchVisibility:'Visibility'}).map(([k,label])=>html`
+                  <div key=${k}>
+                    <div className="text-[16px] font-[800]" style=${{color:scoreColor(siteResult.analysis.categoryScores?.[k]||0)}}>${siteResult.analysis.categoryScores?.[k]??'—'}</div>
+                    <div className="text-[10.5px] text-zinc-400 font-[600]">${label}</div>
+                  </div>
+                `)}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[16px] p-[18px] mb-4">
+            <div className="text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Summary</div>
+            <p className="text-[13px] leading-relaxed text-zinc-700 dark:text-zinc-300 select-text">${siteResult.analysis.summary}</p>
+          </div>
+
+          <div className="text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2 mt-6">Recommendations</div>
+          <div className="space-y-3">
+            ${(siteResult.analysis.recommendations||[]).map((rec,i)=>{
+              const ps = priorityStyle(rec.priority);
+              return html`
+              <div key=${i} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-[16px]">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-[750] px-[9px] py-[3px] rounded-full uppercase tracking-wide" style=${{background:ps.bg, color:ps.fg}}>${ps.label}</span>
+                  <span className="text-[13.5px] font-[700]">${rec.title}</span>
+                </div>
+                <p className="text-[12.5px] leading-relaxed text-zinc-600 dark:text-zinc-300 select-text">${rec.detail}</p>
+              </div>`;
+            })}
+          </div>
+
+          ${(siteResult.analysis.checksUnavailable||[]).length ? html`
+            <div className="mt-4 text-[11.5px] text-zinc-400 flex items-start gap-2">
+              <${I} name="Info" size=${13} className="mt-[1px] shrink-0"/>
+              <span>Couldn't check: ${siteResult.analysis.checksUnavailable.join('; ')}</span>
+            </div>
+          `:null}
+
+          ${siteResult.gsc ? html`
+            <div className="mt-6">
+              <div className="text-[12.5px] font-[700] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Search Console Data</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                ${[['Clicks',siteResult.gsc.clicks],['Impressions',siteResult.gsc.impressions],['CTR',siteResult.gsc.ctr!=null?siteResult.gsc.ctr+'%':'—'],['Avg. Position',siteResult.gsc.avgPosition]].map(([label,val])=>html`
+                  <div key=${label} className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-[14px]">
+                    <div className="text-[16px] font-[800]">${val??'—'}</div>
+                    <div className="text-[10.5px] text-zinc-400 font-[600]">${label}</div>
+                  </div>
+                `)}
+              </div>
+            </div>
+          `:null}
+        </div>
+      `:null}
+    </div>`;
+
   return html`
   <div className="flex-1 overflow-y-auto px-5 md:px-10 py-8 bg-[var(--zed-page)]">
     <div className="max-w-[1080px] mx-auto">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
         <div>
           <div className="text-[19px] font-[800] display flex items-center gap-2"><${I} name="Sparkles" size=${18} className="text-[var(--zed)]"/> SEO Studio</div>
-          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Generate SEO-optimized content for any platform.</div>
+          <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1">Generate SEO-optimized content for any platform, or analyze a website.</div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick=${()=>setShowHowItWorks(true)} className="flex items-center gap-[6px] text-[12px] font-[600] px-3 py-[9px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/40 transition">
@@ -7112,6 +7391,9 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
         </div>
       </div>
 
+      <${ModeTabs}/>
+
+      ${seoMode==='website' ? renderWebsiteSeo() : html`
       <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[18px] p-[20px] mt-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-5 h-5 rounded-full bg-[var(--zed)] text-white text-[10.5px] font-[700] flex items-center justify-center shrink-0">1</div>
@@ -7179,6 +7461,7 @@ function SEOStudioView({plan, isAdminUser, openUpgrade, deductCredits, hasEnough
         <div className="text-[11px] text-zinc-400 -mt-3 mb-4">Switching platforms will regenerate content for that platform using ${SEO_COST} more credits.</div>
       `:null}
       ${renderResult()}
+      `}
     </div>
   </div>`;
 }
@@ -7192,20 +7475,34 @@ const TREND_COUNTRIES = ['Global','India','United States','United Kingdom'];
 const OPP_LABELS = ['Best opportunity','Very good opportunity','Good opportunity','Moderate opportunity','Lowest opportunity'];
 const OPP_COLORS = ['#16a34a','#65a30d','#ca8a04','#ea580c','#dc2626'];
 
-function trendPromptFor(platform, niche, country, searchContext){
+function trendPromptFor(platform, niche, country, topic, searchContext){
+  const focusLine = topic && topic.trim()
+    ? `The creator wants ideas specifically at the intersection of "${niche}" + ${platform} + the topic "${topic.trim()}". Every trend must be relevant to that specific combination, not generic ${niche} content.`
+    : `No specific topic was given — discover the most relevant current trends for a "${niche}" creator on ${platform} broadly.`;
+
   return `You are Zedith's Trend Explorer. Using ONLY the live web search results below (real, current data — do not invent trends from memory), identify the top 5 trending content opportunities right now for a "${niche}" creator on ${platform}${country && country!=='Global' ? ` in ${country}` : ' (global audience)'}.
+
+${focusLine}
 
 LIVE SEARCH RESULTS:
 ${searchContext}
 
+For each trend, produce an AI Opportunity Score (0-100) based on: current relevance in the search results, apparent recency, platform fit, niche fit, content-opportunity size, and competition level where inferable. This is an AI-estimated opportunity score, NOT a real Google/YouTube/TikTok popularity metric — never claim it is an actual platform statistic or exact search volume number.
+
 Rank the 5 trends from best to worst opportunity. Respond with STRICT JSON only, no markdown fences, no commentary, in this exact shape:
 {"trends":[{"title":"...","score":0-100,"competition":"Low|Medium|High","opportunity":"Best opportunity|Very good opportunity|Good opportunity|Moderate opportunity|Lowest opportunity","why":"...","idea":"...","hook":"..."}]}
-Order the array from Best opportunity to Lowest opportunity. Ground every trend in the actual search results provided — do not fabricate trends absent from them.`;
+
+Rules:
+- "why": ground this in what the search results actually show (cite the kind of activity/discussion found), not a generic claim.
+- "idea": a specific, concrete creator opportunity — what the creator could actually make, not vague advice.
+- Order the array from Best opportunity to Lowest opportunity.
+- Ground every trend in the actual search results provided — do not fabricate trends absent from them. If results are thin, it's fine to have fewer than 5 well-grounded trends rather than padding with invented ones.`;
 }
 
-function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits}){
+function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEnoughCredits, setModule}){
   const [platform,setPlatform]=useState('YouTube');
   const [niche,setNiche]=useState('AI');
+  const [topic,setTopic]=useState('');
   const [country,setCountry]=useState('Global');
   const [loading,setLoading]=useState(false);
   const [trends,setTrends]=useState(null);
@@ -7218,14 +7515,35 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
       if(!enough){ toast("You're out of Credits. Upgrade to Zedith Pro or wait until your monthly credits reset.", 'err'); return; }
     }
 
-    const query = `latest trending ${niche} content ${platform} ${country!=='Global'?country:''} ${new Date().toLocaleString('en-US',{month:'long',year:'numeric'})}`.trim();
+    const monthYear = new Date().toLocaleString('en-US',{month:'long',year:'numeric'});
+    const countryPart = country!=='Global' ? country : '';
+    const topicPart = topic.trim();
+
+    // Run a broad niche+platform query plus a topic-focused query (when a
+    // topic is given) so results are grounded in real current activity for
+    // the specific intersection the creator asked about, not just the
+    // niche in isolation.
+    const queries = [
+      `latest trending ${niche} content ideas ${platform} ${countryPart} ${monthYear}`.trim(),
+      topicPart ? `${topicPart} ${niche} ${platform} trending ${monthYear}`.trim() : `${niche} ${platform} viral content ${monthYear}`.trim(),
+    ];
 
     setLoading(true); setError(null); setTrends(null);
     try{
-      const search = await realWebSearch(query);
-      if(search.error && (!search.results || search.results.length===0)) throw new Error('search-failed: '+search.error);
-      const context = (search.results||[]).slice(0,5).map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
-      const r = await callOR([{role:'user', content: trendPromptFor(platform, niche, country, context)}], {smart:true, userText:query});
+      const searches = await Promise.all(queries.map(q=>realWebSearch(q)));
+      const allResults = searches.flatMap(s=>s.results||[]);
+      if(allResults.length===0 && searches.every(s=>s.error)) throw new Error('search-failed: '+searches.map(s=>s.error).join(', '));
+
+      // De-dupe by URL, keep the strongest ~8 for context.
+      const seen = new Set();
+      const deduped = allResults.filter(r=>{
+        const key = r.url||r.title;
+        if(!key || seen.has(key)) return false;
+        seen.add(key); return true;
+      }).slice(0,8);
+
+      const context = deduped.map((r,i)=>`[${i+1}] ${r.title||''} — ${r.snippet||r.description||''} (${r.url||''})`).join('\n') || 'No direct results found — use general current-platform trend knowledge cautiously and note lower confidence.';
+      const r = await callOR([{role:'user', content: trendPromptFor(platform, niche, country, topicPart, context)}], {smart:true, userText:queries[0], maxTokens:1800});
       if(r.error) throw new Error('ai-failed: '+r.text);
       const cleaned = r.text.replace(/```json|```/g,'').trim();
       let parsed;
@@ -7233,7 +7551,7 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
       catch(parseErr){ throw new Error('parse-failed: '+parseErr.message+' | raw: '+cleaned.slice(0,200)); }
       setTrends(parsed.trends||[]);
 
-      await deductCredits(TREND_COST, 'trend_explorer', {platform, niche, country});
+      await deductCredits(TREND_COST, 'trend_explorer', {platform, niche, topic:topicPart, country});
     }catch(e){
       console.error('[TrendExplorer] generation failed:', e);
       setError('Could not fetch live trends right now. Please try again.');
@@ -7264,6 +7582,10 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
             <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Country <span className="normal-case text-zinc-400">(optional)</span></label>
             <div className="mt-[6px]"><${CustomSelect} value=${country} onChange=${setCountry} options=${TREND_COUNTRIES.map(c=>({value:c,label:c}))} className="w-full px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px]"/></div>
           </div>
+        </div>
+        <div className="mt-3">
+          <label className="text-[11.5px] font-[700] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Topic <span className="normal-case text-zinc-400">(optional — narrows results to this specific angle)</span></label>
+          <input value=${topic} onChange=${e=>setTopic(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter') findTrends(); }} placeholder="e.g. AI coding tools" className="mt-[6px] w-full max-w-[420px] px-[14px] py-[11px] rounded-[12px] border border-zinc-200 dark:border-[var(--zed-border)] bg-zinc-50 dark:bg-[var(--zed-surface2)] text-[13.5px] outline-none focus:border-[var(--zed)] transition"/>
         </div>
 
         <button onClick=${findTrends} disabled=${loading} className="mt-5 w-full md:w-auto px-6 py-[11px] rounded-[12px] bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[13.5px] font-[650] flex items-center justify-center gap-2 disabled:opacity-50 transition">
@@ -7305,7 +7627,10 @@ function TrendExplorerView({plan, isAdminUser, openUpgrade, deductCredits, hasEn
               <div className="mt-2 text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed select-text"><span className="font-[650] text-zinc-800 dark:text-zinc-100">Content idea: </span>${t.idea}</div>
               <div className="mt-2 text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed select-text"><span className="font-[650] text-zinc-800 dark:text-zinc-100">Suggested hook: </span>"${t.hook}"</div>
 
-              <div className="flex justify-end mt-3">
+              <div className="flex justify-end items-center gap-4 mt-3">
+                ${setModule ? html`
+                <button onClick=${()=>{ try{ sessionStorage.setItem('zedith_seo_prefill', JSON.stringify({topic:t.title, niche, platform})); }catch(e){} setModule('seo'); }} className="flex items-center gap-1.5 text-[11.5px] font-[600] text-[var(--zed)] hover:opacity-70"><${I} name="ArrowRight" size=${12}/> Optimize with SEO Studio</button>
+                `:null}
                 <button onClick=${()=>copyText(`${t.title}\n\nIdea: ${t.idea}\nHook: ${t.hook}`)} className="flex items-center gap-1.5 text-[11.5px] font-[600] text-[var(--zed)] hover:opacity-70"><${I} name="Copy" size=${12}/> Copy</button>
               </div>
             </div>
