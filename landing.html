@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Zedith — AI Creator Workspace</title>
-<meta name="description" content="The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI."/>
+<title>Zedith — Creator Operating System</title>
+<meta name="description" content="Zedith is the Creator Operating System — everything you need to plan, create, analyze and grow, in one intelligent workspace."/>
 <link rel="canonical" href="https://zedithai.vercel.app/"/>
 
 <!-- Favicons -->
@@ -19,14 +19,14 @@
 <!-- Open Graph / social share -->
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://zedithai.vercel.app/"/>
-<meta property="og:title" content="Zedith — AI Creator Workspace"/>
-<meta property="og:description" content="The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI."/>
+<meta property="og:title" content="Zedith — Creator Operating System"/>
+<meta property="og:description" content="Zedith is the Creator Operating System — everything you need to plan, create, analyze and grow, in one intelligent workspace."/>
 <meta property="og:image" content="https://zedithai.vercel.app/android-chrome-512x512.png"/>
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Zedith — AI Creator Workspace"/>
-<meta name="twitter:description" content="The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI."/>
+<meta name="twitter:title" content="Zedith — Creator Operating System"/>
+<meta name="twitter:description" content="Zedith is the Creator Operating System — everything you need to plan, create, analyze and grow, in one intelligent workspace."/>
 <meta name="twitter:image" content="https://zedithai.vercel.app/android-chrome-512x512.png"/>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,33 +77,124 @@ tailwind.config = {
         <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Now in Milestone 2
       </div>
       <h1 class="display text-5xl md:text-7xl font-[800] leading-tight mb-6">
-        Create faster with <span class="text-[var(--zed-accent)]">Zedith AI</span>
+        Your <span class="text-[var(--zed-accent)]">Creator Operating System</span>
       </h1>
       <p class="text-lg text-zinc-600 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
-        The AI workspace built for YouTubers, creators, and entrepreneurs. Plan content, generate scripts, create thumbnails, analyze your channel, and grow with AI.
+        Plan, create, analyze and grow your content from one intelligent workspace.
       </p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <a href="auth.html?mode=signup" class="px-8 py-4 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold transition-colors">Get Started Free</a>
-        <a href="auth.html?mode=login" class="px-8 py-4 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-semibold hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">Already have an account?</a>
+        <a href="auth.html?mode=signup" class="px-8 py-4 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold transition-colors">Start Creating</a>
+        <a href="#features" class="px-8 py-4 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-semibold hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">Explore Zedith</a>
       </div>
       <p class="text-xs text-zinc-500 mt-4">Free plan includes 50,000 credits/month. No credit card required.</p>
     </div>
   </section>
 
+  <!-- Workflow -->
+  <section class="py-16 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
+    <div class="max-w-5xl mx-auto text-center">
+      <p class="text-sm font-semibold text-zinc-500 dark:text-zinc-400 mb-6">One connected workflow, not a pile of random AI tools</p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-semibold">Idea</span>
+        <span class="text-zinc-400">→</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-semibold">Plan</span>
+        <span class="text-zinc-400">→</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-semibold">Create</span>
+        <span class="text-zinc-400">→</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-semibold">Optimize</span>
+        <span class="text-zinc-400">→</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-semibold">Analyze</span>
+        <span class="text-zinc-400">→</span>
+        <span class="px-4 py-2 rounded-full bg-[var(--zed-solid)] text-white text-sm font-semibold">Grow</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="py-20 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12">
+        <h2 class="display text-3xl md:text-4xl font-[800] mb-3">Everything you need, in one workspace</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">AI Canvas</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Turn ideas into an infinite visual workspace.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Ideas Hub</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Capture, organize and develop content ideas.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">SEO Studio</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Optimize content for platforms and discoverability.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Trend Explorer</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Find current trends and turn them into content opportunities.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Channel Explorer</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Research public YouTube channels, content performance and strategy.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Voice Studio</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Generate creator-ready AI voiceovers from a growing voice library.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Chat</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Use AI for scripts, research, brainstorming, strategy and everyday creator work.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h3 class="font-[700] text-lg mb-2">Projects</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">Keep your creator work organized in dedicated projects.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Creator OS -->
   <section class="py-20 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
-    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <h3 class="font-[700] text-lg mb-2">Content Planner</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Plan, schedule, and manage your content calendar in one place.</p>
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="display text-3xl md:text-4xl font-[800] mb-4">More than AI tools. A workspace built for creators.</h2>
+      <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
+        Creators normally switch between separate tools for ideas, research, trends, SEO, planning, creation and analysis. Zedith brings these workflows together in one place.
+      </p>
+    </div>
+  </section>
+
+  <!-- Canvas spotlight -->
+  <section class="py-20 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="display text-3xl md:text-4xl font-[800] mb-4">AI Canvas</h2>
+      <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto mb-8">
+        An infinite workspace where you can lay out blocks, organize ideas visually, copy and paste content, and connect your creative work in one space.
+      </p>
+      <a href="auth.html?mode=signup" class="inline-block px-8 py-4 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold transition-colors">Start Creating</a>
+    </div>
+  </section>
+
+  <!-- Who is Zedith for -->
+  <section class="py-20 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="display text-3xl md:text-4xl font-[800] mb-8">Who is Zedith for?</h2>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">YouTubers</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">Content creators</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">Social media creators</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">Solo creators</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">Creator businesses</span>
+        <span class="px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#2a2a2a] border border-zinc-200 dark:border-zinc-700 text-sm font-medium">Personal brands</span>
       </div>
-      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <h3 class="font-[700] text-lg mb-2">AI Chat & Images</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Generate scripts, thumbnails, hooks, and analyze content with AI.</p>
-      </div>
-      <div class="p-6 rounded-2xl bg-white dark:bg-[#262626] border border-zinc-200 dark:border-[#3a3a3a] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <h3 class="font-[700] text-lg mb-2">Channel Analytics</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">Track views, CTR, audience growth, and get AI-powered insights.</p>
-      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="py-24 px-6 border-t border-zinc-200 dark:border-[#2a2a2a]">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="display text-3xl md:text-5xl font-[800] mb-8">Build your creator workflow in one place.</h2>
+      <a href="auth.html?mode=signup" class="inline-block px-8 py-4 rounded-full bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white font-semibold transition-colors">Start Creating with Zedith</a>
+      <p class="text-xs text-zinc-500 mt-4">Free plan includes 50,000 credits/month. No credit card required.</p>
     </div>
   </section>
 
