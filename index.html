@@ -59,13 +59,13 @@ function zedithLoadCDNTailwind(){
   --zed-text:#27272a;
 }
 .dark{
-  --zed:#8b7cf6; --zed-600:#7c6ff2; --zed-light:#9d8ff9; --zed-lighter:#b4a9fb;
-  --zed-tint-bg:#211f2e; --zed-tint-bg2:#282539;
-  --zed-solid:#7c6ff2; --zed-solid-600:#8b7cf6;
-  --zed-surface:#2a2a2e; --zed-surface2:#242427; --zed-page:#1e1e21;
-  --zed-border:#38383d; --zed-active:#2e2b3d;
+  --zed:#FF7A00; --zed-600:#E86D00; --zed-light:#FF9433; --zed-lighter:#FFB066;
+  --zed-tint-bg:#1a1108; --zed-tint-bg2:#20140a;
+  --zed-solid:#FF7A00; --zed-solid-600:#E86D00;
+  --zed-surface:#0A0A0A; --zed-surface2:#050505; --zed-page:#000000;
+  --zed-border:#1A1A1A; --zed-active:#141414;
   --zed-gold:#d4a24c; --zed-gold-bg:#2a2416;
-  --zed-text:#ececec;
+  --zed-text:#FFFFFF;
 }
 *{font-family:Inter,system-ui,sans-serif}
 .display{font-family:"Plus Jakarta Sans",Inter,sans-serif}
@@ -79,7 +79,7 @@ function zedithLoadCDNTailwind(){
 .lucide{stroke-width:1.85}
 button:disabled{opacity:.55;cursor:not-allowed}
 .shimmer{background:linear-gradient(90deg,var(--zed-tint-bg) 25%,var(--zed-tint-bg) 50%,var(--zed-tint-bg) 75%);background-size:200% 100%;animation:sh 1.4s infinite}
-.dark .shimmer{background:linear-gradient(90deg,#2e2e2e 25%,#3a3a3a 50%,#2e2e2e 75%);background-size:200% 100%}
+.dark .shimmer{background:linear-gradient(90deg,#0A0A0A 25%,#161616 50%,#0A0A0A 75%);background-size:200% 100%}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn .22s ease}
@@ -92,7 +92,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @keyframes sheetSlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(100%)}}
 .overlay-in{animation:overlayIn .18s ease}
 .modal-panel{background:#ffffff;border:1px solid rgba(20,20,20,0.08);box-shadow:0 24px 60px -12px rgba(20,20,20,0.18),0 2px 8px rgba(20,20,20,0.06)}
-.dark .modal-panel{background:#2a2a2e;border:1px solid #38383d;box-shadow:0 24px 60px -12px rgba(0,0,0,0.6),0 2px 10px rgba(0,0,0,0.3)}
+.dark .modal-panel{background:#0A0A0A;border:1px solid #1A1A1A;box-shadow:0 24px 60px -12px rgba(0,0,0,0.6),0 2px 10px rgba(0,0,0,0.3)}
 @media (max-width:767px){ input, textarea, select { font-size:16px !important; } }
 </style>
 <script type="importmap">
@@ -109,9 +109,9 @@ button:disabled{opacity:.55;cursor:not-allowed}
 }
 </script>
 </head>
-<body class="bg-[#faf9f5] dark:bg-[#1e1e21] text-zinc-900 dark:text-zinc-100 antialiased overflow-hidden">
+<body class="bg-[#faf9f5] dark:bg-[#000000] text-zinc-900 dark:text-zinc-100 antialiased overflow-hidden">
 
-<div id="viewport" class="w-screen h-[100dvh] overflow-hidden bg-[#f4f3ee] dark:bg-[#1a1a1d] relative">
+<div id="viewport" class="w-screen h-[100dvh] overflow-hidden bg-[#f4f3ee] dark:bg-[#000000] relative">
   <div id="root" class="w-full h-full"></div>
 </div>
 
@@ -229,7 +229,7 @@ function PromptDialog({title, placeholder='', onSubmit, onClose}){
     <div className="fixed inset-0 z-[500] bg-black/55 backdrop-blur-[3px] flex items-center justify-center p-4 overlay-in" onClick=${onClose}>
       <div onClick=${e=>e.stopPropagation()} className="modal-panel modal-in w-full max-w-[360px] rounded-[20px] p-5">
         <div className="font-[700] text-[15px] mb-3">${title}</div>
-        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none text-[13px] mb-4 focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"/>
+        <input autoFocus value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>{ if(e.key==='Enter' && val.trim()){ onSubmit(val.trim()); onClose(); } }} placeholder=${placeholder} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none text-[13px] mb-4 focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"/>
         <div className="flex justify-end gap-2">
           <button onClick=${onClose} className="px-[14px] py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12.5px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
           <button onClick=${()=>{ if(val.trim()){ onSubmit(val.trim()); onClose(); } }} className="px-[14px] py-[8px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12.5px] font-[600] shadow-sm transition-colors">Send</button>
@@ -798,7 +798,7 @@ function renderInlineMarkdown(text, sources){
       const src = sources && sources[idx];
       if(src){
         let host=''; try{ host=new URL(src.url).hostname.replace('www.',''); }catch{ host=src.title||src.url; }
-        parts.push(html`<a key=${key++} href=${src.url} target="_blank" rel="noopener noreferrer" title=${src.title||host} className="inline-flex items-center gap-[4px] align-middle mx-[2px] bg-zinc-100 dark:bg-[#38383d] border border-zinc-200 dark:border-zinc-700 rounded-full px-[7px] py-[1px] text-[10.5px] text-zinc-600 dark:text-zinc-300 no-underline hover:bg-zinc-200 dark:hover:bg-[#3c3c3c] transition">
+        parts.push(html`<a key=${key++} href=${src.url} target="_blank" rel="noopener noreferrer" title=${src.title||host} className="inline-flex items-center gap-[4px] align-middle mx-[2px] bg-zinc-100 dark:bg-[#1f1f1f] border border-zinc-200 dark:border-zinc-700 rounded-full px-[7px] py-[1px] text-[10.5px] text-zinc-600 dark:text-zinc-300 no-underline hover:bg-zinc-200 dark:hover:bg-[#3c3c3c] transition">
           <img src=${faviconUrl(src.url)} className="w-[11px] h-[11px] rounded-full bg-white object-contain" onError=${e=>e.target.style.display='none'}/>${host}
         </a>`);
       }
@@ -1745,7 +1745,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
           ${!collapsed ? label : null}
         </button>
       `)}
-      <div className=${`pt-[10px] mt-[10px] border-t border-zinc-100 dark:border-[#2f2f34] ${collapsed?'text-center':''}`}>
+      <div className=${`pt-[10px] mt-[10px] border-t border-zinc-100 dark:border-[#1A1A1A] ${collapsed?'text-center':''}`}>
         ${!collapsed ? html`<div className="px-3 pb-[6px] text-[10px] uppercase tracking-wider text-zinc-400 font-[700]">Creator Tools</div>`:null}
         <button onClick=${()=>setModule('seo')} className=${itemCls(module==='seo')} title="SEO Studio">
           <${I} name="Search" size=${17}/> ${!collapsed ? 'SEO Studio' : ''}
@@ -1812,7 +1812,7 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
 // ---------- Right Rail ----------
 function RightRail({chats, growth, openTool, setModule, onOpenChat}){
   return html`
-  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[var(--zed-page)] dark:bg-[var(--zed-page)] border-l border-zinc-200 dark:border-[#333338] p-[16px] space-y-[14px]">
+  <aside className="hidden lg:flex lg:flex-col w-[318px] shrink-0 h-full overflow-y-auto no-scrollbar bg-[var(--zed-page)] dark:bg-[var(--zed-page)] border-l border-zinc-200 dark:border-[#1A1A1A] p-[16px] space-y-[14px]">
       <div className="bg-white dark:bg-[var(--zed-surface2)] rounded-[14px] border border-zinc-200 dark:border-[var(--zed-border)] p-[14px]">
       <div className="flex items-center justify-between text-[12.5px] font-[650] mb-1">
         Growth Overview 
@@ -2060,7 +2060,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
           className=${`p-[7px] rounded-lg flex items-center justify-center transition ${incognito ? 'bg-zinc-900 dark:bg-black text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
           <${I} name="Ghost" size=${17}/>
         </button>
-        <button onClick=${openUpgrade} className="px-[11px] py-[6px] rounded-[10px] text-[12px] font-[600] border border-zinc-300 dark:border-[#48484e] flex items-center gap-[5px]">
+        <button onClick=${openUpgrade} className="px-[11px] py-[6px] rounded-[10px] text-[12px] font-[600] border border-zinc-300 dark:border-[#242424] flex items-center gap-[5px]">
           <${I} name="Crown" size=${12} className="text-amber-500"/> ${plan.toUpperCase()}
         </button>
         <button onClick=${openNotifications} className="relative p-[4px] hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" title="Notifications">
@@ -2105,7 +2105,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
             <div key=${m.id||idx} className="fade-in">
               ${m.role==='user' ? html`
                 <div className="flex justify-end">
-                  <div className="relative bg-gradient-to-br from-[var(--zed-light)] via-[var(--zed)] to-[var(--zed-600)] dark:from-[#3f3f46] dark:via-[#27272a] dark:to-[#18181b] text-white px-[17px] py-[13px] rounded-[20px] rounded-br-[6px] max-w-[72%] text-[13.5px] leading-[1.55] whitespace-pre-wrap shadow-[0_6px_20px_rgba(0,0,0,0.28),0_1px_2px_rgba(0,0,0,0.15)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-white/10 dark:ring-white/[0.06]">
+                  <div className="relative bg-gradient-to-br from-[var(--zed-light)] via-[var(--zed)] to-[var(--zed-600)] dark:from-[#0A0A0A] dark:via-[#0A0A0A] dark:to-[#0A0A0A] text-white px-[17px] py-[13px] rounded-[20px] rounded-br-[6px] max-w-[72%] text-[13.5px] leading-[1.55] whitespace-pre-wrap shadow-[0_6px_20px_rgba(0,0,0,0.28),0_1px_2px_rgba(0,0,0,0.15)] dark:shadow-[0_6px_22px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)] dark:border dark:border-[#1A1A1A] ring-1 ring-white/10 dark:ring-white/[0.06]">
                     ${m.attachment?.type==='image' ? html`
                       <div className="relative mb-[8px] -mx-[3px] -mt-[1px]">
                         <img src=${m.attachment.dataUrl} className="max-h-[210px] w-full object-cover rounded-[14px] border border-white/20 shadow-md"/>
@@ -2153,10 +2153,10 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
                     ` : (m.id===typingId ? html`<${TypingMarkdown} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100" onDone=${()=>setTypingId(id=>id===m.id?null:id)}/>` : html`<${MarkdownText} text=${m.text} sources=${m.sources} className="text-zinc-800 dark:text-zinc-100"/>`)}
                   `}
                   ${m.sources && m.sources.length ? html`
-                    <button onClick=${()=>setSourcesModalFor(m.id)} className="flex items-center gap-[8px] mt-[10px] bg-zinc-100 dark:bg-[#38383d] hover:bg-zinc-200 dark:hover:bg-[#3c3c3c] border border-zinc-200 dark:border-zinc-700 rounded-full pl-[6px] pr-[12px] py-[4px] text-[11.5px] text-zinc-600 dark:text-zinc-300 transition">
+                    <button onClick=${()=>setSourcesModalFor(m.id)} className="flex items-center gap-[8px] mt-[10px] bg-zinc-100 dark:bg-[#1f1f1f] hover:bg-zinc-200 dark:hover:bg-[#3c3c3c] border border-zinc-200 dark:border-zinc-700 rounded-full pl-[6px] pr-[12px] py-[4px] text-[11.5px] text-zinc-600 dark:text-zinc-300 transition">
                       <span className="flex items-center -space-x-[6px]">
                         ${m.sources.slice(0,3).map((s,si)=> html`
-                          <img key=${si} src=${(()=>{ try{ return `https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=32`; }catch{ return ''; } })()} className="w-[18px] h-[18px] rounded-full border border-white dark:border-[#2d2d32] bg-white object-contain" onError=${e=>e.target.style.visibility='hidden'}/>
+                          <img key=${si} src=${(()=>{ try{ return `https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=32`; }catch{ return ''; } })()} className="w-[18px] h-[18px] rounded-full border border-white dark:border-[#1A1A1A] bg-white object-contain" onError=${e=>e.target.style.visibility='hidden'}/>
                         `)}
                       </span>
                       <span className="font-[600]">Sources</span>
@@ -2200,9 +2200,9 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     </div>
 
     <div className="px-3 sm:px-5 pb-4">
-      <div className="max-w-[760px] mx-auto bg-white dark:bg-[#2e2e32] border border-zinc-200 dark:border-[#454550] rounded-[18px] shadow-soft px-[13px] pt-[10px] pb-[10px]">
+      <div className="max-w-[760px] mx-auto bg-white dark:bg-[#161616] border border-zinc-200 dark:border-[#1f1f1f] rounded-[18px] shadow-soft px-[13px] pt-[10px] pb-[10px]">
         ${attached ? html`
-          <div className="mb-[8px] flex items-center gap-[10px] text-[11px] bg-gradient-to-r from-[var(--zed-tint-bg)] to-white dark:from-[#26232f] dark:to-[#2e2e32] border border-[#bedde0] dark:border-zinc-700 rounded-[12px] px-3 py-[8px] shadow-sm">
+          <div className="mb-[8px] flex items-center gap-[10px] text-[11px] bg-gradient-to-r from-[var(--zed-tint-bg)] to-white dark:from-[#0A0A0A] dark:to-[#0A0A0A] border border-[#bedde0] dark:border-[#1A1A1A] rounded-[12px] px-3 py-[8px] shadow-sm">
             <div className="relative shrink-0">
               <img src=${attached.dataUrl} className="w-[42px] h-[34px] object-cover rounded-[8px] border border-white dark:border-zinc-600 shadow-sm"/>
               <span className="absolute -top-[4px] -right-[4px] bg-[var(--zed-solid)] text-white rounded-full w-[14px] h-[14px] flex items-center justify-center"><${I} name="Image" size=${8}/></span>
@@ -2403,13 +2403,13 @@ function ProjectDetailView({project, projects, updateProject, deleteProject, upl
           <div className="text-[13px] font-[650] mb-3">Project Settings</div>
           <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-4 space-y-3 text-[12px]">
             <div><div className="text-zinc-500 mb-1">Project Name</div>
-              <input value=${project.title} onChange=${e=>updateProject(project.id,{title:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"/>
+              <input value=${project.title} onChange=${e=>updateProject(project.id,{title:e.target.value})} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"/>
             </div>
             <div><div className="text-zinc-500 mb-1">Category</div>
-              <${CustomSelect} value=${project.cat} onChange=${v=>updateProject(project.id,{cat:v})} options=${['YouTube','Instagram','TikTok','Podcast']} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427]"/>
+              <${CustomSelect} value=${project.cat} onChange=${v=>updateProject(project.id,{cat:v})} options=${['YouTube','Instagram','TikTok','Podcast']} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A]"/>
             </div>
             <div><div className="text-zinc-500 mb-1">Description</div>
-              <textarea value=${project.desc||''} onChange=${e=>updateProject(project.id,{desc:e.target.value})} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"></textarea>
+              <textarea value=${project.desc||''} onChange=${e=>updateProject(project.id,{desc:e.target.value})} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"></textarea>
             </div>
             <button onClick=${()=>setShowDeleteConfirm(true)} className="text-red-600 text-[12px] font-[600]">Delete Project</button>
           </div>
@@ -2462,7 +2462,7 @@ function ProjectsView({projects, createProject, updateProject, deleteProject, on
               </button>
               <button onClick=${e=>{ e.stopPropagation(); setMenuOpenId(menuOpenId===p.id?null:p.id); }} className="absolute top-[12px] right-[12px] p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="MoreVertical" size=${14}/></button>
               ${menuOpenId===p.id ? html`
-                <div className="absolute top-[38px] right-[12px] z-20 bg-white dark:bg-[#333338] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 w-[140px] text-[12px]">
+                <div className="absolute top-[38px] right-[12px] z-20 bg-white dark:bg-[#1A1A1A] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 w-[140px] text-[12px]">
                   <button onClick=${()=>{ updateProject(p.id,{pinned:!p.pinned}); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800">${p.pinned?'Unpin':'Pin'}</button>
                   <button onClick=${()=>{ setRenaming(p); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800">Rename</button>
                   <button onClick=${()=>{ setDeleting(p); setMenuOpenId(null); }} className="w-full text-left px-3 py-[7px] hover:bg-zinc-50 dark:hover:bg-zinc-800 text-red-500">Delete</button>
@@ -2497,8 +2497,8 @@ function CreateProjectModal({onClose,onCreate}){
       <div className="p-5 grid grid-cols-3 gap-5 text-[12px]">
         <div className="col-span-2 space-y-3">
           <div className="text-[var(--zed)] font-[600] text-[11.5px]">1. Project Details</div>
-          <input value=${name} onChange=${e=>setName(e.target.value)} placeholder="Enter project name…" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none"/>
-          <textarea value=${desc} onChange=${e=>setDesc(e.target.value)} placeholder="Add a short description…" className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none"></textarea>
+          <input value=${name} onChange=${e=>setName(e.target.value)} placeholder="Enter project name…" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none"/>
+          <textarea value=${desc} onChange=${e=>setDesc(e.target.value)} placeholder="Add a short description…" className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none"></textarea>
           <div className="text-[var(--zed)] font-[600] text-[11.5px]">2. Choose Icon & Color</div>
           <div className="flex gap-[8px] flex-wrap">
             ${['FolderKanban','Play','Code2','GraduationCap','Briefcase','Megaphone','Palette','Lightbulb'].map(ic=> html`
@@ -2513,7 +2513,7 @@ function CreateProjectModal({onClose,onCreate}){
         </div>
         <div>
           <div className="text-[var(--zed)] font-[600] text-[11.5px]">3. Project Type</div>
-          <${CustomSelect} value=${cat} onChange=${setCat} options=${['YouTube','Instagram','TikTok','Podcast']} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] text-[12px]"/>
+          <${CustomSelect} value=${cat} onChange=${setCat} options=${['YouTube','Instagram','TikTok','Podcast']} className="mt-2 w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] text-[12px]"/>
         </div>
       </div>
       <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
@@ -2550,8 +2550,8 @@ function PlannerView({items, createPlannerItem}){
           <div className="text-[12px] text-zinc-500">Plan, schedule and manage your content in one place.</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-zinc-100 dark:bg-[#333338] rounded-[10px] p-1 text-[12px]">
-            ${['Month','Week','List'].map(v=> html`<button key=${v} onClick=${()=>setView(v)} className=${`px-3 py-[6px] rounded-[8px] ${view===v?'bg-white dark:bg-[#424248] shadow-sm font-[600]':'text-zinc-500'}`}>${v}</button>`)}
+          <div className="flex bg-zinc-100 dark:bg-[#1A1A1A] rounded-[10px] p-1 text-[12px]">
+            ${['Month','Week','List'].map(v=> html`<button key=${v} onClick=${()=>setView(v)} className=${`px-3 py-[6px] rounded-[8px] ${view===v?'bg-white dark:bg-[#242424] shadow-sm font-[600]':'text-zinc-500'}`}>${v}</button>`)}
           </div>
           <button onClick=${()=>setShowNew(true)} className="bg-[var(--zed-solid)] text-white px-3 py-[8px] rounded-xl text-[12px] font-[600] flex items-center gap-2"><${I} name="Plus" size=${14}/> New Content</button>
         </div>
@@ -2649,19 +2649,19 @@ function NewContentModal({onClose,onCreate}){
         <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="space-y-3 text-[12px]">
-        <div><div className="text-zinc-500 mb-1">Title</div><input value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. 10 AI Tools for YouTube" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none"/></div>
+        <div><div className="text-zinc-500 mb-1">Title</div><input value=${title} onChange=${e=>setTitle(e.target.value)} placeholder="e.g. 10 AI Tools for YouTube" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none"/></div>
         <div className="grid grid-cols-2 gap-3">
           <div><div className="text-zinc-500 mb-1">Platform</div>
-            <${CustomSelect} value=${platform} onChange=${setPlatform} options=${['YouTube','Instagram','TikTok']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21]"/>
+            <${CustomSelect} value=${platform} onChange=${setPlatform} options=${['YouTube','Instagram','TikTok']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505]"/>
           </div>
           <div><div className="text-zinc-500 mb-1">Type</div>
-            <${CustomSelect} value=${type} onChange=${setType} options=${[{label:'Video',value:'video'},{label:'Short',value:'short'},{label:'Post',value:'post'}]} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21]"/>
+            <${CustomSelect} value=${type} onChange=${setType} options=${[{label:'Video',value:'video'},{label:'Short',value:'short'},{label:'Post',value:'post'}]} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505]"/>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><div className="text-zinc-500 mb-1">Date</div><input type="date" value=${date} onChange=${e=>setDate(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none"/></div>
+          <div><div className="text-zinc-500 mb-1">Date</div><input type="date" value=${date} onChange=${e=>setDate(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none"/></div>
           <div><div className="text-zinc-500 mb-1">Status</div>
-            <${CustomSelect} value=${status} onChange=${setStatus} options=${['Draft','Scheduled','Published']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21]"/>
+            <${CustomSelect} value=${status} onChange=${setStatus} options=${['Draft','Scheduled','Published']} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505]"/>
           </div>
         </div>
       </div>
@@ -2896,7 +2896,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
           `)}
         </div>
         <div className="font-[600] text-[13px]">2. Enter your text</div>
-        <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#242427] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
+        <textarea value=${text} onChange=${e=>setText(e.target.value)} className="w-full h-[110px] bg-zinc-50 dark:bg-[#0A0A0A] border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-[12.5px] outline-none"></textarea>
         <div className="flex gap-3 items-center flex-wrap">
           <button onClick=${gen} disabled=${busy} className="bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white px-[18px] py-[10px] rounded-xl text-[13px] font-[600] flex items-center gap-2 disabled:opacity-60">
             <${I} name="AudioLines" size=${15}/> ${busy?'Generating…':'Generate Voice'}
@@ -2905,7 +2905,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
           <div className="text-[11px] text-zinc-500">${isAdminUser?'Free for admin':`${estCost} Credits (${text.length} chars)`}</div>
         </div>
         ${audioUrl ? html`
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#242427]">
+          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-[#0A0A0A]">
             <div className="flex items-center justify-between mb-2">
               <div className="text-[11px] text-zinc-500">Voice used: <span className="font-[600] text-zinc-700 dark:text-zinc-300">${voice}</span></div>
               <button onClick=${()=>setAudioOn(o=>!o)} className="flex items-center gap-[6px] text-[11px] font-[600] px-[10px] py-[5px] rounded-full border border-zinc-300 dark:border-zinc-600">
@@ -2925,7 +2925,7 @@ function VoiceStudioView({plan, credits, isAdminUser, user, openUpgrade, createV
       <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 max-w-[700px] space-y-4">
         <div className="font-[650] text-[13px]">Clone Your Voice</div>
         <div className="text-[12px] text-zinc-500">Upload a clear 30-60 second sample of your voice.</div>
-        <div><div className="text-[11px] text-zinc-500 mb-1">Voice Name</div><input value=${cloneName} onChange=${e=>setCloneName(e.target.value)} placeholder="e.g. My Studio Voice" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12px]"/></div>
+        <div><div className="text-[11px] text-zinc-500 mb-1">Voice Name</div><input value=${cloneName} onChange=${e=>setCloneName(e.target.value)} placeholder="e.g. My Studio Voice" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12px]"/></div>
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Voice Sample</div>
           <label className="block w-full h-[120px] border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[var(--zed)]">
@@ -3478,7 +3478,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
               ['Subscribers', fmt(data.channel?.subscriberCount ?? 0), subsChange],
               ['Engagement Rate', engagementRate.toFixed(1)+'%', engChange],
             ].map(([l,v,c])=>html`
-              <div key=${l} className="rounded-[14px] border border-zinc-200 dark:border-[#3a3a3f] p-3">
+              <div key=${l} className="rounded-[14px] border border-zinc-200 dark:border-[#1A1A1A] p-3">
                 <div className="text-[10.5px] text-zinc-500 font-[600]">${l}</div>
                 <div className="text-[18px] font-[800] display">${v}</div>
                 <${TrendPill} value=${c}/>
@@ -3497,7 +3497,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
                 const remaining = Math.max(0, g.target_value - cur);
                 const p = Math.min(100, (cur/g.target_value)*100);
                 return html`
-                <div key=${g.id} className="rounded-[14px] border border-zinc-200 dark:border-[#3a3a3f] p-3">
+                <div key=${g.id} className="rounded-[14px] border border-zinc-200 dark:border-[#1A1A1A] p-3">
                   <div className="flex justify-between text-[12px] mb-1">
                     <span className="font-[650]">${metricLabels[g.metric]||g.metric}</span>
                     <span className="text-zinc-500">${fmt(cur)} / ${fmt(g.target_value)} · ${fmt(remaining)} to go</span>
@@ -3517,7 +3517,7 @@ function WeeklyInsightsView({data, goalRows, onClose}){
           ${topVideos.length ? html`
             <div className="space-y-2">
               ${topVideos.slice(0,5).map((v,i)=>html`
-                <div key=${v.id||i} className="flex items-center gap-3 rounded-[12px] border border-zinc-200 dark:border-[#3a3a3f] p-2">
+                <div key=${v.id||i} className="flex items-center gap-3 rounded-[12px] border border-zinc-200 dark:border-[#1A1A1A] p-2">
                   ${v.thumbnail?html`<img src=${v.thumbnail} className="w-14 h-9 rounded-[8px] object-cover shrink-0"/>`:html`<div className="w-14 h-9 rounded-[8px] bg-zinc-100 dark:bg-zinc-800 shrink-0"></div>`}
                   <div className="min-w-0 flex-1">
                     <div className="text-[12px] font-[600] truncate">${v.title}</div>
@@ -3616,7 +3616,7 @@ function DashboardView({user, profile, chats, projects, transactions, onNewChat,
       <div className="text-[11px] uppercase tracking-wide font-[700] text-zinc-400 mb-3">Quick Actions</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         ${quickActions.map(a=>html`
-          <button key=${a.label} onClick=${a.action} className="text-left p-5 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/50 hover:shadow-[0_8px_24px_rgba(139,124,246,0.1)] transition-all">
+          <button key=${a.label} onClick=${a.action} className="text-left p-5 rounded-[16px] border border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] hover:border-[var(--zed)]/50 hover:shadow-[0_4px_14px_rgba(255,122,0,0.08)] transition-all">
             <${I} name=${a.icon} size=${26} className="text-[var(--zed)] mb-4" strokeWidth=${1.6}/>
             <div className="font-[650] text-[14px]">${a.label}</div>
             <div className="text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-[3px] leading-snug">${a.desc}</div>
@@ -3710,7 +3710,7 @@ const CANVAS_BLOCK_TYPES = {
   voice:     {icon:'Mic',          label:'Voice',      color:'#22c1c3', defaultTitle:'Voice File'},
   video:     {icon:'Video',        label:'Video',      color:'#e0457b', defaultTitle:'Video'},
   checklist: {icon:'CheckSquare',  label:'Checklist',  color:'#22a06b', defaultTitle:'Editing Notes'},
-  link:      {icon:'Link',         label:'Link',       color:'#9253f7', defaultTitle:'Link'},
+  link:      {icon:'Link',         label:'Link',       color:'#FF9433', defaultTitle:'Link'},
   note:      {icon:'StickyNote',   label:'Note',       color:'#d4a24c', defaultTitle:'Note'},
 };
 const CANVAS_BLOCK_ORDER = ['idea','script','image','file','voice','video','checklist','link','note'];
@@ -4504,7 +4504,7 @@ const IDEA_STATUSES = {
   new:        {label:'New',        color:'#8b8b8b'},
   developing: {label:'Developing', color:'#4a9eff'},
   ready:      {label:'Ready',      color:'#22a06b'},
-  used:       {label:'Used',       color:'#9253f7'},
+  used:       {label:'Used',       color:'#FF9433'},
 };
 const IDEA_PLATFORMS = ['YouTube','Instagram','TikTok','X','Threads','LinkedIn','Bluesky'];
 const IDEA_CONTENT_TYPES = ['Long-form Video','Short-form Video','Post','Carousel','Article','Podcast'];
@@ -5076,7 +5076,7 @@ function AnalyticsView({addNotification, transactions}){
     {label:'Subscribers', value:fmt(data.channel?.subscriberCount ?? 0), change:pctChange(netSubSeries), icon:'Users', color:'#f5762e', series:netSubSeries},
     {label:'Engagement Rate', value:engagementRate.toFixed(1)+'%', change:pctChange(engSeries), icon:'Zap', color:'#e0457b', series:engSeries},
     {label:'Uploads', value:String(uploadCount), change:0, icon:'Upload', color:'#22a06b', series:uploadsSeries, noTrend:true},
-    {label:'Est. Revenue', value:'—', change:0, icon:'DollarSign', color:'#9b6bf2', comingSoon:true},
+    {label:'Est. Revenue', value:'—', change:0, icon:'DollarSign', color:'#FF9433', comingSoon:true},
   ] : [];
 
   const chartSeriesFor = (metric)=>{
@@ -5506,26 +5506,26 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
     </div>
     <div className="px-4 sm:px-7 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-[1180px]">
       <div className="lg:col-span-8 space-y-4">
-        <div className="bg-white dark:bg-[#2a2a2e] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5">
+        <div className="bg-white dark:bg-[#111111] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5">
           <div className="font-[650] mb-3">Profile Information</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
             <div><div className="text-zinc-500 mb-1">Display Name</div>
-              <input value=${settings.displayName} onChange=${e=>upd('displayName',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"/>
+              <input value=${settings.displayName} onChange=${e=>upd('displayName',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"/>
             </div>
             <div><div className="text-zinc-500 mb-1">Username</div>
-              <input value=${settings.username} onChange=${e=>upd('username',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"/>
+              <input value=${settings.username} onChange=${e=>upd('username',e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"/>
             </div>
             <div className="col-span-2"><div className="text-zinc-500 mb-1">Email Address</div>
               <input value=${settings.email} disabled className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 outline-none"/>
             </div>
             <div className="col-span-2"><div className="text-zinc-500 mb-1">Bio</div>
-              <textarea value=${settings.bio} onChange=${e=>upd('bio',e.target.value)} className="w-full h-[72px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12px]"></textarea>
+              <textarea value=${settings.bio} onChange=${e=>upd('bio',e.target.value)} className="w-full h-[72px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12px]"></textarea>
             </div>
           </div>
           <button onClick=${saveAll} className="mt-4 px-4 py-[8px] rounded-xl bg-[var(--zed-solid)] text-white text-[12px] font-[600]">Save Changes</button>
         </div>
 
-        <div className="bg-white dark:bg-[#2a2a2e] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5 text-[12.5px] space-y-4">
+        <div className="bg-white dark:bg-[#111111] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-5 text-[12.5px] space-y-4">
           <div className="font-[650] text-[14px]">AI Preferences</div>
           <div className="flex items-center justify-between">
             <div><div className="font-[550]">Default AI Model</div><div className="text-[11px] text-zinc-500">Zedith auto-rotates all 27 free models</div></div>
@@ -5533,7 +5533,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
           </div>
           <div className="flex items-center justify-between gap-3">
             <div><div className="font-[550]">Response Style</div><div className="text-[11px] text-zinc-500">How should Zedith respond?</div></div>
-            <${CustomSelect} value=${settings.responseStyle} onChange=${v=>upd('responseStyle', v)} options=${['Balanced','Creative','Precise']} className="border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-[6px] text-[11.5px] bg-white dark:bg-[#242427]"/>
+            <${CustomSelect} value=${settings.responseStyle} onChange=${v=>upd('responseStyle', v)} options=${['Balanced','Creative','Precise']} className="border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-[6px] text-[11.5px] bg-white dark:bg-[#0A0A0A]"/>
           </div>
           ${[
             ['aiMemory','AI Memory','Allow Zedith to remember your chats.'],
@@ -5550,7 +5550,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
             <div className="flex items-center justify-between mb-2">
               <div><div className="font-[550]">Custom System Prompt</div><div className="text-[11px] text-zinc-500">Add extra instructions Zedith follows in every chat.</div></div>
             </div>
-            <textarea value=${settings.systemPrompt||''} onChange=${e=>upd('systemPrompt',e.target.value)} placeholder="e.g. Always reply in Hinglish. Focus on Indian creators." className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12px]"></textarea>
+            <textarea value=${settings.systemPrompt||''} onChange=${e=>upd('systemPrompt',e.target.value)} placeholder="e.g. Always reply in Hinglish. Focus on Indian creators." className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12px]"></textarea>
           </div>
           <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
             <div><div className="font-[550]">Theme</div><div className="text-[11px] text-zinc-500">Dark / Light</div></div>
@@ -5561,7 +5561,7 @@ function SettingsView({settings,setSettings,theme,setTheme,profile,saveProfile,o
         </div>
       </div>
       <div className="lg:col-span-4 space-y-4">
-        <div className="bg-white dark:bg-[#2a2a2e] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-4 text-[12px]">
+        <div className="bg-white dark:bg-[#111111] rounded-[14px] border border-zinc-200 dark:border-zinc-800 p-4 text-[12px]">
           <div className="font-[650] mb-2">Account</div>
           <div className="text-zinc-500 text-[11px] space-y-1">
             <div>Plan: <b>${(profile?.plan||'free').toUpperCase()}</b></div>
@@ -5704,7 +5704,7 @@ function ToolModal({tool,onClose,onSend}){
         <button onClick=${onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"><${I} name="X" size=${16}/></button>
       </div>
       <div className="text-[12px] text-zinc-500 mb-3">${prompts[tool]}</div>
-      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#1e1e21] outline-none text-[12.5px] focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"></textarea>
+      <textarea value=${input} onChange=${e=>setInput(e.target.value)} placeholder="Describe your topic or paste content…" className="w-full h-[120px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#050505] outline-none text-[12.5px] focus:border-[var(--zed)] focus:ring-1 focus:ring-[var(--zed)]/30 transition-colors"></textarea>
       <div className="flex justify-end gap-2 mt-4">
         <button onClick=${onClose} className="px-4 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 text-[12px] font-[550] hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors">Cancel</button>
         <button onClick=${run} disabled=${!input.trim()} className="px-4 py-[8px] rounded-xl bg-[var(--zed-solid)] hover:bg-[var(--zed-solid-600)] text-white text-[12px] font-[600] shadow-sm disabled:opacity-50 transition-colors">Run in Chat</button>
@@ -6148,7 +6148,7 @@ function AdminUsers(){
             <div>
               <div className="font-[650] mb-2">Credits: ${(selectedUser.credits||0).toLocaleString('en-IN')}</div>
               <div className="flex gap-2">
-                <input value=${creditAdj} onChange=${e=>setCreditAdj(e.target.value)} type="number" placeholder="Amount" className="flex-1 px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"/>
+                <input value=${creditAdj} onChange=${e=>setCreditAdj(e.target.value)} type="number" placeholder="Amount" className="flex-1 px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"/>
                 <button onClick=${()=>{ const n=parseInt(creditAdj)||0; adjustCredits(selectedUser.id,n,'add'); setSelectedUser(u=>({...u,credits:(u.credits||0)+n})); }} className="px-3 py-[7px] rounded-xl bg-emerald-500 text-white font-[600]">+Add</button>
                 <button onClick=${()=>{ const n=parseInt(creditAdj)||0; adjustCredits(selectedUser.id,n,'remove'); setSelectedUser(u=>({...u,credits:Math.max(0,(u.credits||0)-n)})); }} className="px-3 py-[7px] rounded-xl bg-orange-500 text-white font-[600]">−Remove</button>
                 <button onClick=${()=>{ resetCredits(selectedUser.id, selectedUser.plan); }} className="px-3 py-[7px] rounded-xl bg-zinc-500 text-white font-[600]">Reset</button>
@@ -6228,7 +6228,7 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
     vision:{label:'Vision / Image analysis', icon:'Eye', color:'#f59e0b'},
     image_gen:{label:'Image Generation', icon:'Image', color:'#ec4899'},
     voice:{label:'Voice Studio', icon:'Mic', color:'var(--zed-lighter)'},
-    seo:{label:'SEO Studio', icon:'Search', color:'#8b5cf6'},
+    seo:{label:'SEO Studio', icon:'Search', color:'#FF9433'},
     trend_explorer:{label:'Trend Explorer', icon:'TrendingUp', color:'#10b981'},
   };
   const usageByFeature = {};
@@ -6379,14 +6379,14 @@ function AdminUserProfile({user, onClose, forceLogout, banTemporary, banForever,
           <div className="p-3 rounded-xl bg-zinc-50 dark:bg-[var(--zed-surface)] space-y-3">
             <div>
               <div className="text-[11px] text-zinc-500 mb-1">Ban reason (optional, shown to user)</div>
-              <input value=${banReason} onChange=${e=>setBanReason(e.target.value)} placeholder="e.g. Spam / abuse / ToS violation" className="w-full px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#242427] outline-none text-[12.5px]"/>
+              <input value=${banReason} onChange=${e=>setBanReason(e.target.value)} placeholder="e.g. Spam / abuse / ToS violation" className="w-full px-3 py-[7px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] text-zinc-500">Duration:</span>
               ${HOUR_PRESETS.map(p=>html`
                 <button key=${p.v} onClick=${()=>setBanHours(String(p.v))} className=${`px-2.5 py-[5px] rounded-lg border text-[11.5px] font-[600] ${banHours===String(p.v) ? 'border-[#e8b04b] bg-[#fbf3e2] dark:bg-[#2a2413] text-[#b3822f] dark:text-[#e8b04b]' : 'border-zinc-200 dark:border-zinc-700'}`}>${p.label}</button>
               `)}
-              <input value=${banHours} onChange=${e=>setBanHours(e.target.value.replace(/[^0-9]/g,''))} type="text" className="w-16 px-2 py-[5px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#242427] outline-none text-[11.5px] text-center"/>
+              <input value=${banHours} onChange=${e=>setBanHours(e.target.value.replace(/[^0-9]/g,''))} type="text" className="w-16 px-2 py-[5px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#0A0A0A] outline-none text-[11.5px] text-center"/>
               <span className="text-[11px] text-zinc-500">hrs</span>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -6491,14 +6491,14 @@ function AdminSubscriptions({planConfig, setPlanConfig}){
           <div className="space-y-3">
             <div>
               <div className="text-[11px] text-zinc-500 mb-1">Monthly Credits</div>
-              <input type="number" value=${plans[k]||0} onChange=${e=>setPlans(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+              <input type="number" value=${plans[k]||0} onChange=${e=>setPlans(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
             </div>
             ${k!=='free' ? html`
               <div>
                 <div className="text-[11px] text-zinc-500 mb-1">Monthly Price (₹)</div>
-                <input type="number" value=${prices[k]||0} onChange=${e=>setPrices(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+                <input type="number" value=${prices[k]||0} onChange=${e=>setPrices(p=>({...p,[k]:parseInt(e.target.value)||0}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
               </div>
-              <div className="p-3 bg-zinc-50 dark:bg-[#242427] rounded-xl text-[11px] text-zinc-500">
+              <div className="p-3 bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl text-[11px] text-zinc-500">
                 Yearly (20% off): <b className="text-zinc-700 dark:text-zinc-300">₹${Math.round((prices[k]||0)*12*0.8).toLocaleString('en-IN')}</b>
               </div>
             ` : null}
@@ -6558,7 +6558,7 @@ function AdminCredits({creditCosts, setCreditCosts, transactions}){
         ${Object.entries(costs).map(([k,v])=>html`
           <div key=${k} className="flex items-center justify-between mb-3">
             <span className="text-[12px] text-zinc-600 dark:text-zinc-300">${k.replace(/_/g,' ')}</span>
-            <input type="number" value=${v} onChange=${e=>setCosts(c=>({...c,[k]:parseFloat(e.target.value)||0}))} className="w-28 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] text-[12px] outline-none"/>
+            <input type="number" value=${v} onChange=${e=>setCosts(c=>({...c,[k]:parseFloat(e.target.value)||0}))} className="w-28 px-3 py-[6px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] text-[12px] outline-none"/>
           </div>
         `)}
         <button onClick=${save} disabled=${saving} className="w-full mt-2 py-[9px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] disabled:opacity-60">${saving?'Saving…':'Save Costs'}</button>
@@ -6635,7 +6635,7 @@ function AdminAIModels(){
                   <button onClick=${()=>setDefault(m.id)} className=${`w-4 h-4 rounded-full border-2 transition ${m.default?'border-[#e8b04b] bg-[#e8b04b]':'border-zinc-400'}`}></button>
                 </td>
                 <td className="px-4 py-3">
-                  <input type="number" value=${m.cost} onChange=${e=>toggleModel(m.id,'cost',parseInt(e.target.value)||0)} className="w-16 px-2 py-[4px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none"/>
+                  <input type="number" value=${m.cost} onChange=${e=>toggleModel(m.id,'cost',parseInt(e.target.value)||0)} className="w-16 px-2 py-[4px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none"/>
                 </td>
                 <td className="px-4 py-3">
                   <button onClick=${()=>toggleModel(m.id,'experimental',!m.experimental)} className=${`text-[10px] px-2 py-[3px] rounded-full font-[600] ${m.experimental?'bg-orange-100 text-orange-600 dark:bg-orange-900/30':'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'}`}>${m.experimental?'Yes':'No'}</button>
@@ -6794,11 +6794,11 @@ function AdminNotifications(){
       <div className="space-y-3">
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Title</div>
-          <input value=${title} onChange=${e=>setNTitle(e.target.value)} placeholder="e.g. New Feature Available" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+          <input value=${title} onChange=${e=>setNTitle(e.target.value)} placeholder="e.g. New Feature Available" className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
         </div>
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Message</div>
-          <textarea value=${msg} onChange=${e=>setMsg(e.target.value)} placeholder="Your announcement message…" className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+          <textarea value=${msg} onChange=${e=>setMsg(e.target.value)} placeholder="Your announcement message…" className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
         </div>
         <button onClick=${sendAnnouncement} disabled=${sending} className="px-5 py-[10px] rounded-xl bg-[#e8b04b] text-white text-[13px] font-[600] disabled:opacity-60">${sending?'Sending…':'Send to All Users'}</button>
       </div>
@@ -6848,7 +6848,7 @@ function AdminSettings(){
         <div className="space-y-3">
           <div>
             <div className="text-[11px] text-zinc-500 mb-1">Site Name</div>
-            <input value=${siteName} onChange=${e=>setSiteName(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+            <input value=${siteName} onChange=${e=>setSiteName(e.target.value)} className="w-full px-3 py-[9px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
           </div>
         </div>
       </div>
@@ -7606,7 +7606,7 @@ function ZedithPicksView(){
           `:null}
 
           ${selected.why_recommended ? html`
-            <div className="bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] border border-[#bedde0] dark:border-[#3a383f] rounded-[12px] p-3 mb-4">
+            <div className="bg-[var(--zed-tint-bg)] dark:bg-[var(--zed-tint-bg2)] border border-[#bedde0] dark:border-[#1A1A1A] rounded-[12px] p-3 mb-4">
               <div className="font-[700] text-[12px] text-[var(--zed)] mb-1 flex items-center gap-1.5"><${ZedithMark} size=${13} color="var(--zed)"/> Why Zedith Recommends This</div>
               <div className="text-[12.5px] text-zinc-600 dark:text-zinc-300">${selected.why_recommended}</div>
             </div>
@@ -7765,8 +7765,8 @@ function AdminPicksCategories({categories,setCategories}){
     <div className="bg-white dark:bg-[var(--zed-surface)] border border-zinc-200 dark:border-[var(--zed-border)] rounded-[14px] p-5 mb-5">
       <div className="font-[650] text-[13px] mb-3">Add Category</div>
       <div className="flex flex-col sm:flex-row gap-2">
-        <input value=${newName} onChange=${e=>setNewName(e.target.value)} placeholder="Category name" className="flex-1 px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
-        <input value=${newIcon} onChange=${e=>setNewIcon(e.target.value)} placeholder="Lucide icon name" className="w-full sm:w-[160px] px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+        <input value=${newName} onChange=${e=>setNewName(e.target.value)} placeholder="Category name" className="flex-1 px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
+        <input value=${newIcon} onChange=${e=>setNewIcon(e.target.value)} placeholder="Lucide icon name" className="w-full sm:w-[160px] px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
         <button onClick=${addCategory} className="px-4 py-[8px] rounded-xl bg-[#e8b04b] text-white text-[12.5px] font-[600] shrink-0">Add</button>
       </div>
     </div>
@@ -7880,7 +7880,7 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
   const field = (label,key,type='text') => html`
     <div>
       <div className="text-[11px] text-zinc-500 mb-1">${label}</div>
-      <input type=${type} value=${form[key]??''} onChange=${e=>set(key,e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+      <input type=${type} value=${form[key]??''} onChange=${e=>set(key,e.target.value)} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
     </div>`;
 
   const toggle = (label,key) => html`
@@ -7903,7 +7903,7 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
         ${field('Product Name','name')}
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Category</div>
-          <${CustomSelect} value=${form.category_id} onChange=${v=>set('category_id',v)} options=${categories.map(c=>({label:c.name,value:c.id}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+          <${CustomSelect} value=${form.category_id} onChange=${v=>set('category_id',v)} options=${categories.map(c=>({label:c.name,value:c.id}))} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
         </div>
         ${field('Logo URL','logo_url')}
         ${field('Banner Image URL','banner_url')}
@@ -7914,31 +7914,31 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
         ${field('Display Order','display_order','number')}
         <div>
           <div className="text-[11px] text-zinc-500 mb-1">Status</div>
-          <${CustomSelect} value=${form.status} onChange=${v=>set('status',v)} options=${[{label:'Draft',value:'draft'},{label:'Published',value:'published'},{label:'Scheduled',value:'scheduled'},{label:'Hidden',value:'hidden'}]} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"/>
+          <${CustomSelect} value=${form.status} onChange=${v=>set('status',v)} options=${[{label:'Draft',value:'draft'},{label:'Published',value:'published'},{label:'Scheduled',value:'scheduled'},{label:'Hidden',value:'hidden'}]} className="w-full px-3 py-[8px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"/>
         </div>
       </div>
 
       <div className="mb-3">
         <div className="text-[11px] text-zinc-500 mb-1">Short Description</div>
-        <textarea value=${form.short_description} onChange=${e=>set('short_description',e.target.value)} className="w-full h-[60px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+        <textarea value=${form.short_description} onChange=${e=>set('short_description',e.target.value)} className="w-full h-[60px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
       </div>
       <div className="mb-3">
         <div className="text-[11px] text-zinc-500 mb-1">Full Description</div>
-        <textarea value=${form.full_description} onChange=${e=>set('full_description',e.target.value)} className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+        <textarea value=${form.full_description} onChange=${e=>set('full_description',e.target.value)} className="w-full h-[100px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
       </div>
       <div className="mb-3">
         <div className="text-[11px] text-zinc-500 mb-1">Features (one per line)</div>
-        <textarea value=${form.features} onChange=${e=>set('features',e.target.value)} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+        <textarea value=${form.features} onChange=${e=>set('features',e.target.value)} className="w-full h-[80px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
       </div>
       <div className="mb-3">
         <div className="text-[11px] text-zinc-500 mb-1">Why Zedith Recommends This</div>
-        <textarea value=${form.why_recommended} onChange=${e=>set('why_recommended',e.target.value)} className="w-full h-[70px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+        <textarea value=${form.why_recommended} onChange=${e=>set('why_recommended',e.target.value)} className="w-full h-[70px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
       </div>
       <div className="mb-4">
         ${field('Tags (comma separated)','tags')}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-zinc-50 dark:bg-[#242427] rounded-xl">
+      <div className="grid grid-cols-2 gap-3 mb-4 p-3 bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl">
         ${toggle('Featured','is_featured')}
         ${toggle('Sponsored','is_sponsored')}
         ${toggle('New Badge','is_new')}
@@ -7947,7 +7947,7 @@ function AdminPicksProductForm({product,categories,onClose,onSaved}){
 
       <div className="mb-5">
         <div className="text-[11px] text-zinc-500 mb-1">Admin Notes (internal only)</div>
-        <textarea value=${form.notes} onChange=${e=>set('notes',e.target.value)} className="w-full h-[50px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#242427] outline-none text-[12.5px]"></textarea>
+        <textarea value=${form.notes} onChange=${e=>set('notes',e.target.value)} className="w-full h-[50px] px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-[#0A0A0A] outline-none text-[12.5px]"></textarea>
       </div>
 
       <div className="flex gap-2">
