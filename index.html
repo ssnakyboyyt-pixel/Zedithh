@@ -1673,7 +1673,7 @@ function App(){
       ${module!=='chat' ? html`
       <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-page)] shrink-0 relative">
         <button onClick=${()=>setMobileSidebarOpen(true)} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
-          <${ZedithMark} size=${24} color="currentColor"/>
+          <${ZedithMark} size=${28} color="currentColor"/>
         </button>
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] text-[14.5px] font-[700]">
           Zedith AI
@@ -1701,11 +1701,11 @@ function LeftSidebar({collapsed, toggleCollapsed, onCloseMobile, module, setModu
   <aside className=${`w-[258px] ${collapsed?'md:w-[72px] md:border-r-0':'md:w-[248px]'} border-r shrink-0 h-full bg-white dark:bg-[var(--zed-surface)] border-zinc-200 dark:border-[var(--zed-border)] flex flex-col shadow-2xl md:shadow-none transition-all duration-200 overflow-hidden`}>
     <div className="h-[56px] px-[14px] flex items-center gap-[10px] border-b border-zinc-100 dark:border-[var(--zed-border)]">
       <button onClick=${toggleCollapsed} className=${`hidden md:flex items-center ${collapsed?'justify-center w-full':'gap-2'} p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition`} aria-label="Toggle sidebar">
-        <div className="w-[36px] h-[36px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${30} color="currentColor" strokeWidth=${2.2}/></div>
+        <div className="w-[40px] h-[40px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${34} color="currentColor" strokeWidth=${2.2}/></div>
         ${!collapsed ? html`<span className="display font-[800] text-[18px] tracking-tight">Zedith</span>` : null}
       </button>
       <div className="md:hidden flex items-center gap-2 flex-1">
-        <div className="w-[36px] h-[36px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${30} color="currentColor" strokeWidth=${2.2}/></div>
+        <div className="w-[40px] h-[40px] flex items-center justify-center text-zinc-900 dark:text-white shrink-0"><${ZedithMark} size=${34} color="currentColor" strokeWidth=${2.2}/></div>
         <span className="display font-[800] text-[18px] tracking-tight">Zedith</span>
       </div>
       <button onClick=${onCloseMobile} className="md:hidden p-[7px] rounded-[9px] hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto" aria-label="Close sidebar">
@@ -2036,7 +2036,7 @@ function ChatView({chat, chats, onSend, onNewChat, updateMessage, updateChat, pl
     <!-- Mobile header: hamburger, centered title, credits pill -->
     <div className="md:hidden h-[54px] px-3 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)] relative">
       <button onClick=${openSidebar} className="p-[6px] -ml-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Open sidebar">
-        <${ZedithMark} size=${24} color="currentColor"/>
+        <${ZedithMark} size=${28} color="currentColor"/>
       </button>
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] text-[14.5px] font-[700]">
         Zedith AI
@@ -3131,7 +3131,7 @@ ${top||'No video data yet.'}`;
     <div className="flex flex-col h-full">
       <div className="h-[52px] px-4 flex items-center justify-between border-b border-zinc-200 dark:border-[var(--zed-border)] shrink-0">
         <div className="flex items-center gap-2">
-          <${ZedithMark} size=${16} color="var(--zed)"/>
+          <${ZedithMark} size=${20} color="var(--zed)"/>
           <span className="font-[700] text-[13px] display">Ask Zedith</span>
         </div>
         <button onClick=${closePanel} className="p-[4px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"><${I} name="X" size=${17}/></button>
@@ -3164,8 +3164,8 @@ ${top||'No video data yet.'}`;
 
   return html`
     <!-- Trigger button -->
-    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Zedith" className="relative w-[30px] h-[30px] rounded-[9px] bg-zinc-900 flex items-center justify-center hover:opacity-85 transition">
-      <${ZedithMark} size=${16} color="white"/>
+    <button onClick=${()=>{ setOpen(true); setMobileSheet(true); }} title="Ask Zedith" className="relative w-[38px] h-[38px] rounded-[10px] bg-zinc-900 flex items-center justify-center hover:opacity-85 transition">
+      <${ZedithMark} size=${21} color="white"/>
     </button>
 
     <!-- Desktop: resizable side panel -->
