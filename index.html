@@ -50,18 +50,20 @@ function zedithLoadCDNTailwind(){
 <script src="./vendor/tailwind.js" onload="zedithApplyTailwindConfig()" onerror="zedithLoadCDNTailwind()"></script>
 <style>
 :root{
-  --zed:#FF7A00; --zed-600:#E86D00; --zed-light:#FF9433; --zed-lighter:#FFB066;
-  --zed-tint-bg:#fff4e9; --zed-tint-bg2:#ffe9d4;
-  --zed-solid:#FF7A00; --zed-solid-600:#E86D00;
+  --zed:#FF8A3D; --zed-600:#F5751F; --zed-light:#FFA666; --zed-lighter:#FFC199;
+  --zed-tint-bg:#fff5ec; --zed-tint-bg2:#ffe9d8;
+  --zed-solid:#FF8A3D; --zed-solid-600:#F5751F;
+  --zed-blue:#6C8CFF; --zed-blue-600:#5372E8; --zed-blue-tint-bg:#eef1ff; --zed-blue-tint-bg2:#e2e7ff;
   --zed-surface:#ffffff; --zed-surface2:#f7f7f8; --zed-page:#fbfaf7;
   --zed-border:#e4e4e7; --zed-active:#f0f0f1;
   --zed-gold:#d4a24c; --zed-gold-bg:#fdf6ea;
   --zed-text:#27272a;
 }
 .dark{
-  --zed:#FF7A00; --zed-600:#E86D00; --zed-light:#FF9433; --zed-lighter:#FFB066;
+  --zed:#FF8A3D; --zed-600:#F5751F; --zed-light:#FFA666; --zed-lighter:#FFC199;
   --zed-tint-bg:#1a1108; --zed-tint-bg2:#20140a;
-  --zed-solid:#FF7A00; --zed-solid-600:#E86D00;
+  --zed-solid:#FF8A3D; --zed-solid-600:#F5751F;
+  --zed-blue:#7C9BFF; --zed-blue-600:#6C8CFF; --zed-blue-tint-bg:#141a2e; --zed-blue-tint-bg2:#1a2238;
   --zed-surface:#0A0A0A; --zed-surface2:#050505; --zed-page:#000000;
   --zed-border:#1A1A1A; --zed-active:#141414;
   --zed-gold:#d4a24c; --zed-gold-bg:#2a2416;
@@ -167,7 +169,7 @@ function toast(msg,type='ok'){
   el.className=`flex items-center gap-2 pl-3 pr-4 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border ${type==='err'?'bg-red-600/95 border-red-500/40 text-white':'bg-zinc-900/95 dark:bg-[var(--zed-surface)]/95 border-[var(--zed)]/25 text-white'}`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
-  dot.className=`w-[6px] h-[6px] rounded-full shrink-0 ${type==='err'?'bg-white':'bg-[#5dc3cf]'}`;
+  dot.className=`w-[6px] h-[6px] rounded-full shrink-0 ${type==='err'?'bg-white':'bg-[#6C8CFF]'}`;
   const label=document.createElement('span');
   label.textContent=msg;
   el.appendChild(dot); el.appendChild(label);
@@ -184,13 +186,13 @@ function toastUndo(msg,onUndo,onExpire){
   el.className=`flex items-center gap-3 pl-3 pr-3 py-[10px] rounded-[12px] text-[12.5px] font-[550] shadow-[0_8px_24px_rgba(0,0,0,0.18)] fade-in backdrop-blur-md border bg-zinc-900/95 dark:bg-[var(--zed-surface)]/95 border-[var(--zed)]/25 text-white`;
   el.style.transition='opacity .2s ease, transform .2s ease';
   const dot=document.createElement('span');
-  dot.className='w-[6px] h-[6px] rounded-full shrink-0 bg-[#5dc3cf]';
+  dot.className='w-[6px] h-[6px] rounded-full shrink-0 bg-[#6C8CFF]';
   const label=document.createElement('span');
   label.textContent=msg;
   label.className='flex-1';
   const undoBtn=document.createElement('button');
   undoBtn.textContent='Undo';
-  undoBtn.className='text-[#5dc3cf] font-[700] hover:text-white transition-colors shrink-0';
+  undoBtn.className='text-[#6C8CFF] font-[700] hover:text-white transition-colors shrink-0';
   let done=false;
   const dismiss=(ranUndo)=>{
     if(done) return; done=true;
@@ -907,7 +909,7 @@ function TypingMarkdown({text, sources, className='', onDone}){
 }
 
 // ---------- App ----------
-function ZedithMark({size=14, color='currentColor', accent='#E8622C', strokeWidth=2.4}){
+function ZedithMark({size=14, color='currentColor', accent='#FF7A00', strokeWidth=2.4}){
   // Twin-spark mark: two mirrored 5-ray sparks meeting at center — mentor + creator.
   return html`<svg width=${size} height=${size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g stroke=${color} stroke-width=${strokeWidth} stroke-linecap="round">
@@ -5630,9 +5632,9 @@ function UpgradeView({plan, planConfig, onPlan}) {
           const {display, sub} = getPrice(p.k);
           return html`
           <div key=${p.k} className=${`relative rounded-[22px] border p-[26px] flex flex-col transition ${p.popular ? 'border-[var(--zed)]/60 bg-white dark:bg-[var(--zed-surface)] shadow-[0_8px_40px_rgba(0,0,0,0.14)]' : ''} ${p.best ? 'border-amber-300/60 bg-white dark:bg-[var(--zed-surface)]' : ''} ${!p.popular && !p.best ? 'border-zinc-200 dark:border-[var(--zed-border)] bg-white dark:bg-[var(--zed-surface)]' : ''}`}>
-            ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#5dc3cf] text-white'}`}>${p.badge}</div>`:null}
+            ${p.badge ? html`<div className=${`absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] px-3 py-[5px] rounded-full font-[700] shadow ${p.best ? 'bg-amber-300 text-zinc-900' : 'bg-[#6C8CFF] text-white'}`}>${p.badge}</div>`:null}
             <div className="text-zinc-400 mb-2 mt-2">
-              ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#5dc3cf]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
+              ${p.k==='free' ? html`<${I} name="Send" size=${18}/>` : p.k==='pro' ? html`<${I} name="Zap" size=${18} className="text-[#6C8CFF]"/>` : html`<${I} name="Crown" size=${20} className="text-amber-500"/>`}
             </div>
             <div className=${`text-[22px] font-[800] display ${p.k==='pro'?'text-[var(--zed)]':''} ${p.k==='elite'?'text-zinc-900 dark:text-amber-200':''}`}>${p.name}</div>
             <div className="text-[12px] text-zinc-500 dark:text-zinc-400 min-h-[34px]">${p.k==='free'?'Explore Zedith with essential features.':p.k==='pro'?'More power, more creativity.':'Unlimited creativity. Ultimate everything.'}</div>
